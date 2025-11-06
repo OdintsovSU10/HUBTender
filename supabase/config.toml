@@ -1,0 +1,31 @@
+# Supabase Local Development Configuration
+
+[api]
+enabled = true
+port = 54321
+max_rows = 1000
+
+[db]
+port = 54322
+pool_size = 10
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:3000"]
+
+[auth.email]
+enable_confirmations = false
+
+[storage]
+enabled = true
+
+[storage.image_transformation]
+enabled = true
+
+# Project specific settings
+[functions]
+enabled = true
