@@ -9,7 +9,14 @@
       "Bash(gh auth:*)",
       "Bash(git config:*)",
       "Bash(git remote set-url:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build)",
+      "Bash(supabase status:*)"
     ],
     "deny": [],
     "ask": []

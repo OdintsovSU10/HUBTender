@@ -7,8 +7,8 @@ interface LogoIconProps {
 }
 
 /**
- * Modern construction/building logo icon for TenderHub
- * Features a geometric building/crane design suitable for sidebar logo
+ * TenderHub by SU10 logo icon
+ * Professional construction tender management logo with building and crane elements
  */
 export const LogoIcon: React.FC<LogoIconProps> = ({
   size = 24,
@@ -19,97 +19,119 @@ export const LogoIcon: React.FC<LogoIconProps> = ({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 512 512"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       role="img"
-      aria-label="TenderHub Logo"
+      aria-label="TenderHub by SU10 Logo"
     >
-      {/* Base building structure */}
-      <path
-        d="M3 21V9L8 5L13 9V21H3Z"
-        fill={color}
-        fillOpacity="0.2"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {/* Background Circle */}
+      <circle cx="256" cy="256" r="240" fill="url(#bgGradient)" opacity="0.1"/>
 
-      {/* Building windows */}
-      <rect
-        x="5"
-        y="11"
-        width="2"
-        height="2"
-        fill={color}
-        rx="0.5"
-      />
-      <rect
-        x="9"
-        y="11"
-        width="2"
-        height="2"
-        fill={color}
-        rx="0.5"
-      />
-      <rect
-        x="5"
-        y="15"
-        width="2"
-        height="2"
-        fill={color}
-        rx="0.5"
-      />
-      <rect
-        x="9"
-        y="15"
-        width="2"
-        height="2"
-        fill={color}
-        rx="0.5"
-      />
+      {/* Main Building Structure */}
+      <g id="building">
+        {/* Left Wing */}
+        <path d="M120 380 L120 200 L180 200 L180 380 Z" fill="url(#primaryGradient)"/>
+        <rect x="135" y="220" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="135" y="260" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="135" y="300" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="135" y="340" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
 
-      {/* Crane tower */}
-      <path
-        d="M15 21V7"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+        {/* Center Tower */}
+        <path d="M200 380 L200 160 L280 160 L280 380 Z" fill="url(#accentGradient)"/>
+        <rect x="215" y="180" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="245" y="180" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="215" y="220" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="245" y="220" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="215" y="260" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="245" y="260" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="215" y="300" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="245" y="300" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="215" y="340" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
+        <rect x="245" y="340" width="20" height="25" rx="2" fill="#ffffff" opacity="0.95"/>
 
-      {/* Crane arm */}
-      <path
-        d="M13 7H21"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+        {/* Right Wing */}
+        <path d="M300 380 L300 220 L360 220 L360 380 Z" fill="url(#primaryGradient)"/>
+        <rect x="315" y="240" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="315" y="280" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="315" y="320" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="330" y="240" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="330" y="280" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+        <rect x="330" y="320" width="15" height="20" rx="2" fill="#ffffff" opacity="0.9"/>
+      </g>
 
-      {/* Crane hook */}
-      <path
-        d="M19 7V11"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      {/* Crane Element */}
+      <g id="crane">
+        <rect x="370" y="240" width="8" height="100" fill="#059669" opacity="0.8"/>
+        <rect x="320" y="236" width="110" height="6" rx="3" fill="url(#craneGradient)"/>
+        <line x1="340" y1="242" x2="340" y2="270" stroke="#10b981" strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="340" cy="275" r="4" fill="#10b981"/>
+      </g>
 
-      {/* Crane counterweight */}
-      <circle
-        cx="15"
-        cy="7"
-        r="1.5"
-        fill={color}
-      />
+      {/* Document/Tender Symbol */}
+      <g id="document" transform="translate(145, 110)">
+        <rect x="0" y="0" width="50" height="60" rx="6" fill="#ffffff" stroke="url(#primaryGradient)" strokeWidth="3"/>
+        <line x1="10" y1="15" x2="40" y2="15" stroke="#10b981" strokeWidth="3" strokeLinecap="round"/>
+        <line x1="10" y1="27" x2="40" y2="27" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+        <line x1="10" y1="37" x2="35" y2="37" stroke="#0891b2" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+        <circle cx="13" cy="47" r="2" fill="#10b981"/>
+        <line x1="18" y1="47" x2="40" y2="47" stroke="#059669" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
+      </g>
 
-      {/* Ground line */}
-      <path
-        d="M2 21H22"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      {/* SU10 Badge */}
+      <g id="su10-badge">
+        <rect x="310" y="105" width="85" height="42" rx="21" fill="url(#badgeGradient)" stroke="#ffffff" strokeWidth="2"/>
+        <text x="352" y="133" fontFamily="Arial, sans-serif" fontSize="22" fontWeight="bold" fill="#ffffff" textAnchor="middle" letterSpacing="1">SU10</text>
+      </g>
+
+      {/* Base Foundation */}
+      <rect x="100" y="380" width="280" height="12" rx="6" fill="url(#foundationGradient)"/>
+
+      {/* Decorative Tech Lines */}
+      <g id="tech-lines" opacity="0.3">
+        <line x1="80" y1="160" x2="100" y2="160" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"/>
+        <line x1="80" y1="200" x2="100" y2="200" stroke="#10b981" strokeWidth="2" strokeLinecap="round"/>
+        <line x1="80" y1="240" x2="100" y2="240" stroke="#0891b2" strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="70" cy="160" r="4" fill="#0891b2"/>
+        <circle cx="70" cy="200" r="4" fill="#10b981"/>
+        <circle cx="70" cy="240" r="4" fill="#0891b2"/>
+      </g>
+
+      {/* Gradients */}
+      <defs>
+        <linearGradient id="primaryGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#059669', stopOpacity: 1 }} />
+        </linearGradient>
+
+        <linearGradient id="accentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style={{ stopColor: '#0891b2', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#0e7490', stopOpacity: 1 }} />
+        </linearGradient>
+
+        <linearGradient id="craneGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style={{ stopColor: '#059669', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+        </linearGradient>
+
+        <linearGradient id="badgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+          <stop offset="50%" style={{ stopColor: '#059669', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#0891b2', stopOpacity: 1 }} />
+        </linearGradient>
+
+        <linearGradient id="foundationGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style={{ stopColor: '#059669', stopOpacity: 0.8 }} />
+          <stop offset="50%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#059669', stopOpacity: 0.8 }} />
+        </linearGradient>
+
+        <radialGradient id="bgGradient">
+          <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#0891b2', stopOpacity: 1 }} />
+        </radialGradient>
+      </defs>
     </svg>
   );
 };

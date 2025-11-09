@@ -131,11 +131,35 @@ const Dashboard: React.FC = () => {
           <div className="header-icon">
             <HeaderIcon size={64} color="#ffffff" />
           </div>
-          <Title level={2} style={{ color: '#fff', margin: '16px 0 8px 0' }}>
-            Добро пожаловать в TenderHub
+          <Title level={2} style={{
+            color: '#fff',
+            margin: '16px 0 8px 0',
+            letterSpacing: '-0.5px',
+            fontWeight: 700
+          }}>
+            Добро пожаловать в TenderHUB
           </Title>
-          <Text style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '16px' }}>
+          <Text style={{
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: '16px',
+            display: 'block'
+          }}>
             Система управления тендерами и строительными расчетами
+          </Text>
+          <Text style={{
+            color: '#ffffff',
+            fontSize: '13px',
+            marginTop: '8px',
+            display: 'inline-block',
+            padding: '4px 12px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            fontWeight: 500,
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase'
+          }}>
+            by SU_10
           </Text>
         </div>
       </div>

@@ -1,0 +1,72 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simplified logo for small sizes and icons -->
+
+  <!-- Main Building Structure - Simplified -->
+  <g id="building">
+    <!-- Left Wing -->
+    <path d="M20 100 L20 50 L40 50 L40 100 Z" fill="url(#primaryGradient)"/>
+    <rect x="26" y="60" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
+    <rect x="26" y="80" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
+
+    <!-- Center Tower -->
+    <path d="M45 100 L45 35 L75 35 L75 100 Z" fill="url(#accentGradient)"/>
+    <rect x="52" y="45" width="8" height="10" rx="1" fill="#ffffff" opacity="0.95"/>
+    <rect x="63" y="45" width="8" height="10" rx="1" fill="#ffffff" opacity="0.95"/>
+    <rect x="52" y="62" width="8" height="10" rx="1" fill="#ffffff" opacity="0.95"/>
+    <rect x="63" y="62" width="8" height="10" rx="1" fill="#ffffff" opacity="0.95"/>
+    <rect x="52" y="79" width="8" height="10" rx="1" fill="#ffffff" opacity="0.95"/>
+    <rect x="63" y="79" width="8" height="10" rx="1" fill="#ffffff" opacity="0.95"/>
+
+    <!-- Right Wing -->
+    <path d="M80 100 L80 55 L100 55 L100 100 Z" fill="url(#primaryGradient)"/>
+    <rect x="86" y="65" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
+    <rect x="86" y="85" width="8" height="10" rx="1" fill="#ffffff" opacity="0.9"/>
+  </g>
+
+  <!-- Crane Element - Simplified -->
+  <g id="crane">
+    <rect x="102" y="60" width="3" height="40" fill="#059669"/>
+    <rect x="85" y="58" width="25" height="3" rx="1.5" fill="url(#craneGradient)"/>
+    <line x1="92" y1="61" x2="92" y2="72" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="92" cy="74" r="2" fill="#10b981"/>
+  </g>
+
+  <!-- SU10 Badge - Simplified -->
+  <g id="su10-badge">
+    <rect x="30" y="15" width="68" height="24" rx="12" fill="url(#badgeGradient)" stroke="#ffffff" strokeWidth="1.5"/>
+    <text x="64" y="32" fontFamily="Arial, sans-serif" fontSize="14" fontWeight="bold" fill="#ffffff" textAnchor="middle" letterSpacing="0.5">SU10</text>
+  </g>
+
+  <!-- Base Foundation -->
+  <rect x="15" y="100" width="90" height="6" rx="3" fill="url(#foundationGradient)"/>
+
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="primaryGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0891b2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0e7490;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="craneGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="badgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="foundationGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+</svg>

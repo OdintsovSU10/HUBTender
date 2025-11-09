@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Layout, Menu, Avatar, Badge, Input, Switch, theme } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   HomeOutlined,
   DashboardOutlined,
@@ -16,6 +17,9 @@ import {
   LogoutOutlined,
   SunOutlined,
   MoonOutlined,
+  ProfileOutlined,
+  FileTextOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -37,7 +41,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
     token: { colorBgContainer },
   } = theme.useToken();
 
-  const menuItems = [
+  const menuItems: MenuProps['items'] = [
     {
       key: '/',
       icon: <HomeOutlined />,
@@ -69,9 +73,26 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       label: 'Затраты на строительство',
     },
     {
-      key: '/admin',
+      key: 'admin',
       icon: <SettingOutlined />,
       label: 'Администрирование',
+      children: [
+        {
+          key: '/admin/nomenclatures',
+          icon: <ProfileOutlined />,
+          label: 'Номенклатуры',
+        },
+        {
+          key: '/admin/tenders',
+          icon: <FileTextOutlined />,
+          label: 'Тендеры',
+        },
+        {
+          key: '/admin/construction_cost',
+          icon: <BankOutlined />,
+          label: 'Затраты строительства',
+        },
+      ],
     },
     {
       key: '/users',
@@ -85,7 +106,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
     },
   ];
 
-  const handleMenuClick = (e: any) => {
+  const handleMenuClick: MenuProps['onClick'] = (e) => {
     navigate(e.key);
   };
 
@@ -102,16 +123,32 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
         }}
         width={250}
       >
-        <div className={`logo logo-${currentTheme}`}>
-          <span className="logo-icon">
-            <LogoIcon size={28} color={currentTheme === 'dark' ? '#10b981' : '#059669'} />
-          </span>
-          {!collapsed && <span className="logo-text">TenderHub</span>}
+        <div
+          className={`logo logo-${currentTheme}`}
+          onClick={() => navigate('/')}
+          style={{ cursor: 'pointer' }}
+        >
+          {collapsed ? (
+            <div className="logo-collapsed">
+              <LogoIcon size={48} color={currentTheme === 'dark' ? '#10b981' : '#ffffff'} />
+            </div>
+          ) : (
+            <div className="logo-expanded">
+              <div className="logo-icon-wrapper">
+                <LogoIcon size={52} color={currentTheme === 'dark' ? '#10b981' : '#ffffff'} />
+              </div>
+              <div className="logo-text-wrapper">
+                <div className="logo-title">TenderHUB</div>
+                <div className="logo-subtitle">by SU_10</div>
+              </div>
+            </div>
+          )}
         </div>
         <Menu
           theme={currentTheme}
           mode="inline"
           selectedKeys={[location.pathname]}
+          defaultOpenKeys={location.pathname.startsWith('/admin') ? ['admin'] : []}
           items={menuItems}
           onClick={handleMenuClick}
           style={{

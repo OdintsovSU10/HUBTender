@@ -4,7 +4,13 @@ import { ConfigProvider, theme } from 'antd';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard/Dashboard';
+import Nomenclatures from './pages/Admin/Nomenclatures/Nomenclatures';
+import Tenders from './pages/Admin/Tenders/Tenders';
+import ConstructionCost from './pages/Admin/ConstructionCost/ConstructionCost';
 import './App.css';
+
+// Временный импорт для тестирования Supabase (удалить после проверки)
+import './test-supabase';
 
 function AppContent() {
   const { theme: currentTheme } = useTheme();
@@ -28,7 +34,12 @@ function AppContent() {
           <Route path="commerce" element={<div>Коммерция</div>} />
           <Route path="library" element={<div>Библиотеки</div>} />
           <Route path="costs" element={<div>Затраты на строительство</div>} />
-          <Route path="admin" element={<div>Администрирование</div>} />
+          <Route path="admin">
+            <Route index element={<Navigate to="/admin/nomenclatures" replace />} />
+            <Route path="nomenclatures" element={<Nomenclatures />} />
+            <Route path="tenders" element={<Tenders />} />
+            <Route path="construction_cost" element={<ConstructionCost />} />
+          </Route>
           <Route path="users" element={<div>Пользователи</div>} />
           <Route path="settings" element={<div>Настройки</div>} />
         </Route>

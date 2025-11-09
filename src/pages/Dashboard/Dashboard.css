@@ -26,10 +26,23 @@
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
 }
 
-/* Dark Theme Header - Green/Teal Gradient */
+/* Dark Theme Header - Darker Green/Teal Gradient with overlay */
 .dashboard-dark .dashboard-header-section {
-  background: linear-gradient(135deg, #1a5f7a 0%, #159957 100%);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #0d3542 0%, #0b4d2e 100%);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+/* Additional overlay for depth in dark mode */
+.dashboard-dark .dashboard-header-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(8, 145, 178, 0.15) 100%);
+  pointer-events: none;
 }
 
 /* Light Theme Header - Green/Teal Gradient */

@@ -2,24 +2,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 64px;
+  padding: 20px 16px;
   margin: 16px;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
 
 /* Dark theme logo */
 .logo-dark {
   background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .logo-dark:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.logo-dark .logo-text {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(16, 185, 129, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
 /* Light theme logo */
@@ -30,23 +30,69 @@
 
 .logo-light:hover {
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+  transform: translateY(-2px);
 }
 
-.logo-light .logo-text {
+/* Logo collapsed state (only icon) */
+.logo-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Logo expanded state (icon + text) */
+.logo-expanded {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.logo-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo-text-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.logo-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
   color: #ffffff;
-  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.logo-subtitle {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.85;
+  color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.logo-icon {
-  font-size: 24px;
+/* Dark theme text adjustments */
+.logo-dark .logo-title {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.logo-text {
-  font-size: 18px;
-  font-weight: 600;
-  margin-left: 12px;
+.logo-dark .logo-subtitle {
+  color: #10b981;
+  opacity: 1;
+  text-shadow: none;
 }
 
 /* Ant Design Menu Overrides */

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TenderHub by SU10 - Превью логотипа</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #059669;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 40px;
+      font-size: 1.2em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .card h2 {
+      color: #059669;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+      text-align: center;
+    }
+
+    .logo-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 15px;
+    }
+
+    .logo-container.light {
+      background: #f0f2f5;
+    }
+
+    .logo-container.dark {
+      background: #141414;
+    }
+
+    .size-label {
+      text-align: center;
+      color: #666;
+      font-size: 0.9em;
+      margin-top: 10px;
+      font-weight: 500;
+    }
+
+    .colors {
+      margin-top: 30px;
+    }
+
+    .color-palette {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .color-item {
+      text-align: center;
+    }
+
+    .color-box {
+      width: 100%;
+      height: 80px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .color-name {
+      font-size: 0.85em;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .color-value {
+      font-size: 0.75em;
+      color: #666;
+      font-family: 'Courier New', monospace;
+    }
+
+    .usage {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .usage h2 {
+      color: #059669;
+      margin-bottom: 20px;
+    }
+
+    .usage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .usage-item {
+      text-align: center;
+      padding: 20px;
+      background: #f0f2f5;
+      border-radius: 12px;
+    }
+
+    .usage-item strong {
+      display: block;
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 0.9em;
+    }
+
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #10b981, #059669, #0891b2);
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin: 10px 0;
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2em;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TenderHub by SU10</h1>
+    <p class="subtitle">Профессиональный логотип для системы управления строительными тендерами</p>
+    <div style="text-align: center; margin-bottom: 30px;">
+      <span class="badge">SU10</span>
+    </div>
+
+    <div class="grid">
+      <!-- Полный логотип на светлом фоне -->
+      <div class="card">
+        <h2>Полный логотип</h2>
+        <div class="logo-container light">
+          <img src="/logo.svg" alt="TenderHub Logo" style="width: 200px; height: 200px;">
+        </div>
+        <div class="size-label">512x512 px • Светлая тема</div>
+      </div>
+
+      <!-- Полный логотип на темном фоне -->
+      <div class="card">
+        <h2>Темная тема</h2>
+        <div class="logo-container dark">
+          <img src="/logo.svg" alt="TenderHub Logo" style="width: 200px; height: 200px;">
+        </div>
+        <div class="size-label">512x512 px • Темная тема</div>
+      </div>
+
+      <!-- Упрощенный логотип -->
+      <div class="card">
+        <h2>Упрощенная версия</h2>
+        <div class="logo-container light">
+          <img src="/logo-simple.svg" alt="TenderHub Logo Simple" style="width: 120px; height: 120px;">
+        </div>
+        <div class="size-label">128x128 px • Для иконок</div>
+      </div>
+    </div>
+
+    <!-- Различные размеры -->
+    <div class="card">
+      <h2>Масштабирование</h2>
+      <div style="display: flex; justify-content: space-around; align-items: flex-end; flex-wrap: wrap; gap: 20px; padding: 20px;">
+        <div style="text-align: center;">
+          <img src="/logo-simple.svg" alt="16px" style="width: 16px; height: 16px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">16px</span>
+        </div>
+        <div style="text-align: center;">
+          <img src="/logo-simple.svg" alt="24px" style="width: 24px; height: 24px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">24px</span>
+        </div>
+        <div style="text-align: center;">
+          <img src="/logo-simple.svg" alt="32px" style="width: 32px; height: 32px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">32px</span>
+        </div>
+        <div style="text-align: center;">
+          <img src="/logo-simple.svg" alt="48px" style="width: 48px; height: 48px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">48px</span>
+        </div>
+        <div style="text-align: center;">
+          <img src="/logo.svg" alt="64px" style="width: 64px; height: 64px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">64px</span>
+        </div>
+        <div style="text-align: center;">
+          <img src="/logo.svg" alt="96px" style="width: 96px; height: 96px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">96px</span>
+        </div>
+        <div style="text-align: center;">
+          <img src="/logo.svg" alt="128px" style="width: 128px; height: 128px; display: block; margin: 0 auto 10px;">
+          <span style="font-size: 0.8em; color: #666;">128px</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Цветовая палитра -->
+    <div class="card colors">
+      <h2>Цветовая схема</h2>
+      <div class="color-palette">
+        <div class="color-item">
+          <div class="color-box" style="background: #10b981;"></div>
+          <div class="color-name">Primary</div>
+          <div class="color-value">#10b981</div>
+        </div>
+        <div class="color-item">
+          <div class="color-box" style="background: #059669;"></div>
+          <div class="color-name">Primary Dark</div>
+          <div class="color-value">#059669</div>
+        </div>
+        <div class="color-item">
+          <div class="color-box" style="background: #0891b2;"></div>
+          <div class="color-name">Accent</div>
+          <div class="color-value">#0891b2</div>
+        </div>
+        <div class="color-item">
+          <div class="color-box" style="background: #0e7490;"></div>
+          <div class="color-name">Accent Dark</div>
+          <div class="color-value">#0e7490</div>
+        </div>
+        <div class="color-item">
+          <div class="color-box" style="background: linear-gradient(180deg, #10b981 0%, #059669 100%);"></div>
+          <div class="color-name">Primary Gradient</div>
+          <div class="color-value">Vertical</div>
+        </div>
+        <div class="color-item">
+          <div class="color-box" style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #0891b2 100%);"></div>
+          <div class="color-name">Badge Gradient</div>
+          <div class="color-value">Diagonal</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Применение -->
+    <div class="usage">
+      <h2>Рекомендуемое применение</h2>
+      <div class="usage-grid">
+        <div class="usage-item">
+          <img src="/logo-simple.svg" alt="Favicon" style="width: 32px; height: 32px; display: block; margin: 0 auto 10px;">
+          <strong>Favicon</strong>
+          <div style="font-size: 0.85em; color: #666;">16-48px</div>
+        </div>
+        <div class="usage-item">
+          <img src="/logo-simple.svg" alt="Sidebar" style="width: 28px; height: 28px; display: block; margin: 0 auto 10px;">
+          <strong>Сайдбар</strong>
+          <div style="font-size: 0.85em; color: #666;">24-32px</div>
+        </div>
+        <div class="usage-item">
+          <img src="/logo.svg" alt="Header" style="width: 40px; height: 40px; display: block; margin: 0 auto 10px;">
+          <strong>Хедер</strong>
+          <div style="font-size: 0.85em; color: #666;">32-48px</div>
+        </div>
+        <div class="usage-item">
+          <img src="/logo.svg" alt="Card" style="width: 64px; height: 64px; display: block; margin: 0 auto 10px;">
+          <strong>Карточки</strong>
+          <div style="font-size: 0.85em; color: #666;">64-96px</div>
+        </div>
+        <div class="usage-item">
+          <img src="/logo.svg" alt="Page" style="width: 80px; height: 80px; display: block; margin: 0 auto 10px;">
+          <strong>Страницы</strong>
+          <div style="font-size: 0.85em; color: #666;">128-256px</div>
+        </div>
+        <div class="usage-item">
+          <img src="/logo.svg" alt="Print" style="width: 96px; height: 96px; display: block; margin: 0 auto 10px;">
+          <strong>Печать</strong>
+          <div style="font-size: 0.85em; color: #666;">512px+</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
+      <p>© 2024 СУ-10 (SU10). Все права защищены.</p>
+      <p style="margin-top: 10px;">Логотип TenderHub by SU10</p>
+    </div>
+  </div>
+</body>
+</html>

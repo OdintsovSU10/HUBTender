@@ -1,5 +1,5 @@
 -- Database Schema Export
--- Generated: 2025-11-08T18:44:36.721937
+-- Generated: 2025-11-08T19:30:12.373601
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -38,6 +38,7 @@ CREATE TYPE auth.oauth_client_type AS ENUM ('public', 'confidential');
 CREATE TYPE auth.oauth_registration_type AS ENUM ('dynamic', 'manual');
 CREATE TYPE auth.oauth_response_type AS ENUM ('code');
 CREATE TYPE auth.one_time_token_type AS ENUM ('confirmation_token', 'reauthentication_token', 'recovery_token', 'email_change_token_new', 'email_change_token_current', 'phone_change_token');
+CREATE TYPE public.unit_type AS ENUM ('шт', 'м', 'м2', 'м3', 'кг', 'т', 'л', 'компл', 'м.п.');
 CREATE TYPE realtime.action AS ENUM ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'ERROR');
 CREATE TYPE realtime.equality_op AS ENUM ('eq', 'neq', 'lt', 'lte', 'gt', 'gte', 'in');
 CREATE TYPE storage.buckettype AS ENUM ('STANDARD', 'ANALYTICS');
@@ -382,6 +383,144 @@ CREATE TABLE IF NOT EXISTS auth.users (
 
 COMMENT ON TABLE auth.users IS 'Auth: Stores user login data within a secure schema.';
 COMMENT ON COLUMN auth.users.is_sso_user IS 'Auth: Set this column to true when the account comes from SSO. These accounts can have duplicate emails.';
+
+-- Категории затрат
+CREATE TABLE IF NOT EXISTS public.cost_categories (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    name text NOT NULL,
+    unit USER-DEFINED NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT cost_categories_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE public.cost_categories IS 'Категории затрат';
+COMMENT ON COLUMN public.cost_categories.id IS 'Уникальный идентификатор категории затрат';
+COMMENT ON COLUMN public.cost_categories.name IS 'Наименование категории затрат';
+COMMENT ON COLUMN public.cost_categories.unit IS 'Единица измерения';
+COMMENT ON COLUMN public.cost_categories.created_at IS 'Дата создания записи';
+COMMENT ON COLUMN public.cost_categories.updated_at IS 'Дата последнего обновления записи';
+
+-- Детализированные категории затрат с привязкой к локациям
+CREATE TABLE IF NOT EXISTS public.detail_cost_categories (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    cost_category_id uuid NOT NULL,
+    location_id uuid NOT NULL,
+    name text NOT NULL,
+    unit USER-DEFINED NOT NULL,
+    order_num integer(32) DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT detail_cost_categories_cost_category_id_fkey FOREIGN KEY (cost_category_id) REFERENCES None.None(None),
+    CONSTRAINT detail_cost_categories_location_id_fkey FOREIGN KEY (location_id) REFERENCES None.None(None),
+    CONSTRAINT detail_cost_categories_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE public.detail_cost_categories IS 'Детализированные категории затрат с привязкой к локациям';
+COMMENT ON COLUMN public.detail_cost_categories.id IS 'Уникальный идентификатор детализированной категории';
+COMMENT ON COLUMN public.detail_cost_categories.cost_category_id IS 'Ссылка на категорию затрат';
+COMMENT ON COLUMN public.detail_cost_categories.location_id IS 'Ссылка на локацию';
+COMMENT ON COLUMN public.detail_cost_categories.name IS 'Наименование детализированной категории';
+COMMENT ON COLUMN public.detail_cost_categories.unit IS 'Единица измерения';
+COMMENT ON COLUMN public.detail_cost_categories.order_num IS 'Порядковый номер для сортировки';
+COMMENT ON COLUMN public.detail_cost_categories.created_at IS 'Дата создания записи';
+COMMENT ON COLUMN public.detail_cost_categories.updated_at IS 'Дата последнего обновления записи';
+
+-- Справочник локаций/местоположений
+CREATE TABLE IF NOT EXISTS public.locations (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    location text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT locations_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE public.locations IS 'Справочник локаций/местоположений';
+COMMENT ON COLUMN public.locations.id IS 'Уникальный идентификатор локации';
+COMMENT ON COLUMN public.locations.location IS 'Наименование локации';
+COMMENT ON COLUMN public.locations.created_at IS 'Дата создания записи';
+COMMENT ON COLUMN public.locations.updated_at IS 'Дата последнего обновления записи';
+
+-- Справочник наименований материалов
+CREATE TABLE IF NOT EXISTS public.material_names (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    name text NOT NULL,
+    unit USER-DEFINED NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT material_names_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE public.material_names IS 'Справочник наименований материалов';
+COMMENT ON COLUMN public.material_names.id IS 'Уникальный идентификатор материала (UUID)';
+COMMENT ON COLUMN public.material_names.name IS 'Наименование материала';
+COMMENT ON COLUMN public.material_names.unit IS 'Единица измерения материала';
+COMMENT ON COLUMN public.material_names.created_at IS 'Дата и время создания записи';
+COMMENT ON COLUMN public.material_names.updated_at IS 'Дата и время последнего обновления';
+
+-- Основная таблица для хранения информации о тендерах
+CREATE TABLE IF NOT EXISTS public.tenders (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    title text NOT NULL,
+    description text,
+    client_name text NOT NULL,
+    tender_number text NOT NULL,
+    submission_deadline timestamp with time zone,
+    version integer(32) DEFAULT 1,
+    area_client numeric(12,2),
+    area_sp numeric(12,2),
+    usd_rate numeric(10,4),
+    eur_rate numeric(10,4),
+    cny_rate numeric(10,4),
+    upload_folder text,
+    bsm_link text,
+    tz_link text,
+    qa_form_link text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    created_by uuid,
+    CONSTRAINT tenders_created_by_fkey FOREIGN KEY (created_by) REFERENCES None.None(None),
+    CONSTRAINT tenders_pkey PRIMARY KEY (id),
+    CONSTRAINT tenders_tender_number_key UNIQUE (tender_number)
+);
+
+COMMENT ON TABLE public.tenders IS 'Основная таблица для хранения информации о тендерах';
+COMMENT ON COLUMN public.tenders.id IS 'Уникальный идентификатор тендера (UUID)';
+COMMENT ON COLUMN public.tenders.title IS 'Название тендера';
+COMMENT ON COLUMN public.tenders.description IS 'Подробное описание тендера';
+COMMENT ON COLUMN public.tenders.client_name IS 'Наименование заказчика';
+COMMENT ON COLUMN public.tenders.tender_number IS 'Номер тендера (уникальный, текст+цифры)';
+COMMENT ON COLUMN public.tenders.submission_deadline IS 'Дата и время окончания приема заявок';
+COMMENT ON COLUMN public.tenders.version IS 'Версия тендера';
+COMMENT ON COLUMN public.tenders.area_client IS 'Площадь объекта заказчика (м²)';
+COMMENT ON COLUMN public.tenders.area_sp IS 'Площадь СП (м²)';
+COMMENT ON COLUMN public.tenders.usd_rate IS 'Курс доллара США';
+COMMENT ON COLUMN public.tenders.eur_rate IS 'Курс евро';
+COMMENT ON COLUMN public.tenders.cny_rate IS 'Курс китайского юаня';
+COMMENT ON COLUMN public.tenders.upload_folder IS 'Ссылка на папку с загруженными файлами';
+COMMENT ON COLUMN public.tenders.bsm_link IS 'Ссылка на БСМ (Bill of Materials)';
+COMMENT ON COLUMN public.tenders.tz_link IS 'Ссылка на техническое задание';
+COMMENT ON COLUMN public.tenders.qa_form_link IS 'Ссылка на форму вопросов и ответов';
+COMMENT ON COLUMN public.tenders.created_at IS 'Дата и время создания записи';
+COMMENT ON COLUMN public.tenders.updated_at IS 'Дата и время последнего обновления';
+COMMENT ON COLUMN public.tenders.created_by IS 'ID пользователя, создавшего тендер';
+
+-- Справочник наименований работ
+CREATE TABLE IF NOT EXISTS public.work_names (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    name text NOT NULL,
+    unit USER-DEFINED NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT work_names_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE public.work_names IS 'Справочник наименований работ';
+COMMENT ON COLUMN public.work_names.id IS 'Уникальный идентификатор работы (UUID)';
+COMMENT ON COLUMN public.work_names.name IS 'Наименование работы';
+COMMENT ON COLUMN public.work_names.unit IS 'Единица измерения работы';
+COMMENT ON COLUMN public.work_names.created_at IS 'Дата и время создания записи';
+COMMENT ON COLUMN public.work_names.updated_at IS 'Дата и время последнего обновления';
 
 CREATE TABLE IF NOT EXISTS realtime.messages (
     topic text NOT NULL,
@@ -1424,6 +1563,18 @@ begin
     from pg_authid 
     where rolname=$1 and rolcanlogin;
 end;
+$function$
+
+;
+
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
 $function$
 
 ;
@@ -3075,6 +3226,24 @@ $function$
 -- TRIGGERS
 -- ============================================
 
+CREATE TRIGGER update_cost_categories_updated_at BEFORE UPDATE ON public.cost_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+;
+
+CREATE TRIGGER update_detail_cost_categories_updated_at BEFORE UPDATE ON public.detail_cost_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+;
+
+CREATE TRIGGER update_locations_updated_at BEFORE UPDATE ON public.locations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+;
+
+CREATE TRIGGER update_material_names_updated_at BEFORE UPDATE ON public.material_names FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+;
+
+CREATE TRIGGER update_tenders_updated_at BEFORE UPDATE ON public.tenders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+;
+
+CREATE TRIGGER update_work_names_updated_at BEFORE UPDATE ON public.work_names FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+;
+
 CREATE TRIGGER tr_check_filters BEFORE INSERT OR UPDATE ON realtime.subscription FOR EACH ROW EXECUTE FUNCTION realtime.subscription_check_filters()
 ;
 
@@ -3263,6 +3432,69 @@ CREATE INDEX users_is_anonymous_idx ON auth.users USING btree (is_anonymous)
 ;
 
 CREATE UNIQUE INDEX users_phone_key ON auth.users USING btree (phone)
+;
+
+CREATE INDEX idx_cost_categories_created_at ON public.cost_categories USING btree (created_at DESC)
+;
+
+CREATE INDEX idx_cost_categories_name ON public.cost_categories USING btree (name)
+;
+
+CREATE INDEX idx_cost_categories_unit ON public.cost_categories USING btree (unit)
+;
+
+CREATE INDEX idx_detail_cost_categories_category_location ON public.detail_cost_categories USING btree (cost_category_id, location_id)
+;
+
+CREATE INDEX idx_detail_cost_categories_cost_category_id ON public.detail_cost_categories USING btree (cost_category_id)
+;
+
+CREATE INDEX idx_detail_cost_categories_created_at ON public.detail_cost_categories USING btree (created_at DESC)
+;
+
+CREATE INDEX idx_detail_cost_categories_location_id ON public.detail_cost_categories USING btree (location_id)
+;
+
+CREATE INDEX idx_detail_cost_categories_name ON public.detail_cost_categories USING btree (name)
+;
+
+CREATE INDEX idx_detail_cost_categories_order_num ON public.detail_cost_categories USING btree (order_num)
+;
+
+CREATE INDEX idx_detail_cost_categories_unit ON public.detail_cost_categories USING btree (unit)
+;
+
+CREATE INDEX idx_locations_created_at ON public.locations USING btree (created_at DESC)
+;
+
+CREATE INDEX idx_locations_location ON public.locations USING btree (location)
+;
+
+CREATE INDEX idx_material_names_name ON public.material_names USING btree (name)
+;
+
+CREATE INDEX idx_material_names_unit ON public.material_names USING btree (unit)
+;
+
+CREATE INDEX idx_tenders_client_name ON public.tenders USING btree (client_name)
+;
+
+CREATE INDEX idx_tenders_created_at ON public.tenders USING btree (created_at DESC)
+;
+
+CREATE INDEX idx_tenders_submission_deadline ON public.tenders USING btree (submission_deadline)
+;
+
+CREATE INDEX idx_tenders_tender_number ON public.tenders USING btree (tender_number)
+;
+
+CREATE UNIQUE INDEX tenders_tender_number_key ON public.tenders USING btree (tender_number)
+;
+
+CREATE INDEX idx_work_names_name ON public.work_names USING btree (name)
+;
+
+CREATE INDEX idx_work_names_unit ON public.work_names USING btree (unit)
 ;
 
 CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE))

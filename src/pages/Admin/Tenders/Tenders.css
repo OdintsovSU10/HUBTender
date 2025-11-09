@@ -1,0 +1,114 @@
+/* Стили для таблицы тендеров */
+
+/* Выравнивание заголовков по центру */
+.tenders-table .ant-table-thead > tr > th {
+  text-align: center !important;
+}
+
+/* Адаптивность таблицы */
+@media (max-width: 1600px) {
+  .tenders-table .ant-table {
+    font-size: 12px;
+  }
+
+  .tenders-table .ant-table-thead > tr > th {
+    padding: 8px 8px;
+    font-size: 12px;
+  }
+
+  .tenders-table .ant-table-tbody > tr > td {
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .tenders-table .ant-table-thead > tr > th {
+    padding: 6px 6px;
+    font-size: 11px;
+  }
+
+  .tenders-table .ant-table-tbody > tr > td {
+    padding: 4px 6px;
+  }
+}
+
+/* Компактный вид для чекбоксов */
+.tenders-table .ant-table-selection-column {
+  width: 32px !important;
+  min-width: 32px !important;
+  padding: 0 4px !important;
+}
+
+/* Убираем лишние отступы */
+.tenders-table .ant-table-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Стили для темной темы */
+.ant-theme-dark .tenders-table {
+  background: transparent;
+}
+
+.ant-theme-dark .tenders-table .ant-table {
+  background: #141414;
+}
+
+.ant-theme-dark .tenders-table .ant-table-thead > tr > th {
+  background: #1f1f1f;
+}
+
+/* Компактные кнопки в таблице */
+.tenders-table .ant-btn-text {
+  padding: 2px 4px;
+  height: 24px;
+}
+
+.tenders-table .ant-btn-text.ant-btn-sm {
+  font-size: 11px;
+}
+
+/* Компактный Dropdown */
+.tenders-table .ant-dropdown-trigger {
+  padding: 0 2px;
+}
+
+/* Сжатые пространства */
+.tenders-table .ant-space-compact {
+  gap: 2px !important;
+}
+
+/* Стили для выпадающего меню ссылок */
+.tenders-table .ant-dropdown-menu-item {
+  font-size: 12px;
+  padding: 4px 12px;
+}
+
+.tenders-table .ant-dropdown-menu-item-icon {
+  font-size: 14px;
+  margin-right: 8px;
+}
+
+/* Анимация для кнопки ссылок */
+.tenders-table .ant-btn-text:hover {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+/* Подсветка активной кнопки ссылок */
+.tenders-table .ant-btn-text[style*="color: #10b981"] {
+  position: relative;
+}
+
+.tenders-table .ant-btn-text[style*="color: #10b981"]::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background-color: #10b981;
+  border-radius: 50%;
+  opacity: 0.8;
+}
