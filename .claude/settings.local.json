@@ -16,7 +16,11 @@
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
       "Bash(npm run build)",
-      "Bash(supabase status:*)"
+      "Bash(supabase status:*)",
+      "Bash(brew:*)",
+      "Bash(git fetch:*)",
+      "Bash(curl:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

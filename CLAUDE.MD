@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TenderHUB by SU_10 is a construction tender management portal for Bill of Quantities (BOQ) and bidding workflows. Currently in initial development with UI foundation complete but backend integration pending.
+TenderHUB by SU_10 is a construction tender management portal for Bill of Quantities (BOQ) and bidding workflows. Currently in initial development with UI foundation complete and Supabase backend partially integrated.
 
 **Language Convention**: Russian UI, English code, Russian commit messages
-**Current State**: React + Ant Design UI shell with Supabase schema partially defined
+**Current State**: React + Ant Design UI shell with Supabase client configured
 **Organization**: SU-10 (Construction Company)
 **Branding**: Complete design system documented in BRANDING.md
 **Logo Preview**: http://localhost:3000/logo-preview.html
@@ -22,9 +22,11 @@ npm run build        # TypeScript check + Vite production build
 npm run preview      # Preview production build
 npm run lint         # ESLint with zero-warning enforcement
 
-# Database (when Supabase client is added)
-supabase db push     # Apply migrations
-supabase db reset    # Reset local database
+# Database operations
+supabase start       # Start local Supabase instance
+supabase stop        # Stop local Supabase instance
+supabase db push     # Apply migrations to local database
+supabase db reset    # Reset local database with fresh migrations
 ```
 
 ## 🚨 CRITICAL DATABASE RULES 🚨
@@ -65,9 +67,15 @@ App.tsx
 ### Implemented Routes
 - `/` and `/dashboard` - Feature card grid with 8 modules (✅ complete)
 - `/admin/nomenclatures` - Materials, Works, Locations, Cost Categories (✅ UI complete, mock data)
-- `/admin/tenders` - Tender management table (✅ UI complete, empty data)
+- `/admin/tenders` - Tender management table (✅ UI complete, integrating Supabase)
 - `/admin/construction_cost` - Cost calculation interface (✅ UI complete, mock data)
 - `/positions`, `/commerce`, `/library`, `/costs`, `/users`, `/settings` - Placeholder pages
+
+### Supabase Configuration
+- **Client**: `src/lib/supabase.ts` - Initialized with environment variables
+- **Environment**: `.env.local` contains `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- **Types**: TypeScript interfaces defined for Tender table
+- **Local Development**: Supabase Studio at http://localhost:54323
 
 ### Theme System
 - **Context**: `src/contexts/ThemeContext.tsx`
@@ -83,15 +91,16 @@ Two parameterized components in `src/components/Icons/`:
 
 Both accept: `size`, `color`, `className` props
 
-## Tech Stack Reality Check
+## Tech Stack
 
 ### Currently Installed (package.json)
 ```json
 {
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@supabase/supabase-js": "^2.80.0",  // ✅ Backend client
     "antd": "^5.28.0",
-    "dayjs": "^1.11.19",    // Date manipulation library
+    "dayjs": "^1.11.19",                  // Date manipulation
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.9.5"
@@ -100,14 +109,13 @@ Both accept: `size`, `color`, `className` props
 ```
 
 ### NOT Yet Installed (but planned)
-- @supabase/supabase-js
-- @tanstack/react-query
-- react-hook-form + yup
-- xlsx-js-style
-- @dnd-kit/sortable
-- react-window
+- @tanstack/react-query - Server state management
+- react-hook-form + yup - Form validation
+- xlsx-js-style - Excel export
+- @dnd-kit/sortable - Drag and drop
+- react-window - Virtual scrolling
 
-**Important**: Verify package.json before using any library
+**Important**: Always verify package.json before using any library
 
 ## Code Constraints
 
@@ -117,15 +125,15 @@ Both accept: `size`, `color`, `className` props
 - Split large files into modules with barrel exports
 
 ### TypeScript Configuration
-- Target: ES2020, strict mode
+- Target: ES2020, strict mode enabled
 - No unused locals/parameters
 - No implicit any (1 violation at MainLayout.tsx:88)
 - React JSX transform (no React import needed)
 
 ### ESLint Rules
 - Zero warnings enforced (`max-warnings: 0`)
-- Current issues:
-  - MainLayout.tsx:88 - `any` type needs fixing
+- Current issues to fix:
+  - MainLayout.tsx:88 - `any` type needs fixing (use `MenuClickEventHandler`)
   - ThemeContext.tsx:45 - Export warning
 
 ### Git Conventions
@@ -152,52 +160,69 @@ Each card has:
 7. Пользователи - #0891b2 → #0e7490
 8. Настройки - #22c55e → #16a34a
 
-## Database Migration Status
+## Database Architecture
 
-### Implemented (in migrations/)
+### Migration Files (supabase/migrations/)
 1. `001_create_tenders_table.sql` - Core tender entity with currency rates
 2. `002_create_material_work_tables.sql` - Name libraries with units
 3. `003_create_location_and_cost_categories_tables.sql` - Locations and cost categories
 
-### Planned but Not Created
+### Key Database Patterns
+- UUID primary keys with `uuid_generate_v4()`
+- `created_at`/`updated_at` with automatic triggers
+- RLS policies defined but currently disabled
+- Foreign keys to `auth.users` for ownership
+- Indexes on frequently queried columns
+- ON DELETE CASCADE for maintaining referential integrity
+
+### Planned Tables (Not Yet Created)
 - users (5 roles: administrator, moderator, engineer, manager, director)
 - organizations, material_categories, materials, works
 - boq_sections, boq_positions (hierarchical BOQ)
 - tender_participants, audit_log, comments
 
-### Key Database Patterns
-- UUID primary keys with uuid_generate_v4()
-- created_at/updated_at with automatic triggers
-- RLS policies defined but currently disabled
-- Foreign keys to auth.users for ownership
+## Component Implementation Status
 
-## Implementation Gaps
+### Fully Implemented Pages
+1. **Dashboard** (`/dashboard`)
+   - 8-card feature grid with gradients and hover effects
+   - Responsive layout with Ant Design Grid
+   - Icons and navigation to all modules
 
-### Backend Integration Missing
-1. No Supabase client initialization
-2. No API service layer
-3. No authentication UI
-4. No data fetching/mutation
+2. **Nomenclatures** (`/admin/nomenclatures`)
+   - 4-tab interface: Materials | Works | Locations | Cost Categories
+   - Search, add/edit/delete actions
+   - Unit color coding for visual identification
+   - Mock data demonstrates expected functionality
 
-### UI Implementation Status
-**Fully Implemented:**
-- /dashboard - 8-card feature grid with gradients and hover effects
-- /admin/nomenclatures - Tabbed interface for Materials, Works, Locations, Cost Categories
-- /admin/tenders - Complex tender management table with filters and actions
-- /admin/construction_cost - Cost calculations with statistics and deviation analysis
+3. **Tenders** (`/admin/tenders`)
+   - Complex table with 12+ columns
+   - Search filters by name, number, client, version
+   - Date range picker for submission deadlines
+   - Row selection for bulk operations
+   - Dropdown actions: Edit, Duplicate, Archive, Export, Delete
+   - Modal for create/edit operations
+   - Integrating with Supabase for real data
 
-**Placeholder Pages:**
-- /positions - BOQ management
-- /commerce - Commercial calculations
-- /library - Materials/works catalog
-- /costs - Construction costs
-- /users - User management
-- /settings - System configuration
+4. **Construction Cost** (`/admin/construction_cost`)
+   - Statistics cards: Planned Cost, Actual Cost, Deviation, Deviation %
+   - Location and category filtering
+   - Data table with deviation color coding (red/green)
+   - Summary row with totals
+   - Mock data with realistic calculations
 
-## Next Development Steps
+### Placeholder Pages
+- `/positions` - BOQ management
+- `/commerce` - Commercial calculations
+- `/library` - Materials/works catalog
+- `/costs` - Construction costs
+- `/users` - User management
+- `/settings` - System configuration
 
-### Immediate Fixes
-1. Fix TypeScript `any` at MainLayout.tsx:88
+## Immediate Development Tasks
+
+### TypeScript Fixes
+1. Fix `any` type at MainLayout.tsx:88:
    ```typescript
    import type { MenuClickEventHandler } from 'antd/es/menu/interface';
    const handleMenuClick: MenuClickEventHandler = (e) => navigate(e.key);
@@ -205,22 +230,13 @@ Each card has:
 
 2. Fix ESLint warning in ThemeContext.tsx (extract hook to separate file)
 
-### Supabase Integration
-1. Install: `npm install @supabase/supabase-js`
-2. Create `.env.local`:
-   ```
-   VITE_SUPABASE_URL=your_project_url
-   VITE_SUPABASE_ANON_KEY=your_anon_key
-   ```
-3. Create `src/lib/supabase.ts` client
-4. Implement auth pages and user context
-
-### Feature Development Priority
-1. Complete remaining table migrations
-2. Build /positions page (BOQ CRUD)
-3. Build /library page (materials/works)
-4. Add react-hook-form for data entry
-5. Implement TanStack Query for server state
+### Next Features to Implement
+1. Complete Supabase integration for all admin pages
+2. Implement authentication with Supabase Auth
+3. Build `/positions` page for BOQ management
+4. Add form validation with react-hook-form
+5. Implement data export functionality
+6. Add real-time updates with Supabase subscriptions
 
 ## Vite Configuration Notes
 
@@ -237,7 +253,7 @@ build: {
 
 ## Important Technical Details
 
-### Theme Toggle Implementation
+### Theme Implementation
 Uses Ant Design's theme algorithms:
 ```typescript
 algorithm: currentTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm
@@ -259,32 +275,8 @@ algorithm: currentTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorith
 ### Ant Design Reset
 Required in main.tsx: `import 'antd/dist/reset.css'`
 
-## Admin Page Components
-
-### Nomenclatures Page (`/admin/nomenclatures`)
-- 4-tab interface: Materials | Works | Locations | Cost Categories
-- Each tab has search, add/edit/delete actions
-- Unit color coding for visual identification
-- Mock data demonstrates expected functionality
-
-### Tenders Page (`/admin/tenders`)
-Complex table with:
-- 12+ columns (number, name, client, dates, areas, currency rates, links)
-- Search filters by name, number, client, version
-- Date range picker for submission deadlines
-- Row selection for bulk operations
-- Dropdown actions: Edit, Duplicate, Archive, Export, Delete
-- Empty state ready for backend data
-
-### Construction Cost Page (`/admin/construction_cost`)
-- Statistics cards: Planned Cost, Actual Cost, Deviation, Deviation %
-- Location and category filtering
-- Data table with deviation color coding (red/green)
-- Summary row with totals
-- Mock data with realistic calculations
-
-## Unit Color System
-Standardized colors for measurement units across the application:
+### Unit Color System
+Standardized colors for measurement units:
 ```typescript
 'шт' (pieces): 'blue'
 'м' (meters): 'green'
@@ -295,4 +287,28 @@ Standardized colors for measurement units across the application:
 'л' (liters): 'magenta'
 'компл' (set): 'volcano'
 'м.п.' (running meters): 'geekblue'
+```
+
+## Testing Commands
+
+Currently no test setup. When implementing tests:
+```bash
+# Future test commands (not yet configured)
+npm run test         # Run unit tests
+npm run test:watch   # Run tests in watch mode
+npm run test:coverage # Generate coverage report
+```
+
+## Environment Variables
+
+Required in `.env.local`:
+```
+VITE_SUPABASE_URL=https://vswxtmkdsimwgmvzysdo.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+Access in code:
+```typescript
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 ```

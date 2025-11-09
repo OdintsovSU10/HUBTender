@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Card, Table, Button, Space, Input, Tag, Select, Typography, Row, Col, Statistic } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Table, Button, Space, Input, Tag, Select, Typography, Row, Col, Statistic, Upload, message, Progress } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -9,10 +9,14 @@ import {
   AppstoreOutlined,
   DollarOutlined,
   BarChartOutlined,
+  FileExcelOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { supabase } from '../../../lib/supabase';
+import { costImportService } from '../../../services/costImportService';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 interface DetailCostCategoryRecord {
@@ -34,94 +38,16 @@ const ConstructionCost: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
-  // Временные данные для демонстрации
-  const detailCostData: DetailCostCategoryRecord[] = [
-    {
-      key: '1',
-      id: '1',
-      categoryName: 'Земляные работы',
-      categoryId: 'cat1',
-      locationName: 'Москва',
-      locationId: 'loc1',
-      name: 'Разработка грунта экскаватором',
-      unit: 'м3',
-      orderNum: 1,
-      estimatedCost: 850000,
-      actualCost: 820000,
-      createdAt: '2025-01-10',
-    },
-    {
-      key: '2',
-      id: '2',
-      categoryName: 'Земляные работы',
-      categoryId: 'cat1',
-      locationName: 'Санкт-Петербург',
-      locationId: 'loc2',
-      name: 'Вывоз грунта',
-      unit: 'м3',
-      orderNum: 2,
-      estimatedCost: 450000,
-      actualCost: 480000,
-      createdAt: '2025-01-11',
-    },
-    {
-      key: '3',
-      id: '3',
-      categoryName: 'Фундаментные работы',
-      categoryId: 'cat2',
-      locationName: 'Москва',
-      locationId: 'loc1',
-      name: 'Устройство монолитного фундамента',
-      unit: 'м3',
-      orderNum: 1,
-      estimatedCost: 2500000,
-      actualCost: 2450000,
-      createdAt: '2025-01-12',
-    },
-    {
-      key: '4',
-      id: '4',
-      categoryName: 'Фундаментные работы',
-      categoryId: 'cat2',
-      locationName: 'Екатеринбург',
-      locationId: 'loc3',
-      name: 'Армирование фундамента',
-      unit: 'т',
-      orderNum: 2,
-      estimatedCost: 1200000,
-      actualCost: 1180000,
-      createdAt: '2025-01-13',
-    },
-    {
-      key: '5',
-      id: '5',
-      categoryName: 'Кровельные работы',
-      categoryId: 'cat3',
-      locationName: 'Москва',
-      locationId: 'loc1',
-      name: 'Монтаж металлочерепицы',
-      unit: 'м2',
-      orderNum: 1,
-      estimatedCost: 950000,
-      actualCost: 980000,
-      createdAt: '2025-01-14',
-    },
-  ];
-
-  const locations = [
-    { value: 'all', label: 'Все локации' },
-    { value: 'loc1', label: 'Москва' },
-    { value: 'loc2', label: 'Санкт-Петербург' },
-    { value: 'loc3', label: 'Екатеринбург' },
-  ];
-
-  const categories = [
-    { value: 'all', label: 'Все категории' },
-    { value: 'cat1', label: 'Земляные работы' },
-    { value: 'cat2', label: 'Фундаментные работы' },
-    { value: 'cat3', label: 'Кровельные работы' },
-  ];
+  const [data, setData] = useState<DetailCostCategoryRecord[]>([]);
+  const [locations, setLocations] = useState<Array<{value: string; label: string}>>([
+    { value: 'all', label: 'Все локации' }
+  ]);
+  const [categories, setCategories] = useState<Array<{value: string; label: string}>>([
+    { value: 'all', label: 'Все категории' }
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
   const unitColors: Record<string, string> = {
     'шт': 'blue',
@@ -135,8 +61,118 @@ const ConstructionCost: React.FC = () => {
     'м.п.': 'geekblue',
   };
 
+  // Загрузка данных из Supabase
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Загружаем детальные категории затрат с привязанными категориями и локациями
+      const { data: detailData, error: detailError } = await supabase
+        .from('detail_cost_categories')
+        .select(`
+          *,
+          cost_categories (
+            id,
+            name,
+            unit
+          ),
+          locations (
+            id,
+            location
+          )
+        `)
+        .order('order_num', { ascending: true });
+
+      if (detailError) {
+        console.error('Ошибка загрузки данных:', detailError);
+        message.error('Ошибка загрузки данных');
+        return;
+      }
+
+      // Преобразуем данные для таблицы
+      const transformedData = (detailData || []).map((item: any) => ({
+        key: item.id,
+        id: item.id,
+        categoryName: item.cost_categories?.name || '',
+        categoryId: item.cost_category_id,
+        locationName: item.locations?.location || '',
+        locationId: item.location_id,
+        name: item.name,
+        unit: item.unit,
+        orderNum: item.order_num,
+        createdAt: item.created_at,
+      }));
+
+      setData(transformedData);
+
+      // Загружаем список локаций
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('id, location')
+        .order('location');
+
+      if (locationData) {
+        const locationOptions = [
+          { value: 'all', label: 'Все локации' },
+          ...locationData.map(loc => ({ value: loc.id, label: loc.location }))
+        ];
+        setLocations(locationOptions);
+      }
+
+      // Загружаем список категорий
+      const { data: categoryData } = await supabase
+        .from('cost_categories')
+        .select('id, name')
+        .order('name');
+
+      if (categoryData) {
+        const categoryOptions = [
+          { value: 'all', label: 'Все категории' },
+          ...categoryData.map(cat => ({ value: cat.id, label: cat.name }))
+        ];
+        setCategories(categoryOptions);
+      }
+    } catch (error) {
+      console.error('Ошибка при загрузке данных:', error);
+      message.error('Произошла ошибка при загрузке данных');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Функция обработки импорта Excel файла
+  const handleImport = async (file: File) => {
+    setImporting(true);
+    setImportProgress(0);
+
+    try {
+      const result = await costImportService.importFromExcel(file, (progress) => {
+        setImportProgress(progress);
+      });
+
+      if (result.success) {
+        message.success(`Импорт завершен! Добавлено ${result.recordsAdded} записей`);
+        // Перезагружаем данные
+        await fetchData();
+      } else {
+        message.error(result.error || 'Ошибка при импорте данных');
+      }
+    } catch (error) {
+      console.error('Ошибка импорта:', error);
+      message.error('Произошла ошибка при импорте');
+    } finally {
+      setImporting(false);
+      setImportProgress(0);
+    }
+
+    return false; // Предотвращаем загрузку файла на сервер
+  };
+
   // Фильтрация данных
-  const filteredData = detailCostData.filter(item => {
+  const filteredData = data.filter(item => {
     const matchesSearch = searchText === '' ||
       item.name.toLowerCase().includes(searchText.toLowerCase()) ||
       item.categoryName.toLowerCase().includes(searchText.toLowerCase());
@@ -217,7 +253,7 @@ const ConstructionCost: React.FC = () => {
       key: 'actualCost',
       width: 150,
       align: 'right',
-      render: (cost?: number, record) => {
+      render: (cost: number | undefined, record: DetailCostCategoryRecord) => {
         const diff = (record.actualCost || 0) - (record.estimatedCost || 0);
         const color = diff > 0 ? '#ff4d4f' : diff < 0 ? '#52c41a' : undefined;
         return (
@@ -254,7 +290,7 @@ const ConstructionCost: React.FC = () => {
       key: 'action',
       width: 100,
       fixed: 'right',
-      render: (_: any, record: DetailCostCategoryRecord) => (
+      render: (_: any) => (
         <Space size="small">
           <Button type="text" icon={<EditOutlined />} />
           <Button type="text" danger icon={<DeleteOutlined />} />
@@ -326,6 +362,7 @@ const ConstructionCost: React.FC = () => {
               value={selectedLocation}
               onChange={setSelectedLocation}
               style={{ width: 150 }}
+              disabled={loading}
             >
               {locations.map(loc => (
                 <Option key={loc.value} value={loc.value}>{loc.label}</Option>
@@ -335,6 +372,7 @@ const ConstructionCost: React.FC = () => {
               value={selectedCategory}
               onChange={setSelectedCategory}
               style={{ width: 180 }}
+              disabled={loading}
             >
               {categories.map(cat => (
                 <Option key={cat.value} value={cat.value}>{cat.label}</Option>
@@ -345,16 +383,45 @@ const ConstructionCost: React.FC = () => {
               prefix={<SearchOutlined />}
               style={{ width: 200 }}
               onChange={(e) => setSearchText(e.target.value)}
+              disabled={loading}
             />
-            <Button type="primary" icon={<PlusOutlined />}>
+            <Upload
+              accept=".xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={handleImport}
+              disabled={importing}
+            >
+              <Button
+                type="primary"
+                icon={<FileExcelOutlined />}
+                loading={importing}
+              >
+                Импорт затрат
+              </Button>
+            </Upload>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchData}
+              loading={loading}
+            >
+              Обновить
+            </Button>
+            <Button icon={<PlusOutlined />}>
               Добавить
             </Button>
           </Space>
         }
       >
+        {importing && (
+          <div style={{ marginBottom: 16 }}>
+            <Progress percent={importProgress} status="active" />
+            <Text type="secondary">Импорт данных...</Text>
+          </div>
+        )}
         <Table
           columns={columns}
           dataSource={filteredData}
+          loading={loading}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
@@ -362,28 +429,35 @@ const ConstructionCost: React.FC = () => {
           }}
           size="middle"
           scroll={{ x: 1400 }}
+          locale={{
+            emptyText: data.length === 0
+              ? 'Нет данных. Используйте кнопку "Импорт затрат" для загрузки данных из Excel файла.'
+              : 'Нет данных по выбранным фильтрам'
+          }}
           summary={() => (
-            <Table.Summary fixed>
-              <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={5}>
-                  <Text strong>Итого:</Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={5} align="right">
-                  <Text strong>{totalEstimated.toLocaleString('ru-RU')} ₽</Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={6} align="right">
-                  <Text strong style={{ color: difference > 0 ? '#ff4d4f' : '#52c41a' }}>
-                    {totalActual.toLocaleString('ru-RU')} ₽
-                  </Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={7} align="right">
-                  <Text strong style={{ color: difference > 0 ? '#ff4d4f' : '#52c41a' }}>
-                    {difference >= 0 ? '+' : ''}{difference.toLocaleString('ru-RU')} ₽
-                  </Text>
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={8} />
-              </Table.Summary.Row>
-            </Table.Summary>
+            filteredData.length > 0 && (
+              <Table.Summary fixed>
+                <Table.Summary.Row>
+                  <Table.Summary.Cell index={0} colSpan={5}>
+                    <Text strong>Итого:</Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={5} align="right">
+                    <Text strong>{totalEstimated.toLocaleString('ru-RU')} ₽</Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={6} align="right">
+                    <Text strong style={{ color: difference > 0 ? '#ff4d4f' : '#52c41a' }}>
+                      {totalActual.toLocaleString('ru-RU')} ₽
+                    </Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={7} align="right">
+                    <Text strong style={{ color: difference > 0 ? '#ff4d4f' : '#52c41a' }}>
+                      {difference >= 0 ? '+' : ''}{difference.toLocaleString('ru-RU')} ₽
+                    </Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={8} />
+                </Table.Summary.Row>
+              </Table.Summary>
+            )
           )}
         />
       </Card>
