@@ -180,12 +180,6 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <Input
-              placeholder="Поиск..."
-              prefix={<SearchOutlined />}
-              style={{ width: 200 }}
-            />
-
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <SunOutlined style={{ fontSize: '16px', color: currentTheme === 'light' ? '#faad14' : '#888' }} />
               <Switch
