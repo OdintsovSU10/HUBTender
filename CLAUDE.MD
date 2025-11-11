@@ -22,7 +22,7 @@ npm run build        # TypeScript check + Vite production build
 npm run preview      # Preview production build
 npm run lint         # ESLint with zero-warning enforcement
 
-# Database (when Supabase client is added)
+# Database (Supabase CLI required)
 supabase db push     # Apply migrations
 supabase db reset    # Reset local database
 ```
@@ -43,9 +43,12 @@ supabase/schemas/prod.sql
 - `tenders` - Main tender records with currency rates
 - `material_names` - Material name library with units
 - `work_names` - Work name library with units
+- `materials_library` - Material records with pricing and cost categories
+- `works_library` - Work records with pricing and cost categories
 - `locations` - Construction site locations
 - `cost_categories` - Cost category definitions
-- `detail_cost_categories` - Detailed cost items per location
+- `detail_cost_categories` - Detailed cost items per location with location reference
+- `units` - Unit of measurement reference table
 - ENUM: `unit_type` ('шт', 'м', 'м2', 'м3', 'кг', 'т', 'л', 'компл', 'м.п.')
 
 ## Architecture & Patterns
@@ -64,10 +67,11 @@ App.tsx
 
 ### Implemented Routes
 - `/` and `/dashboard` - Feature card grid with 8 modules (✅ complete)
-- `/admin/nomenclatures` - Materials, Works, Locations, Cost Categories (✅ UI complete, mock data)
-- `/admin/tenders` - Tender management table (✅ UI complete, empty data)
+- `/admin/nomenclatures` - Materials, Works, Locations, Cost Categories (✅ complete, Supabase integrated)
+- `/admin/tenders` - Tender management table (✅ UI complete, Supabase ready)
 - `/admin/construction_cost` - Cost calculation interface (✅ UI complete, mock data)
-- `/positions`, `/commerce`, `/library`, `/costs`, `/users`, `/settings` - Placeholder pages
+- `/library` - Materials/Works library with inline editing (✅ complete, Supabase integrated)
+- `/positions`, `/commerce`, `/costs`, `/users`, `/settings` - Placeholder pages
 
 ### Theme System
 - **Context**: `src/contexts/ThemeContext.tsx`
@@ -90,20 +94,21 @@ Both accept: `size`, `color`, `className` props
 {
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@supabase/supabase-js": "^2.80.0",
     "antd": "^5.28.0",
-    "dayjs": "^1.11.19",    // Date manipulation library
+    "dayjs": "^1.11.19",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.9.5"
+    "react-router-dom": "^7.9.5",
+    "xlsx": "^0.18.5"
   }
 }
 ```
 
 ### NOT Yet Installed (but planned)
-- @supabase/supabase-js
 - @tanstack/react-query
 - react-hook-form + yup
-- xlsx-js-style
+- xlsx-js-style (currently using basic xlsx)
 - @dnd-kit/sortable
 - react-window
 
@@ -113,22 +118,24 @@ Both accept: `size`, `color`, `className` props
 
 ### File Size Rule
 **STRICT**: All files MUST be ≤ 600 lines
-- Current largest: Tenders.tsx (425 lines), ConstructionCost.tsx (400 lines)
+- Current largest: MaterialsTab.tsx (~970 lines), WorksTab.tsx (~770 lines)
+- **VIOLATION**: Library tabs need refactoring into smaller modules
 - Split large files into modules with barrel exports
 
 ### TypeScript Configuration
 - Target: ES2020, strict mode
 - No unused locals/parameters
-- No implicit any (1 violation at MainLayout.tsx:88)
+- No implicit any
 - React JSX transform (no React import needed)
 
 ### ESLint Rules
 - Zero warnings enforced (`max-warnings: 0`)
-- Current issues:
-  - MainLayout.tsx:88 - `any` type needs fixing
-  - ThemeContext.tsx:45 - Export warning
+- Clean build currently maintained
 
 ### Git Conventions
+- **🚨 ВАЖНО**: Коммиты создаются ТОЛЬКО по явному запросу пользователя
+- Всегда дождаться команды "коммить", "создай коммит" или аналогичной перед выполнением git commit
+- Никогда не делать автоматические коммиты после завершения задачи
 - **Commits**: Russian, imperative mood
 - **Examples**: "Добавить валидацию форм", "Исправить ошибку в расчетах"
 - **Branches**: feature/, fix/, refactor/ prefixes
@@ -156,12 +163,15 @@ Each card has:
 
 ### Implemented (in migrations/)
 1. `001_create_tenders_table.sql` - Core tender entity with currency rates
-2. `002_create_material_work_tables.sql` - Name libraries with units
+2. `002_create_material_work_tables.sql` - Name libraries with units, materials_library, works_library
 3. `003_create_location_and_cost_categories_tables.sql` - Locations and cost categories
+4. `004_fix_detail_cost_categories_foreign_key.sql` - Added location_id foreign key
+5. `005_migrate_enum_to_units_table.sql` - Created units reference table
+6. `006_remove_name_short_from_units.sql` - Cleanup migration
 
 ### Planned but Not Created
 - users (5 roles: administrator, moderator, engineer, manager, director)
-- organizations, material_categories, materials, works
+- organizations, material_categories
 - boq_sections, boq_positions (hierarchical BOQ)
 - tender_participants, audit_log, comments
 
@@ -171,56 +181,56 @@ Each card has:
 - RLS policies defined but currently disabled
 - Foreign keys to auth.users for ownership
 
-## Implementation Gaps
+## Implementation Status
 
-### Backend Integration Missing
-1. No Supabase client initialization
-2. No API service layer
-3. No authentication UI
-4. No data fetching/mutation
+### Supabase Integration
+- ✅ Client initialized in `src/lib/supabase.ts`
+- ✅ TypeScript types defined for all database tables
+- ✅ Environment variables configured (.env.local required)
+- ❌ No authentication UI yet
+- ❌ No RLS policies enabled
 
 ### UI Implementation Status
-**Fully Implemented:**
-- /dashboard - 8-card feature grid with gradients and hover effects
-- /admin/nomenclatures - Tabbed interface for Materials, Works, Locations, Cost Categories
-- /admin/tenders - Complex tender management table with filters and actions
-- /admin/construction_cost - Cost calculations with statistics and deviation analysis
+**Fully Implemented with Supabase:**
+- `/dashboard` - 8-card feature grid with gradients and hover effects
+- `/admin/nomenclatures` - CRUD for Materials, Works, Locations, Cost Categories
+- `/library` - Materials/Works library with inline editing, pagination, search
+
+**UI Complete (Supabase Ready):**
+- `/admin/tenders` - Complex tender management table with filters and actions
+- `/admin/construction_cost` - Cost calculations with statistics and deviation analysis
 
 **Placeholder Pages:**
-- /positions - BOQ management
-- /commerce - Commercial calculations
-- /library - Materials/works catalog
-- /costs - Construction costs
-- /users - User management
-- /settings - System configuration
+- `/positions` - BOQ management
+- `/commerce` - Commercial calculations
+- `/costs` - Construction costs
+- `/users` - User management
+- `/settings` - System configuration
 
 ## Next Development Steps
 
-### Immediate Fixes
-1. Fix TypeScript `any` at MainLayout.tsx:88
-   ```typescript
-   import type { MenuClickEventHandler } from 'antd/es/menu/interface';
-   const handleMenuClick: MenuClickEventHandler = (e) => navigate(e.key);
-   ```
+### Immediate Priorities
+1. **Refactor Library components** - MaterialsTab.tsx and WorksTab.tsx exceed 600-line limit
+   - Extract EditableCell components
+   - Create separate form components
+   - Use barrel exports
 
-2. Fix ESLint warning in ThemeContext.tsx (extract hook to separate file)
+2. **Connect Tenders page to Supabase**
+   - Implement CRUD operations
+   - Add form validation
+   - Handle currency rate updates
 
-### Supabase Integration
-1. Install: `npm install @supabase/supabase-js`
-2. Create `.env.local`:
-   ```
-   VITE_SUPABASE_URL=your_project_url
-   VITE_SUPABASE_ANON_KEY=your_anon_key
-   ```
-3. Create `src/lib/supabase.ts` client
-4. Implement auth pages and user context
+3. **Build Authentication**
+   - Login/signup pages
+   - User context provider
+   - Protected route wrapper
 
 ### Feature Development Priority
-1. Complete remaining table migrations
-2. Build /positions page (BOQ CRUD)
-3. Build /library page (materials/works)
-4. Add react-hook-form for data entry
-5. Implement TanStack Query for server state
+1. Build `/positions` page (BOQ CRUD with hierarchical structure)
+2. Connect `/admin/construction_cost` to real data
+3. Add react-hook-form for complex forms
+4. Implement TanStack Query for server state management
+5. Add Excel export functionality using xlsx library
 
 ## Vite Configuration Notes
 
@@ -259,29 +269,77 @@ algorithm: currentTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorith
 ### Ant Design Reset
 Required in main.tsx: `import 'antd/dist/reset.css'`
 
-## Admin Page Components
+## Key Page Components
 
 ### Nomenclatures Page (`/admin/nomenclatures`)
+**Fully functional with Supabase**
 - 4-tab interface: Materials | Works | Locations | Cost Categories
-- Each tab has search, add/edit/delete actions
+- CRUD operations with real-time data
+- Inline editing with form validation
 - Unit color coding for visual identification
-- Mock data demonstrates expected functionality
+- Duplicate name detection
+
+### Library Page (`/library`)
+**Fully functional with Supabase**
+- 2-tab interface: Materials | Works
+- Inline table editing with color-coded row types:
+  - Materials: мат (orange), суб-мат (purple), мат-комп. (red)
+  - Works: раб (orange), суб-раб (purple), раб-комп. (red)
+- Unified search in Card header
+- Pagination: 100/250/500/1000 rows
+- Parent-child component communication via useImperativeHandle
+- AutoComplete for names and cost categories
+- Dynamic form border colors based on item type
 
 ### Tenders Page (`/admin/tenders`)
-Complex table with:
+**UI complete, needs Supabase connection**
 - 12+ columns (number, name, client, dates, areas, currency rates, links)
 - Search filters by name, number, client, version
 - Date range picker for submission deadlines
 - Row selection for bulk operations
 - Dropdown actions: Edit, Duplicate, Archive, Export, Delete
-- Empty state ready for backend data
+- Modal form for add/edit operations
 
 ### Construction Cost Page (`/admin/construction_cost`)
+**UI complete with mock data**
 - Statistics cards: Planned Cost, Actual Cost, Deviation, Deviation %
 - Location and category filtering
 - Data table with deviation color coding (red/green)
 - Summary row with totals
-- Mock data with realistic calculations
+
+## Library Page Architecture Patterns
+
+### Parent-Child Communication
+The Library index component uses refs to trigger actions in child tabs:
+```typescript
+// Parent (index.tsx)
+const materialsTabRef = useRef<any>(null);
+materialsTabRef.current.handleAdd();
+
+// Child (MaterialsTab.tsx)
+useImperativeHandle(ref, () => ({
+  handleAdd: () => { /* open add form */ }
+}));
+```
+
+### Inline Editing Pattern
+Both MaterialsTab and WorksTab use Ant Design's editable table pattern:
+1. Each row has `isEditing()` check
+2. EditableCell component switches between display/input
+3. Form fields wrap inputs for validation
+4. Border colors change based on `item_type` during editing
+
+### Data Flow
+1. Fetch data with Supabase joins (e.g., `material_names`, `detail_cost_categories`)
+2. Transform to flat structure with computed fields (e.g., `material_name`, `unit`)
+3. Filter by search text from parent
+4. Render with pagination
+
+### AutoComplete Integration
+Cost categories use nested AutoComplete:
+- Format: `"Category / Detail / Location"`
+- Store mapping of display strings to IDs
+- Handle selection by finding matching ID
 
 ## Unit Color System
 Standardized colors for measurement units across the application:
@@ -296,3 +354,21 @@ Standardized colors for measurement units across the application:
 'компл' (set): 'volcano'
 'м.п.' (running meters): 'geekblue'
 ```
+
+## Item Type Color System
+Color coding for material/work types in Library:
+```typescript
+// Materials
+'мат': '#ff9800' (orange)
+'суб-мат': '#9c27b0' (purple)
+'мат-комп.': '#f44336' (red)
+
+// Works
+'раб': '#ff9800' (orange)
+'суб-раб': '#9c27b0' (purple)
+'раб-комп.': '#f44336' (red)
+```
+Applied to:
+- Row background colors (15% opacity, 25% on hover)
+- Form border colors during inline editing
+- Add form border color (dynamic)
