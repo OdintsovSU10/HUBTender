@@ -503,6 +503,38 @@
     "is_primary": false,
     "sql": "CREATE INDEX idx_detail_cost_categories_unit ON public.detail_cost_categories USING btree (unit)"
   },
+  "public.markup_parameters.idx_markup_parameters_is_active": {
+    "schema": "public",
+    "name": "idx_markup_parameters_is_active",
+    "table_name": null,
+    "is_unique": false,
+    "is_primary": false,
+    "sql": "CREATE INDEX idx_markup_parameters_is_active ON public.markup_parameters USING btree (is_active)"
+  },
+  "public.markup_parameters.idx_markup_parameters_key": {
+    "schema": "public",
+    "name": "idx_markup_parameters_key",
+    "table_name": null,
+    "is_unique": false,
+    "is_primary": false,
+    "sql": "CREATE INDEX idx_markup_parameters_key ON public.markup_parameters USING btree (key)"
+  },
+  "public.markup_parameters.idx_markup_parameters_order_num": {
+    "schema": "public",
+    "name": "idx_markup_parameters_order_num",
+    "table_name": null,
+    "is_unique": false,
+    "is_primary": false,
+    "sql": "CREATE INDEX idx_markup_parameters_order_num ON public.markup_parameters USING btree (order_num)"
+  },
+  "public.markup_parameters.markup_parameters_key_key": {
+    "schema": "public",
+    "name": "markup_parameters_key_key",
+    "table_name": null,
+    "is_unique": false,
+    "is_primary": false,
+    "sql": "CREATE UNIQUE INDEX markup_parameters_key_key ON public.markup_parameters USING btree (key)"
+  },
   "public.markup_tactics.idx_markup_tactics_created_at": {
     "schema": "public",
     "name": "idx_markup_tactics_created_at",
@@ -599,13 +631,13 @@
     "is_primary": false,
     "sql": "CREATE INDEX idx_materials_library_type_currency ON public.materials_library USING btree (material_type, currency_type)"
   },
-  "public.tender_markup_percentage.idx_tender_markup_percentage_is_active": {
+  "public.tender_markup_percentage.idx_tender_markup_percentage_markup_parameter_id": {
     "schema": "public",
-    "name": "idx_tender_markup_percentage_is_active",
+    "name": "idx_tender_markup_percentage_markup_parameter_id",
     "table_name": null,
     "is_unique": false,
     "is_primary": false,
-    "sql": "CREATE INDEX idx_tender_markup_percentage_is_active ON public.tender_markup_percentage USING btree (is_active)"
+    "sql": "CREATE INDEX idx_tender_markup_percentage_markup_parameter_id ON public.tender_markup_percentage USING btree (markup_parameter_id)"
   },
   "public.tender_markup_percentage.idx_tender_markup_percentage_tender_id": {
     "schema": "public",
@@ -615,13 +647,13 @@
     "is_primary": false,
     "sql": "CREATE INDEX idx_tender_markup_percentage_tender_id ON public.tender_markup_percentage USING btree (tender_id)"
   },
-  "public.tender_markup_percentage.idx_tender_markup_percentage_unique_active": {
+  "public.tender_markup_percentage.tender_markup_percentage_unique": {
     "schema": "public",
-    "name": "idx_tender_markup_percentage_unique_active",
+    "name": "tender_markup_percentage_unique",
     "table_name": null,
     "is_unique": false,
     "is_primary": false,
-    "sql": "CREATE UNIQUE INDEX idx_tender_markup_percentage_unique_active ON public.tender_markup_percentage USING btree (tender_id) WHERE (is_active = true)"
+    "sql": "CREATE UNIQUE INDEX tender_markup_percentage_unique ON public.tender_markup_percentage USING btree (tender_id, markup_parameter_id)"
   },
   "public.tenders.idx_tenders_client_name": {
     "schema": "public",

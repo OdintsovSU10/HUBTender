@@ -16,31 +16,16 @@ import {
   Tag,
   Divider,
   theme,
-  Radio
+  Radio,
+  Modal,
+  List
 } from 'antd';
-import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined } from '@ant-design/icons';
-import { supabase, Tender, TenderMarkupPercentageInsert } from '../../../lib/supabase';
+import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
+import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupParameterInsert, MarkupTactic } from '../../../lib/supabase';
 import './MarkupConstructor.css';
 
 const { Title, Text } = Typography;
-
-// Доступные наценки для выбора
-const AVAILABLE_MARKUPS = [
-  { key: 'mechanization_service', label: 'Служба механизации' },
-  { key: 'mbp_gsm', label: 'МБП и ГСМ' },
-  { key: 'warranty_period', label: 'Гарантийный период' },
-  { key: 'works_16_markup', label: 'Работы 1,6' },
-  { key: 'works_cost_growth', label: 'Рост стоимости работ' },
-  { key: 'material_cost_growth', label: 'Рост стоимости материалов' },
-  { key: 'subcontract_works_cost_growth', label: 'Рост стоимости работ субподряда' },
-  { key: 'subcontract_materials_cost_growth', label: 'Рост стоимости материалов субподряда' },
-  { key: 'contingency_costs', label: 'Непредвиденные затраты' },
-  { key: 'overhead_own_forces', label: 'ООЗ' },
-  { key: 'overhead_subcontract', label: 'ООЗ субподряда' },
-  { key: 'general_costs_without_subcontract', label: 'ОФЗ без субподряда' },
-  { key: 'profit_own_forces', label: 'Прибыль' },
-  { key: 'profit_subcontract', label: 'Прибыль субподряда' },
-];
+const { TextArea } = Input;
 
 interface MarkupStep {
   name?: string; // Название пункта
@@ -97,11 +82,26 @@ const MarkupConstructor: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tenders, setTenders] = useState<Tender[]>([]);
+  const [tactics, setTactics] = useState<MarkupTactic[]>([]); // Список доступных тактик
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
+  const [selectedTacticId, setSelectedTacticId] = useState<string | null>(null); // Выбранная тактика в селекте
   const [currentMarkupId, setCurrentMarkupId] = useState<string | null>(null);
   const [currentTacticId, setCurrentTacticId] = useState<string | null>(null); // ID сохраненной тактики в БД
+  const [currentTacticName, setCurrentTacticName] = useState<string>(''); // Название текущей тактики
   const [activeTab, setActiveTab] = useState<TabKey>('works');
   const [isDataLoaded, setIsDataLoaded] = useState(false); // Флаг для предотвращения автосохранения до загрузки
+
+  // Состояния для параметров наценок (загружаются из БД)
+  const [markupParameters, setMarkupParameters] = useState<MarkupParameter[]>([]);
+  const [loadingParameters, setLoadingParameters] = useState(false);
+
+  // Состояния для управления параметрами
+  const [isAddParameterModalOpen, setIsAddParameterModalOpen] = useState(false);
+  const [newParameterForm] = Form.useForm();
+
+  // Состояния для inline редактирования параметров
+  const [editingParameterId, setEditingParameterId] = useState<string | null>(null);
+  const [editingParameterLabel, setEditingParameterLabel] = useState('');
 
   // Состояния для порядка наценок на каждой вкладке
   const [markupSequences, setMarkupSequences] = useState<Record<TabKey, MarkupStep[]>>({
@@ -189,7 +189,7 @@ const MarkupConstructor: React.FC = () => {
     material_comp: 'multiply',
   });
 
-  const [operand2Type, setOperand2Type] = useState<Record<TabKey, 'markup' | 'step'>>({
+  const [operand2Type, setOperand2Type] = useState<Record<TabKey, 'markup' | 'step' | 'number'>>({
     works: 'markup',
     materials: 'markup',
     subcontract_works: 'markup',
@@ -226,7 +226,7 @@ const MarkupConstructor: React.FC = () => {
     material_comp: 'multiply',
   });
 
-  const [operand3Type, setOperand3Type] = useState<Record<TabKey, 'markup' | 'step'>>({
+  const [operand3Type, setOperand3Type] = useState<Record<TabKey, 'markup' | 'step' | 'number'>>({
     works: 'markup',
     materials: 'markup',
     subcontract_works: 'markup',
@@ -263,7 +263,7 @@ const MarkupConstructor: React.FC = () => {
     material_comp: 'multiply',
   });
 
-  const [operand4Type, setOperand4Type] = useState<Record<TabKey, 'markup' | 'step'>>({
+  const [operand4Type, setOperand4Type] = useState<Record<TabKey, 'markup' | 'step' | 'number'>>({
     works: 'markup',
     materials: 'markup',
     subcontract_works: 'markup',
@@ -300,7 +300,7 @@ const MarkupConstructor: React.FC = () => {
     material_comp: 'multiply',
   });
 
-  const [operand5Type, setOperand5Type] = useState<Record<TabKey, 'markup' | 'step'>>({
+  const [operand5Type, setOperand5Type] = useState<Record<TabKey, 'markup' | 'step' | 'number'>>({
     works: 'markup',
     materials: 'markup',
     subcontract_works: 'markup',
@@ -325,6 +325,43 @@ const MarkupConstructor: React.FC = () => {
     subcontract_materials: 'addOne',
     work_comp: 'addOne',
     material_comp: 'addOne',
+  });
+
+  // Режим ввода операндов (выбор из списка или ручной ввод числа)
+  const [operand2InputMode, setOperand2InputMode] = useState<Record<TabKey, 'select' | 'manual'>>({
+    works: 'select',
+    materials: 'select',
+    subcontract_works: 'select',
+    subcontract_materials: 'select',
+    work_comp: 'select',
+    material_comp: 'select',
+  });
+
+  const [operand3InputMode, setOperand3InputMode] = useState<Record<TabKey, 'select' | 'manual'>>({
+    works: 'select',
+    materials: 'select',
+    subcontract_works: 'select',
+    subcontract_materials: 'select',
+    work_comp: 'select',
+    material_comp: 'select',
+  });
+
+  const [operand4InputMode, setOperand4InputMode] = useState<Record<TabKey, 'select' | 'manual'>>({
+    works: 'select',
+    materials: 'select',
+    subcontract_works: 'select',
+    subcontract_materials: 'select',
+    work_comp: 'select',
+    material_comp: 'select',
+  });
+
+  const [operand5InputMode, setOperand5InputMode] = useState<Record<TabKey, 'select' | 'manual'>>({
+    works: 'select',
+    materials: 'select',
+    subcontract_works: 'select',
+    subcontract_materials: 'select',
+    work_comp: 'select',
+    material_comp: 'select',
   });
 
   // Видимость полей второго действия
@@ -378,14 +415,53 @@ const MarkupConstructor: React.FC = () => {
   });
 
   // Загрузка существующей тактики из Supabase
-  const fetchTacticFromSupabase = async () => {
+  const fetchTacticFromSupabase = async (tenderId?: string) => {
     try {
+      let tacticId: string | null = null;
+
+      // Если указан тендер, пытаемся получить его тактику
+      if (tenderId) {
+        const { data: tenderData, error: tenderError } = await supabase
+          .from('tenders')
+          .select('markup_tactic_id')
+          .eq('id', tenderId)
+          .single();
+
+        if (tenderError) {
+          console.error('Ошибка загрузки тендера:', tenderError);
+        } else if (tenderData?.markup_tactic_id) {
+          tacticId = tenderData.markup_tactic_id;
+        }
+      }
+
+      // Если не нашли тактику для тендера, загружаем глобальную "Текущая тактика"
+      if (!tacticId) {
+        const { data: globalTactic, error: globalError } = await supabase
+          .from('markup_tactics')
+          .select('id')
+          .eq('name', 'Текущая тактика')
+          .eq('is_global', true)
+          .single();
+
+        if (globalError) {
+          console.error('Ошибка загрузки глобальной тактики:', globalError);
+          return null;
+        }
+
+        tacticId = globalTactic?.id || null;
+      }
+
+      if (!tacticId) {
+        console.warn('Не найдена тактика для загрузки');
+        return null;
+      }
+
+      // Загружаем тактику по ID
       const { data, error } = await supabase
         .from('markup_tactics')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .eq('id', tacticId)
+        .single();
 
       if (error) {
         console.error('Ошибка загрузки тактики из Supabase:', error);
@@ -395,6 +471,7 @@ const MarkupConstructor: React.FC = () => {
       if (data) {
         console.log('Загружена тактика из Supabase:', data);
         setCurrentTacticId(data.id);
+        setCurrentTacticName(data.name || 'Текущая тактика');
 
         // Преобразование из русского формата в английский
         const sequencesEn = {
@@ -425,9 +502,34 @@ const MarkupConstructor: React.FC = () => {
     }
   };
 
-  // Загрузка списка тендеров
+  // Загрузка параметров наценок из БД
+  const fetchMarkupParameters = async () => {
+    setLoadingParameters(true);
+    try {
+      const { data, error } = await supabase
+        .from('markup_parameters')
+        .select('*')
+        .eq('is_active', true)
+        .order('order_num', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        setMarkupParameters(data);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки параметров наценок:', error);
+      message.error('Не удалось загрузить параметры наценок');
+    } finally {
+      setLoadingParameters(false);
+    }
+  };
+
+  // Загрузка списка тендеров и тактик
   useEffect(() => {
     fetchTenders();
+    fetchTactics();
+    fetchMarkupParameters(); // Загружаем параметры наценок
   }, []);
 
   // Загрузка и сохранение тактик наценок из localStorage и Supabase
@@ -504,60 +606,56 @@ const MarkupConstructor: React.FC = () => {
     }
   };
 
+  const fetchTactics = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('markup_tactics')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTactics(data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки тактик:', error);
+      message.error('Не удалось загрузить список тактик');
+    }
+  };
+
   // Загрузка данных наценок для выбранного тендера
   const fetchMarkupData = async (tenderId: string) => {
     setLoading(true);
     try {
+      // Загружаем все записи наценок для тендера с JOIN на markup_parameters
       const { data, error } = await supabase
         .from('tender_markup_percentage')
-        .select('*')
-        .eq('tender_id', tenderId)
-        .eq('is_active', true)
-        .single();
+        .select('*, markup_parameter:markup_parameters(*)')
+        .eq('tender_id', tenderId);
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
-      if (data) {
-        // Данные найдены - заполняем форму
-        setCurrentMarkupId(data.id);
-        form.setFieldsValue({
-          tender_id: tenderId,
-          works_16_markup: data.works_16_markup || 0,
-          works_cost_growth: data.works_cost_growth || 0,
-          material_cost_growth: data.material_cost_growth || 0,
-          subcontract_works_cost_growth: data.subcontract_works_cost_growth || 0,
-          subcontract_materials_cost_growth: data.subcontract_materials_cost_growth || 0,
-          contingency_costs: data.contingency_costs || 0,
-          overhead_own_forces: data.overhead_own_forces || 0,
-          overhead_subcontract: data.overhead_subcontract || 0,
-          general_costs_without_subcontract: data.general_costs_without_subcontract || 0,
-          profit_own_forces: data.profit_own_forces || 0,
-          profit_subcontract: data.profit_subcontract || 0,
-          mechanization_service: data.mechanization_service || 0,
-          mbp_gsm: data.mbp_gsm || 0,
-          warranty_period: data.warranty_period || 0,
+      // Инициализируем объект с нулевыми значениями для всех параметров
+      const markupValues: Record<string, number> = {};
+      markupParameters.forEach((param) => {
+        markupValues[param.key] = 0;
+      });
+
+      if (data && data.length > 0) {
+        // Заполняем значения из загруженных записей
+        data.forEach((record: any) => {
+          if (record.markup_parameter) {
+            markupValues[record.markup_parameter.key] = record.value || 0;
+          }
         });
+        setCurrentMarkupId(tenderId);
       } else {
-        // Данных нет - сбрасываем форму с нулевыми значениями
         setCurrentMarkupId(null);
-        form.setFieldsValue({
-          tender_id: tenderId,
-          works_16_markup: 0,
-          works_cost_growth: 0,
-          material_cost_growth: 0,
-          subcontract_works_cost_growth: 0,
-          subcontract_materials_cost_growth: 0,
-          contingency_costs: 0,
-          overhead_own_forces: 0,
-          overhead_subcontract: 0,
-          general_costs_without_subcontract: 0,
-          profit_own_forces: 0,
-          profit_subcontract: 0,
-          mechanization_service: 0,
-          mbp_gsm: 0,
-          warranty_period: 0,
-        });
       }
+
+      // Устанавливаем значения в форму
+      form.setFieldsValue({
+        tender_id: tenderId,
+        ...markupValues,
+      });
     } catch (error) {
       console.error('Ошибка загрузки данных наценок:', error);
       message.error('Не удалось загрузить данные наценок');
@@ -567,9 +665,65 @@ const MarkupConstructor: React.FC = () => {
   };
 
   // Обработка выбора тендера
-  const handleTenderChange = (tenderId: string) => {
+  const handleTenderChange = async (tenderId: string) => {
     setSelectedTenderId(tenderId);
+
+    // Загружаем тактику для выбранного тендера
+    const tacticFromDb = await fetchTacticFromSupabase(tenderId);
+    if (tacticFromDb) {
+      setMarkupSequences(tacticFromDb.sequences);
+      setBaseCosts(tacticFromDb.baseCosts);
+      setSelectedTacticId(currentTacticId); // Устанавливаем выбранную тактику
+    }
+
+    // Загружаем данные наценок для тендера
     fetchMarkupData(tenderId);
+  };
+
+  // Обработка выбора тактики
+  const handleTacticChange = async (tacticId: string) => {
+    setSelectedTacticId(tacticId);
+
+    // Загружаем выбранную тактику
+    try {
+      const { data, error } = await supabase
+        .from('markup_tactics')
+        .select('*')
+        .eq('id', tacticId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setCurrentTacticId(data.id);
+        setCurrentTacticName(data.name || 'Без названия');
+
+        // Преобразование из русского формата в английский
+        const sequencesEn = {
+          works: data.sequences['раб'] || [],
+          materials: data.sequences['мат'] || [],
+          subcontract_works: data.sequences['суб-раб'] || [],
+          subcontract_materials: data.sequences['суб-мат'] || [],
+          work_comp: data.sequences['раб-комп.'] || [],
+          material_comp: data.sequences['мат-комп.'] || [],
+        };
+
+        const baseCostsEn = {
+          works: data.base_costs['раб'] || 0,
+          materials: data.base_costs['мат'] || 0,
+          subcontract_works: data.base_costs['суб-раб'] || 0,
+          subcontract_materials: data.base_costs['суб-мат'] || 0,
+          work_comp: data.base_costs['раб-комп.'] || 0,
+          material_comp: data.base_costs['мат-комп.'] || 0,
+        };
+
+        setMarkupSequences(sequencesEn);
+        setBaseCosts(baseCostsEn);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки тактики:', error);
+      message.error('Не удалось загрузить тактику');
+    }
   };
 
   // Сохранение данных
@@ -584,46 +738,32 @@ const MarkupConstructor: React.FC = () => {
       const values = form.getFieldsValue();
       setSaving(true);
 
-      const markupData: TenderMarkupPercentageInsert = {
-        tender_id: selectedTenderId,
-        works_16_markup: values.works_16_markup || 0,
-        works_cost_growth: values.works_cost_growth || 0,
-        material_cost_growth: values.material_cost_growth || 0,
-        subcontract_works_cost_growth: values.subcontract_works_cost_growth || 0,
-        subcontract_materials_cost_growth: values.subcontract_materials_cost_growth || 0,
-        contingency_costs: values.contingency_costs || 0,
-        overhead_own_forces: values.overhead_own_forces || 0,
-        overhead_subcontract: values.overhead_subcontract || 0,
-        general_costs_without_subcontract: values.general_costs_without_subcontract || 0,
-        profit_own_forces: values.profit_own_forces || 0,
-        profit_subcontract: values.profit_subcontract || 0,
-        mechanization_service: values.mechanization_service || 0,
-        mbp_gsm: values.mbp_gsm || 0,
-        warranty_period: values.warranty_period || 0,
-        is_active: true,
-      };
-
+      // Если данные уже существуют - удаляем старые записи
       if (currentMarkupId) {
-        // Обновление существующей записи
-        const { error } = await supabase
+        const { error: deleteError } = await supabase
           .from('tender_markup_percentage')
-          .update(markupData)
-          .eq('id', currentMarkupId);
+          .delete()
+          .eq('tender_id', selectedTenderId);
 
-        if (error) throw error;
-        message.success('Данные успешно обновлены');
-      } else {
-        // Создание новой записи
-        const { data, error } = await supabase
-          .from('tender_markup_percentage')
-          .insert([markupData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCurrentMarkupId(data.id);
-        message.success('Данные успешно сохранены');
+        if (deleteError) throw deleteError;
       }
+
+      // Создаем массив записей для вставки (по одной для каждого параметра)
+      const markupRecords: TenderMarkupPercentageInsert[] = markupParameters.map((param) => ({
+        tender_id: selectedTenderId,
+        markup_parameter_id: param.id,
+        value: values[param.key] || 0,
+      }));
+
+      // Вставляем все записи одним запросом
+      const { error: insertError } = await supabase
+        .from('tender_markup_percentage')
+        .insert(markupRecords);
+
+      if (insertError) throw insertError;
+
+      setCurrentMarkupId(selectedTenderId);
+      message.success('Данные успешно обновлены');
     } catch (error) {
       console.error('Ошибка сохранения:', error);
       message.error('Не удалось сохранить данные');
@@ -639,6 +779,186 @@ const MarkupConstructor: React.FC = () => {
     } else {
       form.resetFields();
     }
+  };
+
+  // Добавление нового параметра наценки в БД
+  const handleAddParameter = async () => {
+    try {
+      const values = await newParameterForm.validateFields();
+      const { parameterKey, parameterLabel } = values;
+
+      // Проверяем, не существует ли уже параметр с таким ключом
+      const existing = markupParameters.find(p => p.key === parameterKey);
+      if (existing) {
+        message.error('Параметр с таким ключом уже существует');
+        return;
+      }
+
+      // Определяем следующий order_num
+      const maxOrderNum = markupParameters.length > 0
+        ? Math.max(...markupParameters.map(p => p.order_num || 0))
+        : 0;
+
+      // Добавляем параметр в БД
+      const { data, error } = await supabase
+        .from('markup_parameters')
+        .insert({
+          key: parameterKey,
+          label: parameterLabel,
+          is_active: true,
+          order_num: maxOrderNum + 1
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      message.success(`Параметр "${parameterLabel}" успешно добавлен!`);
+
+      // Обновляем список параметров
+      await fetchMarkupParameters();
+
+      // Закрываем модальное окно
+      handleCloseParameterModal();
+    } catch (error) {
+      console.error('Ошибка добавления параметра:', error);
+      message.error('Не удалось добавить параметр');
+    }
+  };
+
+  // Начало inline редактирования параметра
+  const handleInlineEdit = (parameter: MarkupParameter) => {
+    setEditingParameterId(parameter.id);
+    setEditingParameterLabel(parameter.label);
+  };
+
+  // Сохранение inline редактирования
+  const handleInlineSave = async (parameterId: string) => {
+    if (!editingParameterLabel.trim()) {
+      message.error('Название параметра не может быть пустым');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('markup_parameters')
+        .update({
+          label: editingParameterLabel,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', parameterId);
+
+      if (error) throw error;
+
+      message.success('Параметр успешно обновлен!');
+      await fetchMarkupParameters();
+      setEditingParameterId(null);
+      setEditingParameterLabel('');
+    } catch (error) {
+      console.error('Ошибка обновления параметра:', error);
+      message.error('Не удалось обновить параметр');
+    }
+  };
+
+  // Отмена inline редактирования
+  const handleInlineCancel = () => {
+    setEditingParameterId(null);
+    setEditingParameterLabel('');
+  };
+
+  // Удаление параметра наценки
+  const handleDeleteParameter = async (parameter: MarkupParameter) => {
+    Modal.confirm({
+      title: 'Удаление параметра',
+      content: `Вы уверены, что хотите удалить параметр "${parameter.label}"? Это действие необратимо.`,
+      okText: 'Удалить',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: async () => {
+        try {
+          const { error } = await supabase
+            .from('markup_parameters')
+            .delete()
+            .eq('id', parameter.id);
+
+          if (error) throw error;
+
+          message.success(`Параметр "${parameter.label}" удален`);
+
+          // Обновляем список параметров
+          await fetchMarkupParameters();
+        } catch (error) {
+          console.error('Ошибка удаления параметра:', error);
+          message.error('Не удалось удалить параметр');
+        }
+      }
+    });
+  };
+
+
+  // Изменение порядка параметра (вверх)
+  const handleMoveParameterUp = async (parameter: MarkupParameter) => {
+    const currentIndex = markupParameters.findIndex(p => p.id === parameter.id);
+    if (currentIndex === 0) return; // Уже первый
+
+    const prevParameter = markupParameters[currentIndex - 1];
+
+    try {
+      // Меняем местами order_num
+      await supabase
+        .from('markup_parameters')
+        .update({ order_num: prevParameter.order_num })
+        .eq('id', parameter.id);
+
+      await supabase
+        .from('markup_parameters')
+        .update({ order_num: parameter.order_num })
+        .eq('id', prevParameter.id);
+
+      message.success('Порядок изменен');
+      await fetchMarkupParameters();
+    } catch (error) {
+      console.error('Ошибка изменения порядка:', error);
+      message.error('Не удалось изменить порядок');
+    }
+  };
+
+  // Изменение порядка параметра (вниз)
+  const handleMoveParameterDown = async (parameter: MarkupParameter) => {
+    const currentIndex = markupParameters.findIndex(p => p.id === parameter.id);
+    if (currentIndex === markupParameters.length - 1) return; // Уже последний
+
+    const nextParameter = markupParameters[currentIndex + 1];
+
+    try {
+      // Меняем местами order_num
+      await supabase
+        .from('markup_parameters')
+        .update({ order_num: nextParameter.order_num })
+        .eq('id', parameter.id);
+
+      await supabase
+        .from('markup_parameters')
+        .update({ order_num: parameter.order_num })
+        .eq('id', nextParameter.id);
+
+      message.success('Порядок изменен');
+      await fetchMarkupParameters();
+    } catch (error) {
+      console.error('Ошибка изменения порядка:', error);
+      message.error('Не удалось изменить порядок');
+    }
+  };
+
+  // Закрытие модального окна добавления параметра
+  const handleCloseParameterModal = () => {
+    setIsAddParameterModalOpen(false);
+    newParameterForm.resetFields();
+  };
+
+  // Открытие модального окна добавления параметра
+  const handleOpenParameterModal = () => {
+    setIsAddParameterModalOpen(true);
   };
 
   // Сохранение тактики наценок
@@ -676,10 +996,10 @@ const MarkupConstructor: React.FC = () => {
         const { data, error } = await supabase
           .from('markup_tactics')
           .update({
-            name: 'Текущая тактика',
+            name: currentTacticName || 'Без названия',
             sequences: sequencesRu,
             base_costs: baseCostsRu,
-            is_global: false,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', currentTacticId)
           .select()
@@ -687,17 +1007,32 @@ const MarkupConstructor: React.FC = () => {
 
         if (error) {
           console.error('Ошибка обновления в Supabase:', error);
-          message.warning('Тактика сохранена локально, но не удалось обновить в базе данных');
+          message.warning('Порядок расчета сохранен локально, но не удалось обновить в базе данных');
         } else {
-          console.log('Тактика обновлена в Supabase:', data);
-          message.success('Тактика наценок успешно обновлена');
+          console.log('Порядок расчета обновлен в Supabase:', data);
+
+          // Если выбран тендер, обновляем его markup_tactic_id
+          if (selectedTenderId) {
+            const { error: tenderError } = await supabase
+              .from('tenders')
+              .update({ markup_tactic_id: currentTacticId })
+              .eq('id', selectedTenderId);
+
+            if (tenderError) {
+              console.error('Ошибка обновления тендера:', tenderError);
+            }
+          }
+
+          // Обновляем список тактик
+          await fetchTactics();
+          message.success('Порядок расчета успешно обновлен');
         }
       } else {
         // Создаем новую запись
         const { data, error } = await supabase
           .from('markup_tactics')
           .insert({
-            name: 'Текущая тактика',
+            name: currentTacticName || 'Новый порядок расчета',
             sequences: sequencesRu,
             base_costs: baseCostsRu,
             is_global: false,
@@ -707,16 +1042,32 @@ const MarkupConstructor: React.FC = () => {
 
         if (error) {
           console.error('Ошибка сохранения в Supabase:', error);
-          message.warning('Тактика сохранена локально, но не удалось сохранить в базу данных');
+          message.warning('Порядок расчета сохранен локально, но не удалось сохранить в базу данных');
         } else {
-          console.log('Тактика сохранена в Supabase:', data);
+          console.log('Порядок расчета сохранен в Supabase:', data);
           setCurrentTacticId(data.id); // Сохраняем ID для последующих обновлений
-          message.success('Тактика наценок успешно сохранена');
+          setSelectedTacticId(data.id); // Устанавливаем в селекте
+
+          // Если выбран тендер, обновляем его markup_tactic_id
+          if (selectedTenderId) {
+            const { error: tenderError } = await supabase
+              .from('tenders')
+              .update({ markup_tactic_id: data.id })
+              .eq('id', selectedTenderId);
+
+            if (tenderError) {
+              console.error('Ошибка обновления тендера:', tenderError);
+            }
+          }
+
+          // Обновляем список тактик
+          await fetchTactics();
+          message.success('Порядок расчета успешно создан');
         }
       }
     } catch (error) {
-      console.error('Ошибка сохранения тактики:', error);
-      message.error('Не удалось сохранить тактику');
+      console.error('Ошибка сохранения порядка расчета:', error);
+      message.error('Не удалось сохранить порядок расчета');
     }
   };
 
@@ -758,7 +1109,7 @@ const MarkupConstructor: React.FC = () => {
     if (op2Value !== undefined) {
       newStep.action2 = act2;
       newStep.operand2Type = op2Type;
-      newStep.operand2Key = op2Type === 'markup' ? String(op2Value) : undefined;
+      newStep.operand2Key = op2Type === 'markup' ? String(op2Value) : (op2Type === 'number' ? Number(op2Value) : undefined);
       newStep.operand2Index = op2Type === 'step' ? Number(op2Value) : undefined;
       newStep.operand2MultiplyFormat = act2 === 'multiply' && op2Type === 'markup' ? operand2MultiplyFormat[tabKey] : undefined;
     }
@@ -767,7 +1118,7 @@ const MarkupConstructor: React.FC = () => {
     if (op3Value !== undefined) {
       newStep.action3 = act3;
       newStep.operand3Type = op3Type;
-      newStep.operand3Key = op3Type === 'markup' ? String(op3Value) : undefined;
+      newStep.operand3Key = op3Type === 'markup' ? String(op3Value) : (op3Type === 'number' ? Number(op3Value) : undefined);
       newStep.operand3Index = op3Type === 'step' ? Number(op3Value) : undefined;
       newStep.operand3MultiplyFormat = act3 === 'multiply' && op3Type === 'markup' ? operand3MultiplyFormat[tabKey] : undefined;
     }
@@ -776,7 +1127,7 @@ const MarkupConstructor: React.FC = () => {
     if (op4Value !== undefined) {
       newStep.action4 = act4;
       newStep.operand4Type = op4Type;
-      newStep.operand4Key = op4Type === 'markup' ? String(op4Value) : undefined;
+      newStep.operand4Key = op4Type === 'markup' ? String(op4Value) : (op4Type === 'number' ? Number(op4Value) : undefined);
       newStep.operand4Index = op4Type === 'step' ? Number(op4Value) : undefined;
       newStep.operand4MultiplyFormat = act4 === 'multiply' && op4Type === 'markup' ? operand4MultiplyFormat[tabKey] : undefined;
     }
@@ -785,7 +1136,7 @@ const MarkupConstructor: React.FC = () => {
     if (op5Value !== undefined) {
       newStep.action5 = act5;
       newStep.operand5Type = op5Type;
-      newStep.operand5Key = op5Type === 'markup' ? String(op5Value) : undefined;
+      newStep.operand5Key = op5Type === 'markup' ? String(op5Value) : (op5Type === 'number' ? Number(op5Value) : undefined);
       newStep.operand5Index = op5Type === 'step' ? Number(op5Value) : undefined;
       newStep.operand5MultiplyFormat = act5 === 'multiply' && op5Type === 'markup' ? operand5MultiplyFormat[tabKey] : undefined;
     }
@@ -842,7 +1193,11 @@ const MarkupConstructor: React.FC = () => {
       setOperand2Type(prev => ({ ...prev, [tabKey]: step.operand2Type! }));
       setOperand2Value(prev => ({
         ...prev,
-        [tabKey]: step.operand2Type === 'markup' ? step.operand2Key : step.operand2Index
+        [tabKey]: step.operand2Type === 'markup' ? step.operand2Key : (step.operand2Type === 'number' ? step.operand2Key : step.operand2Index)
+      }));
+      setOperand2InputMode(prev => ({
+        ...prev,
+        [tabKey]: step.operand2Type === 'number' ? 'manual' : 'select'
       }));
       setOperand2MultiplyFormat(prev => ({
         ...prev,
@@ -859,7 +1214,11 @@ const MarkupConstructor: React.FC = () => {
       setOperand3Type(prev => ({ ...prev, [tabKey]: step.operand3Type! }));
       setOperand3Value(prev => ({
         ...prev,
-        [tabKey]: step.operand3Type === 'markup' ? step.operand3Key : step.operand3Index
+        [tabKey]: step.operand3Type === 'markup' ? step.operand3Key : (step.operand3Type === 'number' ? step.operand3Key : step.operand3Index)
+      }));
+      setOperand3InputMode(prev => ({
+        ...prev,
+        [tabKey]: step.operand3Type === 'number' ? 'manual' : 'select'
       }));
       setOperand3MultiplyFormat(prev => ({
         ...prev,
@@ -876,7 +1235,11 @@ const MarkupConstructor: React.FC = () => {
       setOperand4Type(prev => ({ ...prev, [tabKey]: step.operand4Type! }));
       setOperand4Value(prev => ({
         ...prev,
-        [tabKey]: step.operand4Type === 'markup' ? step.operand4Key : step.operand4Index
+        [tabKey]: step.operand4Type === 'markup' ? step.operand4Key : (step.operand4Type === 'number' ? step.operand4Key : step.operand4Index)
+      }));
+      setOperand4InputMode(prev => ({
+        ...prev,
+        [tabKey]: step.operand4Type === 'number' ? 'manual' : 'select'
       }));
       setOperand4MultiplyFormat(prev => ({
         ...prev,
@@ -893,7 +1256,11 @@ const MarkupConstructor: React.FC = () => {
       setOperand5Type(prev => ({ ...prev, [tabKey]: step.operand5Type! }));
       setOperand5Value(prev => ({
         ...prev,
-        [tabKey]: step.operand5Type === 'markup' ? step.operand5Key : step.operand5Index
+        [tabKey]: step.operand5Type === 'markup' ? step.operand5Key : (step.operand5Type === 'number' ? step.operand5Key : step.operand5Index)
+      }));
+      setOperand5InputMode(prev => ({
+        ...prev,
+        [tabKey]: step.operand5Type === 'number' ? 'manual' : 'select'
       }));
       setOperand5MultiplyFormat(prev => ({
         ...prev,
@@ -929,7 +1296,7 @@ const MarkupConstructor: React.FC = () => {
 
   // Получить все доступные наценки (без фильтрации)
   const getAvailableMarkups = (tabKey: TabKey) => {
-    return AVAILABLE_MARKUPS;
+    return markupParameters;
   };
 
   // Расчет промежуточных итогов
@@ -1007,6 +1374,8 @@ const MarkupConstructor: React.FC = () => {
           operand2Value = percentValue / 100;
         } else if (step.operand2Type === 'step' && step.operand2Index !== undefined) {
           operand2Value = step.operand2Index === -1 ? baseCost : (results[step.operand2Index] || baseCost);
+        } else if (step.operand2Type === 'number' && typeof step.operand2Key === 'number') {
+          operand2Value = step.operand2Key;
         } else {
           operand2Value = 0;
         }
@@ -1054,6 +1423,8 @@ const MarkupConstructor: React.FC = () => {
           operand3Value = percentValue / 100;
         } else if (step.operand3Type === 'step' && step.operand3Index !== undefined) {
           operand3Value = step.operand3Index === -1 ? baseCost : (results[step.operand3Index] || baseCost);
+        } else if (step.operand3Type === 'number' && typeof step.operand3Key === 'number') {
+          operand3Value = step.operand3Key;
         } else {
           operand3Value = 0;
         }
@@ -1101,6 +1472,8 @@ const MarkupConstructor: React.FC = () => {
           operand4Value = percentValue / 100;
         } else if (step.operand4Type === 'step' && step.operand4Index !== undefined) {
           operand4Value = step.operand4Index === -1 ? baseCost : (results[step.operand4Index] || baseCost);
+        } else if (step.operand4Type === 'number' && typeof step.operand4Key === 'number') {
+          operand4Value = step.operand4Key;
         } else {
           operand4Value = 0;
         }
@@ -1148,6 +1521,8 @@ const MarkupConstructor: React.FC = () => {
           operand5Value = percentValue / 100;
         } else if (step.operand5Type === 'step' && step.operand5Index !== undefined) {
           operand5Value = step.operand5Index === -1 ? baseCost : (results[step.operand5Index] || baseCost);
+        } else if (step.operand5Type === 'number' && typeof step.operand5Key === 'number') {
+          operand5Value = step.operand5Key;
         } else {
           operand5Value = 0;
         }
@@ -1312,7 +1687,7 @@ const MarkupConstructor: React.FC = () => {
                 let op1Name: string;
                 let op1ValueNum: number;
                 if (step.operand1Type === 'markup' && step.operand1Key) {
-                  const markup = AVAILABLE_MARKUPS.find(m => m.key === step.operand1Key);
+                  const markup = markupParameters.find(m => m.key === step.operand1Key);
                   op1Name = markup?.label || step.operand1Key;
                   op1ValueNum = form.getFieldValue(step.operand1Key) || 0;
                 } else if (step.operand1Type === 'step' && step.operand1Index !== undefined) {
@@ -1343,7 +1718,7 @@ const MarkupConstructor: React.FC = () => {
                   let op2Name: string;
                   let op2ValueNum: number;
                   if (step.operand2Type === 'markup' && step.operand2Key) {
-                    const markup = AVAILABLE_MARKUPS.find(m => m.key === step.operand2Key);
+                    const markup = markupParameters.find(m => m.key === step.operand2Key);
                     op2Name = markup?.label || step.operand2Key;
                     op2ValueNum = form.getFieldValue(step.operand2Key) || 0;
                   } else if (step.operand2Type === 'step' && step.operand2Index !== undefined) {
@@ -1371,7 +1746,7 @@ const MarkupConstructor: React.FC = () => {
                   let op3Name: string;
                   let op3ValueNum: number;
                   if (step.operand3Type === 'markup' && step.operand3Key) {
-                    const markup = AVAILABLE_MARKUPS.find(m => m.key === step.operand3Key);
+                    const markup = markupParameters.find(m => m.key === step.operand3Key);
                     op3Name = markup?.label || step.operand3Key;
                     op3ValueNum = form.getFieldValue(step.operand3Key) || 0;
                   } else if (step.operand3Type === 'step' && step.operand3Index !== undefined) {
@@ -1399,7 +1774,7 @@ const MarkupConstructor: React.FC = () => {
                   let op4Name: string;
                   let op4ValueNum: number;
                   if (step.operand4Type === 'markup' && step.operand4Key) {
-                    const markup = AVAILABLE_MARKUPS.find(m => m.key === step.operand4Key);
+                    const markup = markupParameters.find(m => m.key === step.operand4Key);
                     op4Name = markup?.label || step.operand4Key;
                     op4ValueNum = form.getFieldValue(step.operand4Key) || 0;
                   } else if (step.operand4Type === 'step' && step.operand4Index !== undefined) {
@@ -1427,7 +1802,7 @@ const MarkupConstructor: React.FC = () => {
                   let op5Name: string;
                   let op5ValueNum: number;
                   if (step.operand5Type === 'markup' && step.operand5Key) {
-                    const markup = AVAILABLE_MARKUPS.find(m => m.key === step.operand5Key);
+                    const markup = markupParameters.find(m => m.key === step.operand5Key);
                     op5Name = markup?.label || step.operand5Key;
                     op5ValueNum = form.getFieldValue(step.operand5Key) || 0;
                   } else if (step.operand5Type === 'step' && step.operand5Index !== undefined) {
@@ -1795,60 +2170,94 @@ const MarkupConstructor: React.FC = () => {
                 {/* Операция 2 (опциональная) */}
                 {showSecondAction[tabKey] && (
                   <>
-                    <Row gutter={8} align="middle" style={{ marginBottom: 0 }}>
-                      <Col flex="120px">
-                        <Select
-                          placeholder="Действие"
-                          style={{ width: '100%' }}
-                          options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
-                          onChange={(value) => setAction2(prev => ({ ...prev, [tabKey]: value }))}
-                          value={act2}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="auto" style={{ maxWidth: 250 }}>
-                        <Select
-                          placeholder="Наценка/Пункт"
-                          style={{ width: '100%' }}
-                          options={operandOptions}
-                          onChange={(value) => {
-                            if (value) {
-                              const [type, val] = value.split(':');
-                              if (type === 'base') {
-                                setOperand2Type(prev => ({ ...prev, [tabKey]: 'step' }));
-                                setOperand2Value(prev => ({ ...prev, [tabKey]: -1 }));
-                              } else {
-                                setOperand2Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' }));
-                                setOperand2Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
-                              }
+                    <div style={{ marginBottom: 0 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Radio.Group
+                          size="small"
+                          value={operand2InputMode[tabKey]}
+                          onChange={(e) => {
+                            setOperand2InputMode(prev => ({ ...prev, [tabKey]: e.target.value }));
+                            if (e.target.value === 'manual') {
+                              setOperand2Type(prev => ({ ...prev, [tabKey]: 'number' }));
+                              setOperand2Value(prev => ({ ...prev, [tabKey]: undefined }));
                             } else {
+                              setOperand2Type(prev => ({ ...prev, [tabKey]: 'markup' }));
                               setOperand2Value(prev => ({ ...prev, [tabKey]: undefined }));
                             }
                           }}
-                          value={op2Value !== undefined ? (op2Value === -1 ? 'base:-1' : `${op2Type}:${op2Value}`) : undefined}
-                          allowClear
-                          onClear={() => {
-                            setShowSecondAction(prev => ({ ...prev, [tabKey]: false }));
-                            setShowThirdAction(prev => ({ ...prev, [tabKey]: false }));
-                            setShowFourthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setOperand2Value(prev => ({ ...prev, [tabKey]: undefined }));
-                          }}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="none">
-                        {!showThirdAction[tabKey] && (
-                          <Button
-                            icon={<PlusOutlined />}
-                            onClick={() => setShowThirdAction(prev => ({ ...prev, [tabKey]: true }))}
-                            title="Добавить третье действие"
+                        >
+                          <Radio.Button value="select">Выбрать</Radio.Button>
+                          <Radio.Button value="manual">Ввести число</Radio.Button>
+                        </Radio.Group>
+                      </div>
+
+                      <Row gutter={8} align="middle" style={{ marginBottom: 0 }}>
+                        <Col flex="120px">
+                          <Select
+                            placeholder="Действие"
+                            style={{ width: '100%' }}
+                            options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
+                            onChange={(value) => setAction2(prev => ({ ...prev, [tabKey]: value }))}
+                            value={act2}
                             size="middle"
-                            style={{ minWidth: 32, padding: '4px 8px' }}
                           />
-                        )}
-                      </Col>
-                    </Row>
+                        </Col>
+                        <Col flex="auto" style={{ maxWidth: 250 }}>
+                          {operand2InputMode[tabKey] === 'select' ? (
+                            <Select
+                              placeholder="Наценка/Пункт"
+                              style={{ width: '100%' }}
+                              options={operandOptions}
+                              onChange={(value) => {
+                                if (value) {
+                                  const [type, val] = value.split(':');
+                                  if (type === 'base') {
+                                    setOperand2Type(prev => ({ ...prev, [tabKey]: 'step' }));
+                                    setOperand2Value(prev => ({ ...prev, [tabKey]: -1 }));
+                                  } else {
+                                    setOperand2Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' | 'number' }));
+                                    setOperand2Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
+                                  }
+                                } else {
+                                  setOperand2Value(prev => ({ ...prev, [tabKey]: undefined }));
+                                }
+                              }}
+                              value={op2Value !== undefined && op2Type !== 'number' ? (op2Value === -1 ? 'base:-1' : `${op2Type}:${op2Value}`) : undefined}
+                              allowClear
+                              onClear={() => {
+                                setShowSecondAction(prev => ({ ...prev, [tabKey]: false }));
+                                setShowThirdAction(prev => ({ ...prev, [tabKey]: false }));
+                                setShowFourthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setOperand2Value(prev => ({ ...prev, [tabKey]: undefined }));
+                              }}
+                              size="middle"
+                            />
+                          ) : (
+                            <InputNumber
+                              placeholder="Введите число"
+                              style={{ width: '100%' }}
+                              value={typeof op2Value === 'number' ? op2Value : undefined}
+                              onChange={(value) => {
+                                setOperand2Value(prev => ({ ...prev, [tabKey]: value || 0 }));
+                              }}
+                              size="middle"
+                            />
+                          )}
+                        </Col>
+                        <Col flex="none">
+                          {!showThirdAction[tabKey] && (
+                            <Button
+                              icon={<PlusOutlined />}
+                              onClick={() => setShowThirdAction(prev => ({ ...prev, [tabKey]: true }))}
+                              title="Добавить третье действие"
+                              size="middle"
+                              style={{ minWidth: 32, padding: '4px 8px' }}
+                            />
+                          )}
+                        </Col>
+                      </Row>
+                    </div>
                     {act2 === 'multiply' && op2Type === 'markup' && (
                       <Row style={{ marginBottom: showThirdAction[tabKey] ? 12 : 0, marginTop: 8, marginLeft: 128 }}>
                         <Col>
@@ -1872,59 +2281,93 @@ const MarkupConstructor: React.FC = () => {
                 {/* Операция 3 (опциональная) */}
                 {showThirdAction[tabKey] && (
                   <>
-                    <Row gutter={8} align="middle" style={{ marginBottom: 0 }}>
-                      <Col flex="120px">
-                        <Select
-                          placeholder="Действие"
-                          style={{ width: '100%' }}
-                          options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
-                          onChange={(value) => setAction3(prev => ({ ...prev, [tabKey]: value }))}
-                          value={action3[tabKey]}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="auto" style={{ maxWidth: 250 }}>
-                        <Select
-                          placeholder="Наценка/Пункт"
-                          style={{ width: '100%' }}
-                          options={operandOptions}
-                          onChange={(value) => {
-                            if (value) {
-                              const [type, val] = value.split(':');
-                              if (type === 'base') {
-                                setOperand3Type(prev => ({ ...prev, [tabKey]: 'step' }));
-                                setOperand3Value(prev => ({ ...prev, [tabKey]: -1 }));
-                              } else {
-                                setOperand3Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' }));
-                                setOperand3Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
-                              }
+                    <div style={{ marginBottom: 0 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Radio.Group
+                          size="small"
+                          value={operand3InputMode[tabKey]}
+                          onChange={(e) => {
+                            setOperand3InputMode(prev => ({ ...prev, [tabKey]: e.target.value }));
+                            if (e.target.value === 'manual') {
+                              setOperand3Type(prev => ({ ...prev, [tabKey]: 'number' }));
+                              setOperand3Value(prev => ({ ...prev, [tabKey]: undefined }));
                             } else {
+                              setOperand3Type(prev => ({ ...prev, [tabKey]: 'markup' }));
                               setOperand3Value(prev => ({ ...prev, [tabKey]: undefined }));
                             }
                           }}
-                          value={operand3Value[tabKey] !== undefined ? (operand3Value[tabKey] === -1 ? 'base:-1' : `${operand3Type[tabKey]}:${operand3Value[tabKey]}`) : undefined}
-                          allowClear
-                          onClear={() => {
-                            setShowThirdAction(prev => ({ ...prev, [tabKey]: false }));
-                            setShowFourthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setOperand3Value(prev => ({ ...prev, [tabKey]: undefined }));
-                          }}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="none">
-                        {!showFourthAction[tabKey] && (
-                          <Button
-                            icon={<PlusOutlined />}
-                            onClick={() => setShowFourthAction(prev => ({ ...prev, [tabKey]: true }))}
-                            title="Добавить четвертое действие"
+                        >
+                          <Radio.Button value="select">Выбрать</Radio.Button>
+                          <Radio.Button value="manual">Ввести число</Radio.Button>
+                        </Radio.Group>
+                      </div>
+
+                      <Row gutter={8} align="middle" style={{ marginBottom: 0 }}>
+                        <Col flex="120px">
+                          <Select
+                            placeholder="Действие"
+                            style={{ width: '100%' }}
+                            options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
+                            onChange={(value) => setAction3(prev => ({ ...prev, [tabKey]: value }))}
+                            value={action3[tabKey]}
                             size="middle"
-                            style={{ minWidth: 32, padding: '4px 8px' }}
                           />
-                        )}
-                      </Col>
-                    </Row>
+                        </Col>
+                        <Col flex="auto" style={{ maxWidth: 250 }}>
+                          {operand3InputMode[tabKey] === 'select' ? (
+                            <Select
+                              placeholder="Наценка/Пункт"
+                              style={{ width: '100%' }}
+                              options={operandOptions}
+                              onChange={(value) => {
+                                if (value) {
+                                  const [type, val] = value.split(':');
+                                  if (type === 'base') {
+                                    setOperand3Type(prev => ({ ...prev, [tabKey]: 'step' }));
+                                    setOperand3Value(prev => ({ ...prev, [tabKey]: -1 }));
+                                  } else {
+                                    setOperand3Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' | 'number' }));
+                                    setOperand3Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
+                                  }
+                                } else {
+                                  setOperand3Value(prev => ({ ...prev, [tabKey]: undefined }));
+                                }
+                              }}
+                              value={operand3Value[tabKey] !== undefined && operand3Type[tabKey] !== 'number' ? (operand3Value[tabKey] === -1 ? 'base:-1' : `${operand3Type[tabKey]}:${operand3Value[tabKey]}`) : undefined}
+                              allowClear
+                              onClear={() => {
+                                setShowThirdAction(prev => ({ ...prev, [tabKey]: false }));
+                                setShowFourthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setOperand3Value(prev => ({ ...prev, [tabKey]: undefined }));
+                              }}
+                              size="middle"
+                            />
+                          ) : (
+                            <InputNumber
+                              placeholder="Введите число"
+                              style={{ width: '100%' }}
+                              value={typeof operand3Value[tabKey] === 'number' ? operand3Value[tabKey] : undefined}
+                              onChange={(value) => {
+                                setOperand3Value(prev => ({ ...prev, [tabKey]: value || 0 }));
+                              }}
+                              size="middle"
+                            />
+                          )}
+                        </Col>
+                        <Col flex="none">
+                          {!showFourthAction[tabKey] && (
+                            <Button
+                              icon={<PlusOutlined />}
+                              onClick={() => setShowFourthAction(prev => ({ ...prev, [tabKey]: true }))}
+                              title="Добавить четвертое действие"
+                              size="middle"
+                              style={{ minWidth: 32, padding: '4px 8px' }}
+                            />
+                          )}
+                        </Col>
+                      </Row>
+                    </div>
                     {action3[tabKey] === 'multiply' && operand3Type[tabKey] === 'markup' && (
                       <Row style={{ marginBottom: showFourthAction[tabKey] ? 12 : 0, marginTop: 8, marginLeft: 128 }}>
                         <Col>
@@ -1948,58 +2391,92 @@ const MarkupConstructor: React.FC = () => {
                 {/* Операция 4 (опциональная) */}
                 {showFourthAction[tabKey] && (
                   <>
-                    <Row gutter={8} align="middle" style={{ marginBottom: 0 }}>
-                      <Col flex="120px">
-                        <Select
-                          placeholder="Действие"
-                          style={{ width: '100%' }}
-                          options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
-                          onChange={(value) => setAction4(prev => ({ ...prev, [tabKey]: value }))}
-                          value={action4[tabKey]}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="auto" style={{ maxWidth: 250 }}>
-                        <Select
-                          placeholder="Наценка/Пункт"
-                          style={{ width: '100%' }}
-                          options={operandOptions}
-                          onChange={(value) => {
-                            if (value) {
-                              const [type, val] = value.split(':');
-                              if (type === 'base') {
-                                setOperand4Type(prev => ({ ...prev, [tabKey]: 'step' }));
-                                setOperand4Value(prev => ({ ...prev, [tabKey]: -1 }));
-                              } else {
-                                setOperand4Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' }));
-                                setOperand4Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
-                              }
+                    <div style={{ marginBottom: 0 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Radio.Group
+                          size="small"
+                          value={operand4InputMode[tabKey]}
+                          onChange={(e) => {
+                            setOperand4InputMode(prev => ({ ...prev, [tabKey]: e.target.value }));
+                            if (e.target.value === 'manual') {
+                              setOperand4Type(prev => ({ ...prev, [tabKey]: 'number' }));
+                              setOperand4Value(prev => ({ ...prev, [tabKey]: undefined }));
                             } else {
+                              setOperand4Type(prev => ({ ...prev, [tabKey]: 'markup' }));
                               setOperand4Value(prev => ({ ...prev, [tabKey]: undefined }));
                             }
                           }}
-                          value={operand4Value[tabKey] !== undefined ? (operand4Value[tabKey] === -1 ? 'base:-1' : `${operand4Type[tabKey]}:${operand4Value[tabKey]}`) : undefined}
-                          allowClear
-                          onClear={() => {
-                            setShowFourthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setOperand4Value(prev => ({ ...prev, [tabKey]: undefined }));
-                          }}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="none">
-                        {!showFifthAction[tabKey] && (
-                          <Button
-                            icon={<PlusOutlined />}
-                            onClick={() => setShowFifthAction(prev => ({ ...prev, [tabKey]: true }))}
-                            title="Добавить пятое действие"
+                        >
+                          <Radio.Button value="select">Выбрать</Radio.Button>
+                          <Radio.Button value="manual">Ввести число</Radio.Button>
+                        </Radio.Group>
+                      </div>
+
+                      <Row gutter={8} align="middle" style={{ marginBottom: 0 }}>
+                        <Col flex="120px">
+                          <Select
+                            placeholder="Действие"
+                            style={{ width: '100%' }}
+                            options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
+                            onChange={(value) => setAction4(prev => ({ ...prev, [tabKey]: value }))}
+                            value={action4[tabKey]}
                             size="middle"
-                            style={{ minWidth: 32, padding: '4px 8px' }}
                           />
-                        )}
-                      </Col>
-                    </Row>
+                        </Col>
+                        <Col flex="auto" style={{ maxWidth: 250 }}>
+                          {operand4InputMode[tabKey] === 'select' ? (
+                            <Select
+                              placeholder="Наценка/Пункт"
+                              style={{ width: '100%' }}
+                              options={operandOptions}
+                              onChange={(value) => {
+                                if (value) {
+                                  const [type, val] = value.split(':');
+                                  if (type === 'base') {
+                                    setOperand4Type(prev => ({ ...prev, [tabKey]: 'step' }));
+                                    setOperand4Value(prev => ({ ...prev, [tabKey]: -1 }));
+                                  } else {
+                                    setOperand4Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' | 'number' }));
+                                    setOperand4Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
+                                  }
+                                } else {
+                                  setOperand4Value(prev => ({ ...prev, [tabKey]: undefined }));
+                                }
+                              }}
+                              value={operand4Value[tabKey] !== undefined && operand4Type[tabKey] !== 'number' ? (operand4Value[tabKey] === -1 ? 'base:-1' : `${operand4Type[tabKey]}:${operand4Value[tabKey]}`) : undefined}
+                              allowClear
+                              onClear={() => {
+                                setShowFourthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setOperand4Value(prev => ({ ...prev, [tabKey]: undefined }));
+                              }}
+                              size="middle"
+                            />
+                          ) : (
+                            <InputNumber
+                              placeholder="Введите число"
+                              style={{ width: '100%' }}
+                              value={typeof operand4Value[tabKey] === 'number' ? operand4Value[tabKey] : undefined}
+                              onChange={(value) => {
+                                setOperand4Value(prev => ({ ...prev, [tabKey]: value || 0 }));
+                              }}
+                              size="middle"
+                            />
+                          )}
+                        </Col>
+                        <Col flex="none">
+                          {!showFifthAction[tabKey] && (
+                            <Button
+                              icon={<PlusOutlined />}
+                              onClick={() => setShowFifthAction(prev => ({ ...prev, [tabKey]: true }))}
+                              title="Добавить пятое действие"
+                              size="middle"
+                              style={{ minWidth: 32, padding: '4px 8px' }}
+                            />
+                          )}
+                        </Col>
+                      </Row>
+                    </div>
                     {action4[tabKey] === 'multiply' && operand4Type[tabKey] === 'markup' && (
                       <Row style={{ marginBottom: showFifthAction[tabKey] ? 12 : 0, marginTop: 8, marginLeft: 128 }}>
                         <Col>
@@ -2023,46 +2500,80 @@ const MarkupConstructor: React.FC = () => {
                 {/* Операция 5 (опциональная) */}
                 {showFifthAction[tabKey] && (
                   <>
-                    <Row gutter={8} align="middle">
-                      <Col flex="120px">
-                        <Select
-                          placeholder="Действие"
-                          style={{ width: '100%' }}
-                          options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
-                          onChange={(value) => setAction5(prev => ({ ...prev, [tabKey]: value }))}
-                          value={action5[tabKey]}
-                          size="middle"
-                        />
-                      </Col>
-                      <Col flex="auto" style={{ maxWidth: 250 }}>
-                        <Select
-                          placeholder="Наценка/Пункт"
-                          style={{ width: '100%' }}
-                          options={operandOptions}
-                          onChange={(value) => {
-                            if (value) {
-                              const [type, val] = value.split(':');
-                              if (type === 'base') {
-                                setOperand5Type(prev => ({ ...prev, [tabKey]: 'step' }));
-                                setOperand5Value(prev => ({ ...prev, [tabKey]: -1 }));
-                              } else {
-                                setOperand5Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' }));
-                                setOperand5Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
-                              }
+                    <div style={{ marginBottom: 0 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Radio.Group
+                          size="small"
+                          value={operand5InputMode[tabKey]}
+                          onChange={(e) => {
+                            setOperand5InputMode(prev => ({ ...prev, [tabKey]: e.target.value }));
+                            if (e.target.value === 'manual') {
+                              setOperand5Type(prev => ({ ...prev, [tabKey]: 'number' }));
+                              setOperand5Value(prev => ({ ...prev, [tabKey]: undefined }));
                             } else {
+                              setOperand5Type(prev => ({ ...prev, [tabKey]: 'markup' }));
                               setOperand5Value(prev => ({ ...prev, [tabKey]: undefined }));
                             }
                           }}
-                          value={operand5Value[tabKey] !== undefined ? (operand5Value[tabKey] === -1 ? 'base:-1' : `${operand5Type[tabKey]}:${operand5Value[tabKey]}`) : undefined}
-                          allowClear
-                          onClear={() => {
-                            setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
-                            setOperand5Value(prev => ({ ...prev, [tabKey]: undefined }));
-                          }}
-                          size="middle"
-                        />
-                      </Col>
-                    </Row>
+                        >
+                          <Radio.Button value="select">Выбрать</Radio.Button>
+                          <Radio.Button value="manual">Ввести число</Radio.Button>
+                        </Radio.Group>
+                      </div>
+
+                      <Row gutter={8} align="middle">
+                        <Col flex="120px">
+                          <Select
+                            placeholder="Действие"
+                            style={{ width: '100%' }}
+                            options={ACTIONS.map(a => ({ label: a.label, value: a.value }))}
+                            onChange={(value) => setAction5(prev => ({ ...prev, [tabKey]: value }))}
+                            value={action5[tabKey]}
+                            size="middle"
+                          />
+                        </Col>
+                        <Col flex="auto" style={{ maxWidth: 250 }}>
+                          {operand5InputMode[tabKey] === 'select' ? (
+                            <Select
+                              placeholder="Наценка/Пункт"
+                              style={{ width: '100%' }}
+                              options={operandOptions}
+                              onChange={(value) => {
+                                if (value) {
+                                  const [type, val] = value.split(':');
+                                  if (type === 'base') {
+                                    setOperand5Type(prev => ({ ...prev, [tabKey]: 'step' }));
+                                    setOperand5Value(prev => ({ ...prev, [tabKey]: -1 }));
+                                  } else {
+                                    setOperand5Type(prev => ({ ...prev, [tabKey]: type as 'markup' | 'step' | 'number' }));
+                                    setOperand5Value(prev => ({ ...prev, [tabKey]: type === 'markup' ? val : Number(val) }));
+                                  }
+                                } else {
+                                  setOperand5Value(prev => ({ ...prev, [tabKey]: undefined }));
+                                }
+                              }}
+                              value={operand5Value[tabKey] !== undefined && operand5Type[tabKey] !== 'number' ? (operand5Value[tabKey] === -1 ? 'base:-1' : `${operand5Type[tabKey]}:${operand5Value[tabKey]}`) : undefined}
+                              allowClear
+                              onClear={() => {
+                                setShowFifthAction(prev => ({ ...prev, [tabKey]: false }));
+                                setOperand5Value(prev => ({ ...prev, [tabKey]: undefined }));
+                              }}
+                              size="middle"
+                            />
+                          ) : (
+                            <InputNumber
+                              placeholder="Введите число"
+                              style={{ width: '100%' }}
+                              value={typeof operand5Value[tabKey] === 'number' ? operand5Value[tabKey] : undefined}
+                              onChange={(value) => {
+                                setOperand5Value(prev => ({ ...prev, [tabKey]: value || 0 }));
+                              }}
+                              size="middle"
+                            />
+                          )}
+                        </Col>
+                      </Row>
+                    </div>
                     {action5[tabKey] === 'multiply' && operand5Type[tabKey] === 'markup' && (
                       <Row style={{ marginTop: 8, marginLeft: 128 }}>
                         <Col>
@@ -2142,279 +2653,100 @@ const MarkupConstructor: React.FC = () => {
                   </Space>
                 }
               >
-            <Spin spinning={loading}>
-              <Form
-                form={form}
-                layout="horizontal"
-                labelCol={{ style: { width: '250px', textAlign: 'left' } }}
-                wrapperCol={{ style: { flex: 1 } }}
-                initialValues={{
-                  works_16_markup: 0,
-                  works_cost_growth: 0,
-                  material_cost_growth: 0,
-                  subcontract_works_cost_growth: 0,
-                  subcontract_materials_cost_growth: 0,
-                  contingency_costs: 0,
-                  overhead_own_forces: 0,
-                  overhead_subcontract: 0,
-                  general_costs_without_subcontract: 0,
-                  profit_own_forces: 0,
-                  profit_subcontract: 0,
-                  mechanization_service: 0,
-                  mbp_gsm: 0,
-                  warranty_period: 0,
-                }}
-              >
-              {/* Выбор тендера */}
-              <Form.Item
-                label="Тендер"
-                name="tender_id"
-                rules={[{ required: true, message: 'Выберите тендер' }]}
-                style={{ marginBottom: '24px' }}
-              >
-                <Select
-                  placeholder="Выберите тендер"
-                  onChange={handleTenderChange}
-                  showSearch
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                  }
-                  options={tenders.map(tender => ({
-                    label: tender.title,
-                    value: tender.id,
-                  }))}
-                  style={{ width: '250px' }}
-                />
-              </Form.Item>
+            <Spin spinning={loading || loadingParameters}>
+              {loadingParameters ? (
+                <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                  <Text>Загрузка параметров наценок...</Text>
+                </div>
+              ) : markupParameters.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                  <Text type="danger">Параметры наценок не найдены. Проверьте базу данных.</Text>
+                </div>
+              ) : (
+                <Form
+                  form={form}
+                  layout="horizontal"
+                  labelCol={{ style: { width: '250px', textAlign: 'left' } }}
+                  wrapperCol={{ style: { flex: 1 } }}
+                  initialValues={{
+                    ...markupParameters.reduce((acc, param) => ({
+                      ...acc,
+                      [param.key]: 0
+                    }), {}),
+                    tender_id: undefined
+                  }}
+                >
+                  {/* Выбор тендера и тактики */}
+                  <Row gutter={16} style={{ marginBottom: '24px' }}>
+                    <Col>
+                      <Form.Item
+                        label="Тендер"
+                        name="tender_id"
+                        rules={[{ required: true, message: 'Выберите тендер' }]}
+                        style={{ marginBottom: 0 }}
+                      >
+                        <Select
+                          placeholder="Выберите тендер"
+                          onChange={handleTenderChange}
+                          showSearch
+                          optionFilterProp="children"
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          options={tenders.map(tender => ({
+                            label: tender.title,
+                            value: tender.id,
+                          }))}
+                          style={{ width: '250px' }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col>
+                      <Form.Item
+                        label="Порядок расчета"
+                        style={{ marginBottom: 0 }}
+                      >
+                        <Select
+                          placeholder="Выберите порядок расчета"
+                          value={selectedTacticId}
+                          onChange={handleTacticChange}
+                          showSearch
+                          optionFilterProp="children"
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          options={tactics.map(tactic => ({
+                            label: tactic.name || 'Без названия',
+                            value: tactic.id,
+                          }))}
+                          style={{ width: '250px' }}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
 
-              <Row gutter={[16, 0]}>
-                <Col span={24}>
-                  <Form.Item
-                    label="Служба механизации"
-                    name="mechanization_service"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="МБП и ГСМ"
-                    name="mbp_gsm"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Гарантийный период"
-                    name="warranty_period"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Работы 1,6"
-                    name="works_16_markup"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Рост стоимости работ"
-                    name="works_cost_growth"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Рост стоимости материалов"
-                    name="material_cost_growth"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Рост стоимости работ субподряда"
-                    name="subcontract_works_cost_growth"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Рост стоимости материалов субподряда"
-                    name="subcontract_materials_cost_growth"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Непредвиденные затраты"
-                    name="contingency_costs"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="ООЗ"
-                    name="overhead_own_forces"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="ООЗ субподряда"
-                    name="overhead_subcontract"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="ОФЗ без субподряда"
-                    name="general_costs_without_subcontract"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Прибыль"
-                    name="profit_own_forces"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={24}>
-                  <Form.Item
-                    label="Прибыль субподряда"
-                    name="profit_subcontract"
-                    style={{ marginBottom: '4px' }}
-                  >
-                    <InputNumber
-                      min={0}
-                      max={999.99}
-                      step={0.01}
-                      addonAfter="%"
-                      style={{ width: '120px' }}
-                      precision={2}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
+                  <Row gutter={[16, 0]}>
+                    {markupParameters.map((param) => (
+                      <Col span={24} key={param.id}>
+                        <Form.Item
+                          label={param.label}
+                          name={param.key}
+                          style={{ marginBottom: '4px' }}
+                        >
+                          <InputNumber
+                            min={0}
+                            max={999.99}
+                            step={0.01}
+                            addonAfter="%"
+                            style={{ width: '120px' }}
+                            precision={2}
+                          />
+                        </Form.Item>
+                      </Col>
+                    ))}
+                  </Row>
                 </Form>
+              )}
               </Spin>
               </Card>
             ),
@@ -2424,22 +2756,77 @@ const MarkupConstructor: React.FC = () => {
             label: 'Порядок применения наценок',
             children: (
               <div style={{ minHeight: '100%', overflow: 'visible' }}>
-                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
+                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, maxWidth: '600px' }}>
                     <Title level={4} style={{ margin: 0 }}>
                       Порядок применения наценок
                     </Title>
-                    <Text type="secondary" style={{ fontSize: '14px' }}>
+                    <Text type="secondary" style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>
                       Настройте последовательность расчета для каждого типа позиций
                     </Text>
+                    <Space direction="vertical" style={{ width: '100%' }} size="small">
+                      <Select
+                        placeholder="Выберите порядок расчета для редактирования"
+                        value={selectedTacticId}
+                        onChange={handleTacticChange}
+                        showSearch
+                        optionFilterProp="children"
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        options={tactics.map(tactic => ({
+                          label: tactic.name || 'Без названия',
+                          value: tactic.id,
+                        }))}
+                        style={{ width: '100%' }}
+                      />
+                      {selectedTacticId && (
+                        <Input
+                          placeholder="Название порядка расчета"
+                          value={currentTacticName}
+                          onChange={(e) => setCurrentTacticName(e.target.value)}
+                          style={{ width: '100%' }}
+                        />
+                      )}
+                    </Space>
                   </div>
-                  <Button
-                    type="primary"
-                    icon={<SaveOutlined />}
-                    onClick={handleSaveTactic}
-                  >
-                    Сохранить тактику
-                  </Button>
+                  <Space>
+                    <Button
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        // Создание новой тактики
+                        setSelectedTacticId(null);
+                        setCurrentTacticId(null);
+                        setCurrentTacticName('');
+                        setMarkupSequences({
+                          works: [],
+                          materials: [],
+                          subcontract_works: [],
+                          subcontract_materials: [],
+                          work_comp: [],
+                          material_comp: [],
+                        });
+                        setBaseCosts({
+                          works: 0,
+                          materials: 0,
+                          subcontract_works: 0,
+                          subcontract_materials: 0,
+                          work_comp: 0,
+                          material_comp: 0,
+                        });
+                        message.info('Создается новый порядок расчета');
+                      }}
+                    >
+                      Создать новый
+                    </Button>
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
+                      onClick={handleSaveTactic}
+                    >
+                      Сохранить порядок расчета
+                    </Button>
+                  </Space>
                 </div>
                 <Tabs
                   activeKey={activeTab}
@@ -2481,8 +2868,199 @@ const MarkupConstructor: React.FC = () => {
               </div>
             ),
           },
+          {
+            key: 'parameters',
+            label: 'Управление параметрами',
+            children: (
+              <Card
+                title={
+                  <Space direction="vertical" size={0}>
+                    <Title level={4} style={{ margin: 0 }}>
+                      Управление параметрами наценок
+                    </Title>
+                    <Text type="secondary" style={{ fontSize: '14px' }}>
+                      Добавление новых параметров наценок в систему
+                    </Text>
+                  </Space>
+                }
+                extra={
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={handleOpenParameterModal}
+                  >
+                    Добавить параметр
+                  </Button>
+                }
+              >
+                <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                  <div>
+                    <Text>
+                      Здесь вы можете управлять параметрами наценок: добавлять новые, редактировать существующие, изменять порядок отображения или удалять ненужные.
+                      Изменения вступают в силу немедленно и отображаются во всех формах автоматически.
+                    </Text>
+                  </div>
+
+                  <Divider />
+
+                  <div>
+                    <Title level={5}>Текущие параметры наценок ({markupParameters.length})</Title>
+                    <List
+                      size="small"
+                      bordered
+                      dataSource={markupParameters}
+                      locale={{ emptyText: 'Нет параметров. Нажмите "Добавить параметр" для создания нового.' }}
+                      renderItem={(markup, index) => (
+                        <List.Item
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: editingParameterId === markup.id ? '#f0f5ff' : undefined,
+                          }}
+                          actions={[
+                            <Button
+                              key="up"
+                              icon={<ArrowUpOutlined />}
+                              size="small"
+                              type="text"
+                              disabled={index === 0}
+                              onClick={() => handleMoveParameterUp(markup)}
+                              title="Переместить вверх"
+                            />,
+                            <Button
+                              key="down"
+                              icon={<ArrowDownOutlined />}
+                              size="small"
+                              type="text"
+                              disabled={index === markupParameters.length - 1}
+                              onClick={() => handleMoveParameterDown(markup)}
+                              title="Переместить вниз"
+                            />,
+                            <Button
+                              key="delete"
+                              icon={<DeleteOutlined />}
+                              size="small"
+                              type="text"
+                              danger
+                              onClick={() => handleDeleteParameter(markup)}
+                              title="Удалить"
+                            />,
+                          ]}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                            <Tag color="blue" style={{ margin: 0 }}>#{index + 1}</Tag>
+                            {editingParameterId === markup.id ? (
+                              <Input
+                                value={editingParameterLabel}
+                                onChange={(e) => setEditingParameterLabel(e.target.value)}
+                                onPressEnter={() => handleInlineSave(markup.id)}
+                                onBlur={() => handleInlineCancel()}
+                                autoFocus
+                                style={{ flex: 1, maxWidth: '400px' }}
+                                suffix={
+                                  <Space size={4}>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<SaveOutlined />}
+                                      onClick={() => handleInlineSave(markup.id)}
+                                      style={{ color: '#52c41a' }}
+                                    />
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<CloseOutlined />}
+                                      onClick={() => handleInlineCancel()}
+                                    />
+                                  </Space>
+                                }
+                              />
+                            ) : (
+                              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Text
+                                  strong
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={() => handleInlineEdit(markup)}
+                                  title="Нажмите для редактирования"
+                                >
+                                  {markup.label}
+                                </Text>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={() => handleInlineEdit(markup)}
+                                  title="Редактировать"
+                                  style={{ padding: '0 4px' }}
+                                />
+                              </div>
+                            )}
+                            <Text type="secondary" code style={{ fontSize: '12px' }}>{markup.key}</Text>
+                          </div>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                </Space>
+              </Card>
+            ),
+          },
         ]}
       />
+
+      {/* Модальное окно для добавления нового параметра */}
+      <Modal
+        title="Добавление нового параметра наценки"
+        open={isAddParameterModalOpen}
+        onCancel={handleCloseParameterModal}
+        footer={null}
+        width={800}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Form
+            form={newParameterForm}
+            layout="vertical"
+          >
+            <Form.Item
+              label="Ключ параметра"
+              name="parameterKey"
+              rules={[
+                { required: true, message: 'Введите ключ параметра' },
+                {
+                  pattern: /^[a-z0-9_]+$/,
+                  message: 'Ключ должен содержать только строчные латинские буквы, цифры и подчеркивания (snake_case)'
+                }
+              ]}
+              extra="Например: new_markup_parameter или works_16_markup"
+            >
+              <Input placeholder="new_markup_parameter" />
+            </Form.Item>
+
+            <Form.Item
+              label="Название параметра (на русском)"
+              name="parameterLabel"
+              rules={[{ required: true, message: 'Введите название параметра' }]}
+              extra="Например: Новая наценка"
+            >
+              <Input placeholder="Новая наценка" />
+            </Form.Item>
+
+            <Form.Item>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleAddParameter}
+                >
+                  Добавить
+                </Button>
+                <Button onClick={handleCloseParameterModal}>
+                  Отмена
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Space>
+      </Modal>
     </div>
   );
 };

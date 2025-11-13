@@ -42,6 +42,11 @@
   width: 100%;
 }
 
+/* Уменьшаем padding для свернутого состояния, чтобы логотип был виден полностью */
+.ant-layout-sider-collapsed .logo {
+  padding: 12px 8px !important;
+}
+
 /* Logo expanded state (icon + text) */
 .logo-expanded {
   display: flex;
@@ -135,4 +140,24 @@
 
 .ant-layout-sider::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Submenu popup styles - менее прозрачный фон для лучшей читаемости */
+.ant-menu-submenu-popup.ant-menu-dark {
+  background: rgba(10, 10, 10, 0.98) !important;
+  backdrop-filter: blur(8px);
+}
+
+.ant-menu-submenu-popup.ant-menu-dark .ant-menu {
+  background: rgba(10, 10, 10, 0.98) !important;
+}
+
+.ant-menu-submenu-popup.ant-menu-light {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ant-menu-submenu-popup.ant-menu-light .ant-menu {
+  background: rgba(255, 255, 255, 0.98) !important;
 }

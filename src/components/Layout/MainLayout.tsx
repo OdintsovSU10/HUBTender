@@ -20,6 +20,7 @@ import {
   ProfileOutlined,
   FileTextOutlined,
   BankOutlined,
+  PercentageOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -92,6 +93,11 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
           icon: <BankOutlined />,
           label: 'Затраты строительства',
         },
+        {
+          key: '/admin/markup_constructor',
+          icon: <PercentageOutlined />,
+          label: 'Конструктор наценок',
+        },
       ],
     },
     {
@@ -111,7 +117,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', height: '100vh' }}>
       <Sider
         trigger={null}
         collapsible
@@ -130,7 +136,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
         >
           {collapsed ? (
             <div className="logo-collapsed">
-              <LogoIcon size={48} color={currentTheme === 'dark' ? '#10b981' : '#ffffff'} />
+              <LogoIcon size={80} color={currentTheme === 'dark' ? '#10b981' : '#ffffff'} />
             </div>
           ) : (
             <div className="logo-expanded">
@@ -202,11 +208,12 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
         </Header>
         <Content
           style={{
-            margin: '24px',
+            margin: '16px 8px',
             padding: 24,
             minHeight: 280,
             background: colorBgContainer,
             borderRadius: '8px',
+            overflow: 'auto',
           }}
         >
           <Outlet />

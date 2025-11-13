@@ -1,3 +1,4 @@
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -37,19 +38,28 @@ supabase/schemas/prod.sql
 - NEVER trust TypeScript types over prod.sql definitions
 - prod.sql contains ALL Supabase system tables and extensions
 - Business tables defined in migrations (001, 002, 003)
+
+ROW LEVEL SECURITY (RLS):
+- RLS MUST BE DISABLED by default in all new tables
+- DO NOT add "ALTER TABLE ... ENABLE ROW LEVEL SECURITY"
+- DO NOT create RLS policies in migrations
+- Authentication and authorization will be handled at application level
+- RLS for markup_tactics was DISABLED (migration: disable_markup_tactics_rls.sql)
 ```
 
 **Current Tables**:
 - `tenders` - Main tender records with currency rates
+- `tender_markup_percentage` - Tender markup percentages and commercial calculations
+- `markup_tactics` - Markup calculation tactics/sequences (localStorage + Supabase)
 - `material_names` - Material name library with units
 - `work_names` - Work name library with units
-- `materials_library` - Material records with pricing and cost categories
-- `works_library` - Work records with pricing and cost categories
+- `materials_library` - Material records with pricing
+- `works_library` - Work records with pricing
 - `locations` - Construction site locations
 - `cost_categories` - Cost category definitions
 - `detail_cost_categories` - Detailed cost items per location with location reference
 - `units` - Unit of measurement reference table
-- ENUM: `unit_type` ('шт', 'м', 'м2', 'м3', 'кг', 'т', 'л', 'компл', 'м.п.')
+- ENUM: `boq_item_type` ('мат', 'суб-мат', 'мат-комп.', 'раб', 'суб-раб', 'раб-комп.')
 
 ## Architecture & Patterns
 
@@ -70,6 +80,7 @@ App.tsx
 - `/admin/nomenclatures` - Materials, Works, Locations, Cost Categories (✅ complete, Supabase integrated)
 - `/admin/tenders` - Tender management table (✅ UI complete, Supabase ready)
 - `/admin/construction_cost` - Cost calculation interface (✅ UI complete, mock data)
+- `/admin/markup-constructor` - Markup calculation tactics builder (✅ complete, localStorage + Supabase)
 - `/library` - Materials/Works library with inline editing (✅ complete, Supabase integrated)
 - `/positions`, `/commerce`, `/costs`, `/users`, `/settings` - Placeholder pages
 
@@ -79,6 +90,12 @@ App.tsx
 - **Colors**: Primary `#10b981` (emerald)
 - **Dark**: Black background (`#000`), sidebar `#0a0a0a`
 - **Light**: Ant Design defaults
+
+### localStorage Keys
+- `tenderHub_theme` - Theme preference (light/dark)
+- `markupSequences` - Markup calculation sequences (per item type)
+- `markupBaseCosts` - Base costs for markup calculations
+- `markupSequencesVersion` - Version tracking ('v2')
 
 ### Custom SVG Icons
 Two parameterized components in `src/components/Icons/`:
@@ -118,9 +135,12 @@ Both accept: `size`, `color`, `className` props
 
 ### File Size Rule
 **STRICT**: All files MUST be ≤ 600 lines
-- Current largest: MaterialsTab.tsx (~970 lines), WorksTab.tsx (~770 lines)
-- **VIOLATION**: Library tabs need refactoring into smaller modules
-- Split large files into modules with barrel exports
+- Current violations:
+  - MarkupConstructor.tsx (~1790 lines) - Complex state management for multi-step calculations
+  - MaterialsTab.tsx (~970 lines) - Library inline editing
+  - WorksTab.tsx (~770 lines) - Library inline editing
+- **TODO**: Refactor into smaller modules with barrel exports
+- Split candidates: EditableCell, form components, calculation logic
 
 ### TypeScript Configuration
 - Target: ES2020, strict mode
@@ -161,13 +181,24 @@ Each card has:
 
 ## Database Migration Status
 
-### Implemented (in migrations/)
-1. `001_create_tenders_table.sql` - Core tender entity with currency rates
-2. `002_create_material_work_tables.sql` - Name libraries with units, materials_library, works_library
-3. `003_create_location_and_cost_categories_tables.sql` - Locations and cost categories
-4. `004_fix_detail_cost_categories_foreign_key.sql` - Added location_id foreign key
-5. `005_migrate_enum_to_units_table.sql` - Created units reference table
-6. `006_remove_name_short_from_units.sql` - Cleanup migration
+### Schema Management
+- **Source of Truth**: `supabase/schemas/prod.sql` - Complete database schema with all Supabase system tables
+- **Migration Files**: Consolidated into `supabase/migrations/prod.sql`
+- **Latest Migration**: `20251113_create_markup_tactics_table.sql` - Markup tactics with RLS enabled (exception to RLS rule)
+
+### Current Tables (as defined in prod.sql)
+1. `tenders` - Core tender entity with currency rates
+2. `tender_markup_percentage` - Tender markup percentages and commercial calculations
+3. `markup_tactics` - User-specific markup calculation tactics (RLS enabled, user_id based)
+4. `material_names` - Material name library with units
+5. `work_names` - Work name library with units
+6. `materials_library` - Material records with pricing
+7. `works_library` - Work records with pricing
+8. `locations` - Construction site locations
+9. `cost_categories` - Cost category definitions
+10. `detail_cost_categories` - Detailed cost items per location
+11. `units` - Unit of measurement reference table
+12. ENUM: `boq_item_type` - Unified item types ('мат', 'суб-мат', 'мат-комп.', 'раб', 'суб-раб', 'раб-комп.')
 
 ### Planned but Not Created
 - users (5 roles: administrator, moderator, engineer, manager, director)
@@ -178,8 +209,8 @@ Each card has:
 ### Key Database Patterns
 - UUID primary keys with uuid_generate_v4()
 - created_at/updated_at with automatic triggers
-- RLS policies defined but currently disabled
-- Foreign keys to auth.users for ownership
+- **RLS DISABLED** - Authorization handled at application level
+- Foreign keys with ON DELETE CASCADE where appropriate
 
 ## Implementation Status
 
@@ -187,13 +218,14 @@ Each card has:
 - ✅ Client initialized in `src/lib/supabase.ts`
 - ✅ TypeScript types defined for all database tables
 - ✅ Environment variables configured (.env.local required)
+- ✅ RLS disabled - authorization at application level
 - ❌ No authentication UI yet
-- ❌ No RLS policies enabled
 
 ### UI Implementation Status
 **Fully Implemented with Supabase:**
 - `/dashboard` - 8-card feature grid with gradients and hover effects
 - `/admin/nomenclatures` - CRUD for Materials, Works, Locations, Cost Categories
+- `/admin/markup-constructor` - Markup calculation tactics builder with localStorage auto-save
 - `/library` - Materials/Works library with inline editing, pagination, search
 
 **UI Complete (Supabase Ready):**
@@ -306,6 +338,24 @@ Required in main.tsx: `import 'antd/dist/reset.css'`
 - Location and category filtering
 - Data table with deviation color coding (red/green)
 - Summary row with totals
+
+### Markup Constructor Page (`/admin/markup-constructor`)
+**Fully functional with dual storage**
+- 2-tab interface: "Проценты наценок" | "Порядок применения наценок"
+- **Percentages Tab**: 14 markup percentage inputs linked to tender_markup_percentage table
+- **Tactics Tab**: 6 sub-tabs (works, materials, subcontract_works, subcontract_materials, work_comp, material_comp)
+- **Complex State Management**: ~1790 lines handling multi-step markup calculation sequences
+- **Data Flow**:
+  - Markup percentages: Supabase (tender_markup_percentage table)
+  - Markup sequences/tactics: localStorage auto-save (key: 'markupSequences', 'markupBaseCosts')
+  - Future: Will sync tactics to markup_tactics table with user_id
+- **Calculation Engine**:
+  - Base cost input per item type
+  - Up to 5 chained operations per step (multiply/divide/add/subtract)
+  - Operands can be markup percentages or previous step results
+  - Real-time intermediate result calculation and display
+  - Visual formula rendering with step-by-step breakdown
+- **Important Pattern**: Uses `isDataLoaded` flag to prevent auto-save during initial mount
 
 ## Library Page Architecture Patterns
 

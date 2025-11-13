@@ -1,5 +1,5 @@
 -- Database Schema Export
--- Generated: 2025-11-13T09:49:56.054053
+-- Generated: 2025-11-13T12:41:06.055066
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -435,6 +435,28 @@ COMMENT ON COLUMN public.detail_cost_categories.created_at IS 'Дата и
 COMMENT ON COLUMN public.detail_cost_categories.updated_at IS 'Дата и
   время последнего обновления';
 
+-- Справочник параметров наценок
+CREATE TABLE IF NOT EXISTS public.markup_parameters (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    key text NOT NULL,
+    label text NOT NULL,
+    is_active boolean NOT NULL DEFAULT true,
+    order_num integer(32) NOT NULL DEFAULT 0,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT markup_parameters_key_key UNIQUE (key),
+    CONSTRAINT markup_parameters_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE public.markup_parameters IS 'Справочник параметров наценок';
+COMMENT ON COLUMN public.markup_parameters.id IS 'Уникальный идентификатор параметра';
+COMMENT ON COLUMN public.markup_parameters.key IS 'Ключ параметра (snake_case с цифрами, уникальный)';
+COMMENT ON COLUMN public.markup_parameters.label IS 'Название параметра (для UI)';
+COMMENT ON COLUMN public.markup_parameters.is_active IS 'Активен ли параметр';
+COMMENT ON COLUMN public.markup_parameters.order_num IS 'Порядок отображения';
+COMMENT ON COLUMN public.markup_parameters.created_at IS 'Дата создания';
+COMMENT ON COLUMN public.markup_parameters.updated_at IS 'Дата последнего обновления';
+
 -- Хранение тактик наценок для конструктора наценок
 CREATE TABLE IF NOT EXISTS public.markup_tactics (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -502,56 +524,27 @@ COMMENT ON COLUMN public.materials_library.material_name_id IS 'Связь с н
 COMMENT ON COLUMN public.materials_library.created_at IS 'Дата создания';
 COMMENT ON COLUMN public.materials_library.updated_at IS 'Дата изменения';
 
--- Проценты наценки и коммерческие расчеты по тендерам
+-- Проценты наценок по тендерам (связь с справочником параметров)
 CREATE TABLE IF NOT EXISTS public.tender_markup_percentage (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
     tender_id uuid NOT NULL,
-    works_16_markup numeric(5,2) DEFAULT 0,
-    works_cost_growth numeric(5,2) DEFAULT 0,
-    material_cost_growth numeric(5,2) DEFAULT 0,
-    subcontract_works_cost_growth numeric(5,2) DEFAULT 0,
-    subcontract_materials_cost_growth numeric(5,2) DEFAULT 0,
-    contingency_costs numeric(5,2) DEFAULT 0,
-    overhead_own_forces numeric(5,2) DEFAULT 0,
-    overhead_subcontract numeric(5,2) DEFAULT 0,
-    general_costs_without_subcontract numeric(5,2) DEFAULT 0,
-    profit_own_forces numeric(5,2) DEFAULT 0,
-    profit_subcontract numeric(5,2) DEFAULT 0,
-    mechanization_service numeric(5,2) DEFAULT 0,
-    mbp_gsm numeric(5,2) DEFAULT 0,
-    warranty_period numeric(5,2) DEFAULT 0,
-    notes text,
-    is_active boolean DEFAULT true,
-    commercial_total_value numeric(15,2),
-    commercial_total_calculated_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
+    markup_parameter_id uuid NOT NULL,
+    value numeric(5,2) NOT NULL DEFAULT 0,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT tender_markup_percentage_markup_parameter_id_fkey FOREIGN KEY (markup_parameter_id) REFERENCES None.None(None),
     CONSTRAINT tender_markup_percentage_pkey PRIMARY KEY (id),
-    CONSTRAINT tender_markup_percentage_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None)
+    CONSTRAINT tender_markup_percentage_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None),
+    CONSTRAINT tender_markup_percentage_unique UNIQUE (markup_parameter_id),
+    CONSTRAINT tender_markup_percentage_unique UNIQUE (tender_id)
 );
 
-COMMENT ON TABLE public.tender_markup_percentage IS 'Проценты наценки и коммерческие расчеты по тендерам';
+COMMENT ON TABLE public.tender_markup_percentage IS 'Проценты наценок по тендерам (связь с справочником параметров)';
 COMMENT ON COLUMN public.tender_markup_percentage.id IS 'Уникальный идентификатор записи';
 COMMENT ON COLUMN public.tender_markup_percentage.tender_id IS 'Ссылка на тендер';
-COMMENT ON COLUMN public.tender_markup_percentage.works_16_markup IS 'Работы 1,6 (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.works_cost_growth IS 'Рост стоимости Работ (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.material_cost_growth IS 'Рост стоимости Материалов (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.subcontract_works_cost_growth IS 'Рост стоимости Работ субподряда (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.subcontract_materials_cost_growth IS 'Рост стоимости Материалов Субподряда (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.contingency_costs IS 'Непредвиденные затраты (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.overhead_own_forces IS 'ООЗ - Общестроительные затраты (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.overhead_subcontract IS 'ООЗ Субподряда (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.general_costs_without_subcontract IS 'ОФЗ без субподряда - Общефирменные затраты (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.profit_own_forces IS 'Прибыль собственными силами (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.profit_subcontract IS 'Прибыль субподряда (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.mechanization_service IS 'Служба механизации (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.mbp_gsm IS 'МБП и ГСМ - Малоценные быстроизнашивающиеся предметы и горюче-смазочные материалы (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.warranty_period IS 'Гарантийный период (%)';
-COMMENT ON COLUMN public.tender_markup_percentage.notes IS 'Примечания';
-COMMENT ON COLUMN public.tender_markup_percentage.is_active IS 'Активность записи (только одна активная запись на тендер)';
-COMMENT ON COLUMN public.tender_markup_percentage.commercial_total_value IS 'Итоговая коммерческая стоимость (руб)';
-COMMENT ON COLUMN public.tender_markup_percentage.commercial_total_calculated_at IS 'Время последнего расчета итоговой стоимости';
-COMMENT ON COLUMN public.tender_markup_percentage.created_at IS 'Дата создания записи';
+COMMENT ON COLUMN public.tender_markup_percentage.markup_parameter_id IS 'Ссылка на параметр наценки';
+COMMENT ON COLUMN public.tender_markup_percentage.value IS 'Значение процента (0-100)';
+COMMENT ON COLUMN public.tender_markup_percentage.created_at IS 'Дата создания';
 COMMENT ON COLUMN public.tender_markup_percentage.updated_at IS 'Дата последнего обновления';
 
 -- Основная таблица для хранения информации о тендерах
@@ -1263,7 +1256,7 @@ AS '$libdir/pgcrypto', $function$pgp_key_id_w$function$
 
 ;
 
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1279,7 +1272,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
 
 ;
 
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1311,7 +1304,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
 
 ;
 
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1319,7 +1312,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_text$function$
 
 ;
 
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1375,7 +1368,7 @@ AS '$libdir/pgcrypto', $function$pgp_sym_decrypt_bytea$function$
 
 ;
 
-CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1383,7 +1376,7 @@ AS '$libdir/pgcrypto', $function$pgp_sym_encrypt_text$function$
 
 ;
 
-CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_sym_encrypt(text, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1722,6 +1715,18 @@ begin
     from pg_authid 
     where rolname=$1 and rolcanlogin;
 end;
+$function$
+
+;
+
+CREATE OR REPLACE FUNCTION public.update_markup_parameters_updated_at()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
 $function$
 
 ;
@@ -3428,6 +3433,9 @@ CREATE TRIGGER update_cost_categories_updated_at BEFORE UPDATE ON public.cost_ca
 CREATE TRIGGER update_detail_cost_categories_updated_at BEFORE UPDATE ON public.detail_cost_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
 ;
 
+CREATE TRIGGER trigger_update_markup_parameters_updated_at BEFORE UPDATE ON public.markup_parameters FOR EACH ROW EXECUTE FUNCTION update_markup_parameters_updated_at()
+;
+
 CREATE TRIGGER trigger_update_markup_tactics_updated_at BEFORE UPDATE ON public.markup_tactics FOR EACH ROW EXECUTE FUNCTION update_markup_tactics_updated_at()
 ;
 
@@ -3669,6 +3677,18 @@ CREATE INDEX idx_detail_cost_categories_order_num ON public.detail_cost_categori
 CREATE INDEX idx_detail_cost_categories_unit ON public.detail_cost_categories USING btree (unit)
 ;
 
+CREATE INDEX idx_markup_parameters_is_active ON public.markup_parameters USING btree (is_active)
+;
+
+CREATE INDEX idx_markup_parameters_key ON public.markup_parameters USING btree (key)
+;
+
+CREATE INDEX idx_markup_parameters_order_num ON public.markup_parameters USING btree (order_num)
+;
+
+CREATE UNIQUE INDEX markup_parameters_key_key ON public.markup_parameters USING btree (key)
+;
+
 CREATE INDEX idx_markup_tactics_created_at ON public.markup_tactics USING btree (created_at DESC)
 ;
 
@@ -3705,13 +3725,13 @@ CREATE INDEX idx_materials_library_material_type ON public.materials_library USI
 CREATE INDEX idx_materials_library_type_currency ON public.materials_library USING btree (material_type, currency_type)
 ;
 
-CREATE INDEX idx_tender_markup_percentage_is_active ON public.tender_markup_percentage USING btree (is_active)
+CREATE INDEX idx_tender_markup_percentage_markup_parameter_id ON public.tender_markup_percentage USING btree (markup_parameter_id)
 ;
 
 CREATE INDEX idx_tender_markup_percentage_tender_id ON public.tender_markup_percentage USING btree (tender_id)
 ;
 
-CREATE UNIQUE INDEX idx_tender_markup_percentage_unique_active ON public.tender_markup_percentage USING btree (tender_id) WHERE (is_active = true)
+CREATE UNIQUE INDEX tender_markup_percentage_unique ON public.tender_markup_percentage USING btree (tender_id, markup_parameter_id)
 ;
 
 CREATE INDEX idx_tenders_client_name ON public.tenders USING btree (client_name)

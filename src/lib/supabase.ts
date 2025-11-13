@@ -32,6 +32,7 @@ export interface TenderInsert {
   bsm_link?: string;
   tz_link?: string;
   qa_form_link?: string;
+  markup_tactic_id?: string; // Ссылка на тактику наценок для данного тендера
 }
 
 export interface Tender extends TenderInsert {
@@ -189,35 +190,47 @@ export interface WorkLibraryFull extends WorkLibrary {
 }
 
 // =============================================
+// Типы для таблицы markup_parameters (справочник параметров наценок)
+// =============================================
+
+export interface MarkupParameterInsert {
+  key: string;
+  label: string;
+  is_active?: boolean;
+  order_num?: number;
+}
+
+export interface MarkupParameter extends MarkupParameterInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// =============================================
 // Типы для таблицы tender_markup_percentage
 // =============================================
 
 export interface TenderMarkupPercentageInsert {
   tender_id: string;
-  works_16_markup?: number;
-  works_cost_growth?: number;
-  material_cost_growth?: number;
-  subcontract_works_cost_growth?: number;
-  subcontract_materials_cost_growth?: number;
-  contingency_costs?: number;
-  overhead_own_forces?: number;
-  overhead_subcontract?: number;
-  general_costs_without_subcontract?: number;
-  profit_own_forces?: number;
-  profit_subcontract?: number;
-  mechanization_service?: number;
-  mbp_gsm?: number;
-  warranty_period?: number;
-  notes?: string;
-  is_active?: boolean;
-  commercial_total_value?: number;
-  commercial_total_calculated_at?: string;
+  markup_parameter_id: string;
+  value: number;
 }
 
 export interface TenderMarkupPercentage extends TenderMarkupPercentageInsert {
   id: string;
   created_at: string;
   updated_at: string;
+}
+
+// Расширенный тип с данными параметра наценки
+export interface TenderMarkupPercentageFull extends TenderMarkupPercentage {
+  markup_parameter: MarkupParameter;
+}
+
+// Вспомогательный тип для UI - данные наценок с ключами параметров
+export interface TenderMarkupPercentageUI {
+  tender_id: string;
+  [key: string]: number | string; // динамические ключи параметров
 }
 
 // =============================================
@@ -238,29 +251,29 @@ export interface MarkupStep {
 
   // Вторая операция (опциональная)
   action2?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand2Type?: 'markup' | 'step';
-  operand2Key?: string;
+  operand2Type?: 'markup' | 'step' | 'number';
+  operand2Key?: string | number;
   operand2Index?: number;
   operand2MultiplyFormat?: 'addOne' | 'direct';
 
   // Третья операция (опциональная)
   action3?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand3Type?: 'markup' | 'step';
-  operand3Key?: string;
+  operand3Type?: 'markup' | 'step' | 'number';
+  operand3Key?: string | number;
   operand3Index?: number;
   operand3MultiplyFormat?: 'addOne' | 'direct';
 
   // Четвертая операция (опциональная)
   action4?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand4Type?: 'markup' | 'step';
-  operand4Key?: string;
+  operand4Type?: 'markup' | 'step' | 'number';
+  operand4Key?: string | number;
   operand4Index?: number;
   operand4MultiplyFormat?: 'addOne' | 'direct';
 
   // Пятая операция (опциональная)
   action5?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand5Type?: 'markup' | 'step';
-  operand5Key?: string;
+  operand5Type?: 'markup' | 'step' | 'number';
+  operand5Key?: string | number;
   operand5Index?: number;
   operand5MultiplyFormat?: 'addOne' | 'direct';
 }

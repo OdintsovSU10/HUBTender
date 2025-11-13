@@ -3400,6 +3400,166 @@
     ],
     "sql": "-- Детальные категории затрат по локациям\nCREATE TABLE IF NOT EXISTS public.detail_cost_categories (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    cost_category_id uuid NOT NULL,\n    location text NOT NULL,\n    name text NOT NULL,\n    unit text NOT NULL,\n    order_num integer(32) DEFAULT 0,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now(),\n    CONSTRAINT detail_cost_categories_cost_category_id_fkey FOREIGN KEY (cost_category_id) REFERENCES None.None(None),\n    CONSTRAINT detail_cost_categories_pkey PRIMARY KEY (id),\n    CONSTRAINT detail_cost_categories_unit_fkey FOREIGN KEY (unit) REFERENCES None.None(None)\n);\n\nCOMMENT ON TABLE public.detail_cost_categories IS 'Детальные категории затрат по локациям';\nCOMMENT ON COLUMN public.detail_cost_categories.id IS 'Уникальный идентификатор детальной категории (UUID)';\nCOMMENT ON COLUMN public.detail_cost_categories.cost_category_id IS 'Ссылка на категорию затрат';\nCOMMENT ON COLUMN public.detail_cost_categories.location IS 'Локация/местоположение';\nCOMMENT ON COLUMN public.detail_cost_categories.name IS 'Наименование детальной категории';\nCOMMENT ON COLUMN public.detail_cost_categories.unit IS 'Единица измерения';\nCOMMENT ON COLUMN public.detail_cost_categories.order_num IS 'Порядковый      \r\n  номер для сортировки';\nCOMMENT ON COLUMN public.detail_cost_categories.created_at IS 'Дата и\r\n  время создания записи';\nCOMMENT ON COLUMN public.detail_cost_categories.updated_at IS 'Дата и\r\n  время последнего обновления';"
   },
+  "public.markup_parameters": {
+    "schema": "public",
+    "name": "markup_parameters",
+    "comment": "Справочник параметров наценок",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "uuid",
+        "max_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null,
+        "is_nullable": "NO",
+        "default": "uuid_generate_v4()",
+        "comment": "Уникальный идентификатор параметра"
+      },
+      {
+        "name": "key",
+        "data_type": "text",
+        "max_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null,
+        "is_nullable": "NO",
+        "default": null,
+        "comment": "Ключ параметра (snake_case с цифрами, уникальный)"
+      },
+      {
+        "name": "label",
+        "data_type": "text",
+        "max_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null,
+        "is_nullable": "NO",
+        "default": null,
+        "comment": "Название параметра (для UI)"
+      },
+      {
+        "name": "is_active",
+        "data_type": "boolean",
+        "max_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null,
+        "is_nullable": "NO",
+        "default": "true",
+        "comment": "Активен ли параметр"
+      },
+      {
+        "name": "order_num",
+        "data_type": "integer",
+        "max_length": null,
+        "numeric_precision": 32,
+        "numeric_scale": 0,
+        "is_nullable": "NO",
+        "default": "0",
+        "comment": "Порядок отображения"
+      },
+      {
+        "name": "created_at",
+        "data_type": "timestamp with time zone",
+        "max_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null,
+        "is_nullable": "NO",
+        "default": "now()",
+        "comment": "Дата создания"
+      },
+      {
+        "name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "max_length": null,
+        "numeric_precision": null,
+        "numeric_scale": null,
+        "is_nullable": "NO",
+        "default": "now()",
+        "comment": "Дата последнего обновления"
+      }
+    ],
+    "constraints": [
+      {
+        "name": "2200_21221_1_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21221_2_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21221_3_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21221_4_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21221_5_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21221_6_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21221_7_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "markup_parameters_key_check",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": "public",
+        "foreign_table": "markup_parameters",
+        "foreign_column": "key"
+      },
+      {
+        "name": "markup_parameters_key_key",
+        "type": "UNIQUE",
+        "column": "key",
+        "foreign_table_schema": "public",
+        "foreign_table": "markup_parameters",
+        "foreign_column": "key"
+      },
+      {
+        "name": "markup_parameters_pkey",
+        "type": "PRIMARY KEY",
+        "column": "id",
+        "foreign_table_schema": "public",
+        "foreign_table": "markup_parameters",
+        "foreign_column": "id"
+      }
+    ],
+    "sql": "-- Справочник параметров наценок\nCREATE TABLE IF NOT EXISTS public.markup_parameters (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    key text NOT NULL,\n    label text NOT NULL,\n    is_active boolean NOT NULL DEFAULT true,\n    order_num integer(32) NOT NULL DEFAULT 0,\n    created_at timestamp with time zone NOT NULL DEFAULT now(),\n    updated_at timestamp with time zone NOT NULL DEFAULT now(),\n    CONSTRAINT markup_parameters_key_key UNIQUE (key),\n    CONSTRAINT markup_parameters_pkey PRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE public.markup_parameters IS 'Справочник параметров наценок';\nCOMMENT ON COLUMN public.markup_parameters.id IS 'Уникальный идентификатор параметра';\nCOMMENT ON COLUMN public.markup_parameters.key IS 'Ключ параметра (snake_case с цифрами, уникальный)';\nCOMMENT ON COLUMN public.markup_parameters.label IS 'Название параметра (для UI)';\nCOMMENT ON COLUMN public.markup_parameters.is_active IS 'Активен ли параметр';\nCOMMENT ON COLUMN public.markup_parameters.order_num IS 'Порядок отображения';\nCOMMENT ON COLUMN public.markup_parameters.created_at IS 'Дата создания';\nCOMMENT ON COLUMN public.markup_parameters.updated_at IS 'Дата последнего обновления';"
+  },
   "public.markup_tactics": {
     "schema": "public",
     "name": "markup_tactics",
@@ -3825,7 +3985,7 @@
   "public.tender_markup_percentage": {
     "schema": "public",
     "name": "tender_markup_percentage",
-    "comment": "Проценты наценки и коммерческие расчеты по тендерам",
+    "comment": "Проценты наценок по тендерам (связь с справочником параметров)",
     "columns": [
       {
         "name": "id",
@@ -3848,184 +4008,24 @@
         "comment": "Ссылка на тендер"
       },
       {
-        "name": "works_16_markup",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Работы 1,6 (%)"
-      },
-      {
-        "name": "works_cost_growth",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Рост стоимости Работ (%)"
-      },
-      {
-        "name": "material_cost_growth",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Рост стоимости Материалов (%)"
-      },
-      {
-        "name": "subcontract_works_cost_growth",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Рост стоимости Работ субподряда (%)"
-      },
-      {
-        "name": "subcontract_materials_cost_growth",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Рост стоимости Материалов Субподряда (%)"
-      },
-      {
-        "name": "contingency_costs",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Непредвиденные затраты (%)"
-      },
-      {
-        "name": "overhead_own_forces",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "ООЗ - Общестроительные затраты (%)"
-      },
-      {
-        "name": "overhead_subcontract",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "ООЗ Субподряда (%)"
-      },
-      {
-        "name": "general_costs_without_subcontract",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "ОФЗ без субподряда - Общефирменные затраты (%)"
-      },
-      {
-        "name": "profit_own_forces",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Прибыль собственными силами (%)"
-      },
-      {
-        "name": "profit_subcontract",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Прибыль субподряда (%)"
-      },
-      {
-        "name": "mechanization_service",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Служба механизации (%)"
-      },
-      {
-        "name": "mbp_gsm",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "МБП и ГСМ - Малоценные быстроизнашивающиеся предметы и горюче-смазочные материалы (%)"
-      },
-      {
-        "name": "warranty_period",
-        "data_type": "numeric",
-        "max_length": null,
-        "numeric_precision": 5,
-        "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": "0",
-        "comment": "Гарантийный период (%)"
-      },
-      {
-        "name": "notes",
-        "data_type": "text",
+        "name": "markup_parameter_id",
+        "data_type": "uuid",
         "max_length": null,
         "numeric_precision": null,
         "numeric_scale": null,
-        "is_nullable": "YES",
+        "is_nullable": "NO",
         "default": null,
-        "comment": "Примечания"
+        "comment": "Ссылка на параметр наценки"
       },
       {
-        "name": "is_active",
-        "data_type": "boolean",
-        "max_length": null,
-        "numeric_precision": null,
-        "numeric_scale": null,
-        "is_nullable": "YES",
-        "default": "true",
-        "comment": "Активность записи (только одна активная запись на тендер)"
-      },
-      {
-        "name": "commercial_total_value",
+        "name": "value",
         "data_type": "numeric",
         "max_length": null,
-        "numeric_precision": 15,
+        "numeric_precision": 5,
         "numeric_scale": 2,
-        "is_nullable": "YES",
-        "default": null,
-        "comment": "Итоговая коммерческая стоимость (руб)"
-      },
-      {
-        "name": "commercial_total_calculated_at",
-        "data_type": "timestamp with time zone",
-        "max_length": null,
-        "numeric_precision": null,
-        "numeric_scale": null,
-        "is_nullable": "YES",
-        "default": null,
-        "comment": "Время последнего расчета итоговой стоимости"
+        "is_nullable": "NO",
+        "default": "0",
+        "comment": "Значение процента (0-100)"
       },
       {
         "name": "created_at",
@@ -4033,9 +4033,9 @@
         "max_length": null,
         "numeric_precision": null,
         "numeric_scale": null,
-        "is_nullable": "YES",
+        "is_nullable": "NO",
         "default": "now()",
-        "comment": "Дата создания записи"
+        "comment": "Дата создания"
       },
       {
         "name": "updated_at",
@@ -4043,14 +4043,14 @@
         "max_length": null,
         "numeric_precision": null,
         "numeric_scale": null,
-        "is_nullable": "YES",
+        "is_nullable": "NO",
         "default": "now()",
         "comment": "Дата последнего обновления"
       }
     ],
     "constraints": [
       {
-        "name": "2200_20814_1_not_null",
+        "name": "2200_21239_1_not_null",
         "type": "CHECK",
         "column": null,
         "foreign_table_schema": null,
@@ -4058,9 +4058,49 @@
         "foreign_column": null
       },
       {
-        "name": "2200_20814_2_not_null",
+        "name": "2200_21239_2_not_null",
         "type": "CHECK",
         "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21239_3_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21239_4_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21239_5_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "2200_21239_6_not_null",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": null,
+        "foreign_table": null,
+        "foreign_column": null
+      },
+      {
+        "name": "tender_markup_percentage_markup_parameter_id_fkey",
+        "type": "FOREIGN KEY",
+        "column": "markup_parameter_id",
         "foreign_table_schema": null,
         "foreign_table": null,
         "foreign_column": null
@@ -4080,9 +4120,33 @@
         "foreign_table_schema": null,
         "foreign_table": null,
         "foreign_column": null
+      },
+      {
+        "name": "tender_markup_percentage_unique",
+        "type": "UNIQUE",
+        "column": "markup_parameter_id",
+        "foreign_table_schema": "public",
+        "foreign_table": "tender_markup_percentage",
+        "foreign_column": "markup_parameter_id"
+      },
+      {
+        "name": "tender_markup_percentage_unique",
+        "type": "UNIQUE",
+        "column": "tender_id",
+        "foreign_table_schema": "public",
+        "foreign_table": "tender_markup_percentage",
+        "foreign_column": "markup_parameter_id"
+      },
+      {
+        "name": "tender_markup_percentage_value_check",
+        "type": "CHECK",
+        "column": null,
+        "foreign_table_schema": "public",
+        "foreign_table": "tender_markup_percentage",
+        "foreign_column": "value"
       }
     ],
-    "sql": "-- Проценты наценки и коммерческие расчеты по тендерам\nCREATE TABLE IF NOT EXISTS public.tender_markup_percentage (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    tender_id uuid NOT NULL,\n    works_16_markup numeric(5,2) DEFAULT 0,\n    works_cost_growth numeric(5,2) DEFAULT 0,\n    material_cost_growth numeric(5,2) DEFAULT 0,\n    subcontract_works_cost_growth numeric(5,2) DEFAULT 0,\n    subcontract_materials_cost_growth numeric(5,2) DEFAULT 0,\n    contingency_costs numeric(5,2) DEFAULT 0,\n    overhead_own_forces numeric(5,2) DEFAULT 0,\n    overhead_subcontract numeric(5,2) DEFAULT 0,\n    general_costs_without_subcontract numeric(5,2) DEFAULT 0,\n    profit_own_forces numeric(5,2) DEFAULT 0,\n    profit_subcontract numeric(5,2) DEFAULT 0,\n    mechanization_service numeric(5,2) DEFAULT 0,\n    mbp_gsm numeric(5,2) DEFAULT 0,\n    warranty_period numeric(5,2) DEFAULT 0,\n    notes text,\n    is_active boolean DEFAULT true,\n    commercial_total_value numeric(15,2),\n    commercial_total_calculated_at timestamp with time zone,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now(),\n    CONSTRAINT tender_markup_percentage_pkey PRIMARY KEY (id),\n    CONSTRAINT tender_markup_percentage_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None)\n);\n\nCOMMENT ON TABLE public.tender_markup_percentage IS 'Проценты наценки и коммерческие расчеты по тендерам';\nCOMMENT ON COLUMN public.tender_markup_percentage.id IS 'Уникальный идентификатор записи';\nCOMMENT ON COLUMN public.tender_markup_percentage.tender_id IS 'Ссылка на тендер';\nCOMMENT ON COLUMN public.tender_markup_percentage.works_16_markup IS 'Работы 1,6 (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.works_cost_growth IS 'Рост стоимости Работ (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.material_cost_growth IS 'Рост стоимости Материалов (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.subcontract_works_cost_growth IS 'Рост стоимости Работ субподряда (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.subcontract_materials_cost_growth IS 'Рост стоимости Материалов Субподряда (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.contingency_costs IS 'Непредвиденные затраты (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.overhead_own_forces IS 'ООЗ - Общестроительные затраты (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.overhead_subcontract IS 'ООЗ Субподряда (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.general_costs_without_subcontract IS 'ОФЗ без субподряда - Общефирменные затраты (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.profit_own_forces IS 'Прибыль собственными силами (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.profit_subcontract IS 'Прибыль субподряда (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.mechanization_service IS 'Служба механизации (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.mbp_gsm IS 'МБП и ГСМ - Малоценные быстроизнашивающиеся предметы и горюче-смазочные материалы (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.warranty_period IS 'Гарантийный период (%)';\nCOMMENT ON COLUMN public.tender_markup_percentage.notes IS 'Примечания';\nCOMMENT ON COLUMN public.tender_markup_percentage.is_active IS 'Активность записи (только одна активная запись на тендер)';\nCOMMENT ON COLUMN public.tender_markup_percentage.commercial_total_value IS 'Итоговая коммерческая стоимость (руб)';\nCOMMENT ON COLUMN public.tender_markup_percentage.commercial_total_calculated_at IS 'Время последнего расчета итоговой стоимости';\nCOMMENT ON COLUMN public.tender_markup_percentage.created_at IS 'Дата создания записи';\nCOMMENT ON COLUMN public.tender_markup_percentage.updated_at IS 'Дата последнего обновления';"
+    "sql": "-- Проценты наценок по тендерам (связь с справочником параметров)\nCREATE TABLE IF NOT EXISTS public.tender_markup_percentage (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    tender_id uuid NOT NULL,\n    markup_parameter_id uuid NOT NULL,\n    value numeric(5,2) NOT NULL DEFAULT 0,\n    created_at timestamp with time zone NOT NULL DEFAULT now(),\n    updated_at timestamp with time zone NOT NULL DEFAULT now(),\n    CONSTRAINT tender_markup_percentage_markup_parameter_id_fkey FOREIGN KEY (markup_parameter_id) REFERENCES None.None(None),\n    CONSTRAINT tender_markup_percentage_pkey PRIMARY KEY (id),\n    CONSTRAINT tender_markup_percentage_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None),\n    CONSTRAINT tender_markup_percentage_unique UNIQUE (markup_parameter_id),\n    CONSTRAINT tender_markup_percentage_unique UNIQUE (tender_id)\n);\n\nCOMMENT ON TABLE public.tender_markup_percentage IS 'Проценты наценок по тендерам (связь с справочником параметров)';\nCOMMENT ON COLUMN public.tender_markup_percentage.id IS 'Уникальный идентификатор записи';\nCOMMENT ON COLUMN public.tender_markup_percentage.tender_id IS 'Ссылка на тендер';\nCOMMENT ON COLUMN public.tender_markup_percentage.markup_parameter_id IS 'Ссылка на параметр наценки';\nCOMMENT ON COLUMN public.tender_markup_percentage.value IS 'Значение процента (0-100)';\nCOMMENT ON COLUMN public.tender_markup_percentage.created_at IS 'Дата создания';\nCOMMENT ON COLUMN public.tender_markup_percentage.updated_at IS 'Дата последнего обновления';"
   },
   "public.tenders": {
     "schema": "public",

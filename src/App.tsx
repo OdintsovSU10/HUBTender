@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Nomenclatures from './pages/Admin/Nomenclatures/Nomenclatures';
 import Tenders from './pages/Admin/Tenders/Tenders';
 import ConstructionCost from './pages/Admin/ConstructionCost/ConstructionCost';
+import MarkupConstructor from './pages/Admin/MarkupConstructor/MarkupConstructor';
 import Library from './pages/Library';
 import './App.css';
 
@@ -40,6 +41,7 @@ function AppContent() {
             <Route path="nomenclatures" element={<Nomenclatures />} />
             <Route path="tenders" element={<Tenders />} />
             <Route path="construction_cost" element={<ConstructionCost />} />
+            <Route path="markup_constructor" element={<MarkupConstructor />} />
           </Route>
           <Route path="users" element={<div>Пользователи</div>} />
           <Route path="settings" element={<div>Настройки</div>} />
