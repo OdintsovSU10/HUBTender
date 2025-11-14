@@ -530,6 +530,9 @@ const MarkupConstructor: React.FC = () => {
           initialValues[param.key] = param.default_value || 0;
         });
         basePercentagesForm.setFieldsValue(initialValues);
+
+        // Также инициализируем основную форму базовыми значениями (для расчётов)
+        form.setFieldsValue(initialValues);
       }
     } catch (error) {
       console.error('Ошибка загрузки параметров наценок:', error);
@@ -690,10 +693,10 @@ const MarkupConstructor: React.FC = () => {
 
       if (error) throw error;
 
-      // Инициализируем объект с нулевыми значениями для всех параметров
+      // Инициализируем объект с базовыми значениями для всех параметров
       const markupValues: Record<string, number> = {};
       markupParameters.forEach((param) => {
-        markupValues[param.key] = 0;
+        markupValues[param.key] = param.default_value || 0;
       });
 
       if (data && data.length > 0) {
@@ -1728,7 +1731,7 @@ const MarkupConstructor: React.FC = () => {
 
     // Опции для выбора операндов (наценки или пункты) с группировкой
     const markupOptionsList = availableMarkups.map(markup => ({
-      label: markup.label,
+      label: `${markup.label} (${markup.default_value || 0}%)`,
       value: `markup:${markup.key}`
     }));
 
@@ -2824,6 +2827,24 @@ const MarkupConstructor: React.FC = () => {
                     </Button>
                   </Space>
                 </div>
+
+                {/* Панель с базовыми процентами наценок */}
+                {markupParameters.length > 0 && (
+                  <Card
+                    size="small"
+                    title={<Text strong>Базовые проценты наценок</Text>}
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Space wrap size="small">
+                      {markupParameters.map((param, index) => (
+                        <Tag key={param.id} color="blue">
+                          {index + 1}. {param.label}: <Text strong>{param.default_value || 0}%</Text>
+                        </Tag>
+                      ))}
+                    </Space>
+                  </Card>
+                )}
+
                 <Tabs
                   activeKey={activeTab}
                   onChange={(key) => setActiveTab(key as TabKey)}
