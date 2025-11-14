@@ -190,6 +190,47 @@ export interface WorkLibraryFull extends WorkLibrary {
 }
 
 // =============================================
+// Типы для таблицы work_material_templates
+// =============================================
+
+export interface WorkMaterialTemplateInsert {
+  template_name: string;
+  detail_cost_category_id: string;
+  consumption_coefficient: number;
+  work_library_id: string;
+  material_library_id: string;
+  order_num?: number;
+  is_active?: boolean;
+}
+
+export interface WorkMaterialTemplate extends WorkMaterialTemplateInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// =============================================
+// Расширенный тип для work_material_templates с JOIN данными
+// =============================================
+
+export interface WorkMaterialTemplateFull extends WorkMaterialTemplate {
+  work_name: string;
+  work_unit: UnitType;
+  work_item_type: WorkItemType;
+  work_unit_rate: number;
+  work_currency_type: CurrencyType;
+  material_name: string;
+  material_unit: UnitType;
+  material_type: MaterialType;
+  material_item_type: ItemType;
+  material_unit_rate: number;
+  material_currency_type: CurrencyType;
+  detail_cost_category_name: string;
+  cost_category_name: string;
+  location: string;
+}
+
+// =============================================
 // Типы для таблицы markup_parameters (справочник параметров наценок)
 // =============================================
 
@@ -233,6 +274,56 @@ export interface TenderMarkupPercentageFull extends TenderMarkupPercentage {
 export interface TenderMarkupPercentageUI {
   tender_id: string;
   [key: string]: number | string; // динамические ключи параметров
+}
+
+// =============================================
+// Типы для таблицы templates
+// =============================================
+
+export interface TemplateInsert {
+  name: string;
+  detail_cost_category_id: string;
+}
+
+export interface Template extends TemplateInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// =============================================
+// Типы для таблицы template_items
+// =============================================
+
+export type TemplateItemKind = 'work' | 'material';
+
+export interface TemplateItemInsert {
+  template_id: string;
+  kind: TemplateItemKind;
+  work_library_id?: string | null;
+  material_library_id?: string | null;
+  parent_work_item_id?: string | null;
+  conversation_coeff?: number | null;
+  detail_cost_category_id?: string | null;
+  position?: number;
+  note?: string | null;
+}
+
+export interface TemplateItem extends TemplateItemInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Расширенные типы с JOIN данными
+export interface TemplateItemFull extends TemplateItem {
+  work_name?: string;
+  work_unit?: UnitType;
+  material_name?: string;
+  material_unit?: UnitType;
+  parent_work_name?: string;
+  detail_cost_category_name?: string;
+  detail_cost_category_full?: string; // Format: "Category / Detail / Location"
 }
 
 // =============================================

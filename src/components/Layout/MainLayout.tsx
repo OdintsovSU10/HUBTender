@@ -64,9 +64,21 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       label: 'Коммерция',
     },
     {
-      key: '/library',
+      key: 'library',
       icon: <BookOutlined />,
       label: 'Библиотеки',
+      children: [
+        {
+          key: '/library',
+          icon: <BookOutlined />,
+          label: 'Материалы и работы',
+        },
+        {
+          key: '/library/templates',
+          icon: <ProfileOutlined />,
+          label: 'Шаблоны',
+        },
+      ],
     },
     {
       key: '/costs',

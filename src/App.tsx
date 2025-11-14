@@ -10,6 +10,7 @@ import ConstructionCost from './pages/Admin/ConstructionCost/ConstructionCost';
 import MarkupConstructor from './pages/Admin/MarkupConstructor/MarkupConstructor';
 import MarkupPercentages from './pages/Admin/MarkupPercentages/MarkupPercentages';
 import Library from './pages/Library';
+import Templates from './pages/Library/Templates';
 import './App.css';
 
 // Временный импорт для тестирования Supabase (удалить после проверки)
@@ -37,6 +38,7 @@ function AppContent() {
             <Route path="positions" element={<div>Позиции заказчика</div>} />
             <Route path="commerce" element={<div>Коммерция</div>} />
             <Route path="library" element={<Library />} />
+            <Route path="library/templates" element={<Templates />} />
             <Route path="costs" element={<div>Затраты на строительство</div>} />
             <Route path="admin">
               <Route index element={<Navigate to="/admin/nomenclatures" replace />} />
