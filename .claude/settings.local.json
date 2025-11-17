@@ -20,7 +20,11 @@
       "Bash(\"C:\\Users\\nekrasov.l.m\\WebstormProjects\\HUBTender\\src\\pages\\Library\\MaterialsTab.tmp.tsx\")",
       "Bash(supabase db reset:*)",
       "Bash(supabase db push:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(test:*)",
+      "Bash(node scripts/fix-global-tactic.js:*)",
+      "Bash(/tmp/markup_old.tsx)",
+      "Bash(supabase db diff:*)"
     ],
     "deny": [],
     "ask": []

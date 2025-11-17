@@ -22,8 +22,10 @@ import {
   AutoComplete,
   App
 } from 'antd';
-import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
+import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined, CopyOutlined, CloseOutlined, ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
 import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupParameterInsert, MarkupTactic } from '../../../lib/supabase';
+import { parseNumberWithSpaces, formatNumberWithSpaces } from '../../../utils/numberFormat';
+import dayjs from 'dayjs';
 import './MarkupConstructor.css';
 
 const { Title, Text } = Typography;
@@ -93,6 +95,10 @@ const MarkupConstructor: React.FC = () => {
   const [currentTacticName, setCurrentTacticName] = useState<string>(''); // Название текущей тактики
   const [activeTab, setActiveTab] = useState<TabKey>('works');
   const [isDataLoaded, setIsDataLoaded] = useState(false); // Флаг для предотвращения автосохранения до загрузки
+  const [isTacticSelected, setIsTacticSelected] = useState(false); // Флаг выбора схемы
+  const [loadingTactics, setLoadingTactics] = useState(false); // Загрузка списка тактик
+  const [isEditingName, setIsEditingName] = useState(false); // Флаг редактирования названия
+  const [editingName, setEditingName] = useState(''); // Редактируемое название
 
   // Состояния для параметров наценок (загружаются из БД)
   const [markupParameters, setMarkupParameters] = useState<MarkupParameter[]>([]);
@@ -667,6 +673,7 @@ const MarkupConstructor: React.FC = () => {
   };
 
   const fetchTactics = async () => {
+    setLoadingTactics(true);
     try {
       const { data, error } = await supabase
         .from('markup_tactics')
@@ -678,6 +685,8 @@ const MarkupConstructor: React.FC = () => {
     } catch (error) {
       console.error('Ошибка загрузки тактик:', error);
       message.error('Не удалось загрузить список тактик');
+    } finally {
+      setLoadingTactics(false);
     }
   };
 
@@ -779,6 +788,8 @@ const MarkupConstructor: React.FC = () => {
 
         setMarkupSequences(sequencesEn);
         setBaseCosts(baseCostsEn);
+        setIsTacticSelected(true); // Показываем страницу
+        setIsDataLoaded(true); // Разрешаем автосохранение
       }
     } catch (error) {
       console.error('Ошибка загрузки тактики:', error);
@@ -849,6 +860,57 @@ const MarkupConstructor: React.FC = () => {
     } else {
       form.resetFields();
     }
+  };
+
+  // Возврат к списку схем
+  const handleBackToList = () => {
+    setIsTacticSelected(false);
+    setIsDataLoaded(false);
+    setCurrentTacticId(null);
+    setCurrentTacticName('');
+    setSelectedTacticId(null);
+    setIsEditingName(false);
+  };
+
+  // Функции для редактирования названия схемы
+  const handleStartEditingName = () => {
+    setEditingName(currentTacticName || 'Новая схема');
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!editingName.trim()) {
+      message.warning('Название схемы не может быть пустым');
+      return;
+    }
+
+    if (currentTacticId) {
+      try {
+        const { error } = await supabase
+          .from('markup_tactics')
+          .update({ name: editingName })
+          .eq('id', currentTacticId);
+
+        if (error) throw error;
+
+        setCurrentTacticName(editingName);
+        setIsEditingName(false);
+        message.success('Название схемы обновлено');
+        await fetchTactics(); // Обновляем список
+      } catch (error) {
+        console.error('Ошибка обновления названия:', error);
+        message.error('Не удалось обновить название');
+      }
+    } else {
+      // Для новой схемы просто обновляем локальное состояние
+      setCurrentTacticName(editingName);
+      setIsEditingName(false);
+    }
+  };
+
+  const handleCancelEditingName = () => {
+    setIsEditingName(false);
+    setEditingName('');
   };
 
   // Добавление нового параметра наценки в БД

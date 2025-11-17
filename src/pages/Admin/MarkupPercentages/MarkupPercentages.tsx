@@ -14,6 +14,7 @@ import {
 } from 'antd';
 import { SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupTactic } from '../../../lib/supabase';
+import { parseNumberInput, formatNumberInput } from '../../../utils/numberFormat';
 
 const { Title, Text } = Typography;
 
@@ -52,7 +53,7 @@ const MarkupPercentages: React.FC = () => {
         const { data: globalTactic, error: globalError } = await supabase
           .from('markup_tactics')
           .select('id')
-          .eq('name', 'Текущая тактика')
+          .eq('name', 'Базовая схема')
           .eq('is_global', true)
           .single();
 
@@ -364,6 +365,8 @@ const MarkupPercentages: React.FC = () => {
                       addonAfter="%"
                       style={{ width: '120px' }}
                       precision={2}
+                      parser={parseNumberInput}
+                      formatter={formatNumberInput}
                     />
                   </Form.Item>
                 </Col>

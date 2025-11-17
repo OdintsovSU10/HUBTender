@@ -11,7 +11,8 @@ import {
   Dropdown,
   DatePicker,
   message,
-  Form
+  Form,
+  Modal
 } from 'antd';
 import {
   FileTextOutlined,
@@ -34,6 +35,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import TenderModal from './TenderModal';
+import UploadBOQModal from './UploadBOQModal';
 import { supabase, type Tender, type TenderInsert, type MarkupParameter, type TenderMarkupPercentageInsert } from '../../../lib/supabase';
 import dayjs from 'dayjs';
 import './Tenders.css';
@@ -76,6 +78,10 @@ const Tenders: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editingTender, setEditingTender] = useState<Tender | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+
+  // Состояние для модального окна загрузки ВОР
+  const [uploadBOQVisible, setUploadBOQVisible] = useState(false);
+  const [selectedTenderForUpload, setSelectedTenderForUpload] = useState<TenderRecord | null>(null);
 
   // Загрузка тендеров из БД
   const fetchTenders = async () => {
@@ -178,7 +184,32 @@ const Tenders: React.FC = () => {
         message.success(`Тендер скопирован: ${record.tender}`);
         break;
       case 'delete':
-        message.warning(`Удаление тендера: ${record.tender}`);
+        Modal.confirm({
+          title: 'Удаление тендера',
+          content: `Вы уверены, что хотите удалить тендер "${record.tender}"? Это действие нельзя будет отменить.`,
+          okText: 'Удалить',
+          okType: 'danger',
+          cancelText: 'Отмена',
+          onOk: async () => {
+            try {
+              const { error } = await supabase
+                .from('tenders')
+                .delete()
+                .eq('id', record.id);
+
+              if (error) {
+                console.error('Ошибка удаления тендера:', error);
+                message.error('Не удалось удалить тендер');
+              } else {
+                message.success(`Тендер "${record.tender}" успешно удален`);
+                await fetchTenders();
+              }
+            } catch (error) {
+              console.error('Ошибка при удалении тендера:', error);
+              message.error('Произошла ошибка при удалении тендера');
+            }
+          },
+        });
         break;
       case 'archive':
         message.info(`Тендер отправлен в архив: ${record.tender}`);
@@ -447,7 +478,7 @@ const Tenders: React.FC = () => {
             type="text"
             size="small"
             icon={<DownloadOutlined />}
-            onClick={() => message.info('Загрузка тендера...')}
+            onClick={() => handleOpenUploadBOQ(record)}
             style={{ fontSize: 11 }}
           >
             Загрузить
@@ -561,6 +592,25 @@ const Tenders: React.FC = () => {
                 // Не показываем ошибку пользователю, т.к. тендер уже создан
               }
             }
+
+            // Устанавливаем базовую схему наценок для нового тендера
+            const { data: baseTactic, error: tacticError } = await supabase
+              .from('markup_tactics')
+              .select('id')
+              .eq('name', 'Базовая схема')
+              .eq('is_global', true)
+              .single();
+
+            if (!tacticError && baseTactic) {
+              const { error: updateError } = await supabase
+                .from('tenders')
+                .update({ markup_tactic_id: baseTactic.id })
+                .eq('id', data.id);
+
+              if (updateError) {
+                console.error('Ошибка установки базовой схемы наценок:', updateError);
+              }
+            }
           } catch (markupError) {
             console.error('Ошибка при копировании базовых процентов:', markupError);
           }
@@ -582,6 +632,22 @@ const Tenders: React.FC = () => {
     setIsModalVisible(false);
     setIsEditMode(false);
     setEditingTender(null);
+  };
+
+  // Обработчики для модального окна загрузки ВОР
+  const handleOpenUploadBOQ = (record: TenderRecord) => {
+    setSelectedTenderForUpload(record);
+    setUploadBOQVisible(true);
+  };
+
+  const handleCloseUploadBOQ = () => {
+    setUploadBOQVisible(false);
+    setSelectedTenderForUpload(null);
+  };
+
+  const handleUploadSuccess = () => {
+    message.success('Позиции заказчика успешно загружены');
+    // Можно добавить дополнительные действия при успешной загрузке
   };
 
   return (
@@ -664,6 +730,17 @@ const Tenders: React.FC = () => {
         onCancel={handleModalCancel}
         isEditMode={isEditMode}
       />
+
+      {/* Модальное окно для загрузки ВОРа заказчика */}
+      {selectedTenderForUpload && (
+        <UploadBOQModal
+          visible={uploadBOQVisible}
+          tenderId={selectedTenderForUpload.id}
+          tenderName={selectedTenderForUpload.tender}
+          onCancel={handleCloseUploadBOQ}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
     </div>
   );
 };

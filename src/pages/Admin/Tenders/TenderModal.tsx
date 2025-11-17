@@ -20,6 +20,7 @@ import {
 } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { parseNumberInput, formatNumberInput } from '../../../utils/numberFormat';
 
 const { TextArea } = Input;
 
@@ -160,6 +161,8 @@ const TenderModal: React.FC<TenderModalProps> = ({
                 min={1}
                 style={{ width: '100%' }}
                 placeholder="1"
+                parser={parseNumberInput}
+                formatter={formatNumberInput}
               />
             </Form.Item>
           </Col>
@@ -178,6 +181,8 @@ const TenderModal: React.FC<TenderModalProps> = ({
                 style={{ width: '100%' }}
                 placeholder="0.00"
                 precision={2}
+                parser={parseNumberInput}
+                formatter={formatNumberInput}
               />
             </Form.Item>
           </Col>
@@ -191,6 +196,8 @@ const TenderModal: React.FC<TenderModalProps> = ({
                 style={{ width: '100%' }}
                 placeholder="0.00"
                 precision={2}
+                parser={parseNumberInput}
+                formatter={formatNumberInput}
               />
             </Form.Item>
           </Col>
@@ -215,6 +222,8 @@ const TenderModal: React.FC<TenderModalProps> = ({
                 placeholder="100.00"
                 precision={2}
                 step={0.1}
+                parser={parseNumberInput}
+                formatter={formatNumberInput}
               />
             </Form.Item>
           </Col>
@@ -234,6 +243,8 @@ const TenderModal: React.FC<TenderModalProps> = ({
                 placeholder="108.00"
                 precision={2}
                 step={0.1}
+                parser={parseNumberInput}
+                formatter={formatNumberInput}
               />
             </Form.Item>
           </Col>
@@ -253,6 +264,8 @@ const TenderModal: React.FC<TenderModalProps> = ({
                 placeholder="13.50"
                 precision={2}
                 step={0.01}
+                parser={parseNumberInput}
+                formatter={formatNumberInput}
               />
             </Form.Item>
           </Col>
