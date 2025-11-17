@@ -19,17 +19,15 @@ import {
   Radio,
   Modal,
   List,
-  AutoComplete,
   App
 } from 'antd';
-import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined, CopyOutlined, CloseOutlined, ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
-import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupParameterInsert, MarkupTactic } from '../../../lib/supabase';
-import { parseNumberWithSpaces, formatNumberWithSpaces } from '../../../utils/numberFormat';
+import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined, CloseOutlined, ArrowLeftOutlined, CheckOutlined, CopyOutlined } from '@ant-design/icons';
+import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupTactic } from '../../../lib/supabase';
+import { formatNumberWithSpaces, parseNumberWithSpaces } from '../../../utils/numberFormat';
 import dayjs from 'dayjs';
 import './MarkupConstructor.css';
 
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 
 interface MarkupStep {
   name?: string; // Название пункта
@@ -37,36 +35,36 @@ interface MarkupStep {
 
   // Первая операция
   action1: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand1Type: 'markup' | 'step'; // наценка или результат другого шага
-  operand1Key?: string; // ключ наценки (если operand1Type = 'markup')
+  operand1Type: 'markup' | 'step' | 'number'; // наценка, результат другого шага или число
+  operand1Key?: string | number; // ключ наценки (если operand1Type = 'markup') или число
   operand1Index?: number; // индекс шага (если operand1Type = 'step')
   operand1MultiplyFormat?: 'addOne' | 'direct'; // формат умножения: 'addOne' = (1 + %), 'direct' = %
 
   // Вторая операция (опциональная)
   action2?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand2Type?: 'markup' | 'step';
-  operand2Key?: string;
+  operand2Type?: 'markup' | 'step' | 'number';
+  operand2Key?: string | number;
   operand2Index?: number;
   operand2MultiplyFormat?: 'addOne' | 'direct';
 
   // Третья операция (опциональная)
   action3?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand3Type?: 'markup' | 'step';
-  operand3Key?: string;
+  operand3Type?: 'markup' | 'step' | 'number';
+  operand3Key?: string | number;
   operand3Index?: number;
   operand3MultiplyFormat?: 'addOne' | 'direct';
 
   // Четвертая операция (опциональная)
   action4?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand4Type?: 'markup' | 'step';
-  operand4Key?: string;
+  operand4Type?: 'markup' | 'step' | 'number';
+  operand4Key?: string | number;
   operand4Index?: number;
   operand4MultiplyFormat?: 'addOne' | 'direct';
 
   // Пятая операция (опциональная)
   action5?: 'multiply' | 'divide' | 'add' | 'subtract';
-  operand5Type?: 'markup' | 'step';
-  operand5Key?: string;
+  operand5Type?: 'markup' | 'step' | 'number';
+  operand5Key?: string | number;
   operand5Index?: number;
   operand5MultiplyFormat?: 'addOne' | 'direct';
 }
@@ -99,6 +97,7 @@ const MarkupConstructor: React.FC = () => {
   const [loadingTactics, setLoadingTactics] = useState(false); // Загрузка списка тактик
   const [isEditingName, setIsEditingName] = useState(false); // Флаг редактирования названия
   const [editingName, setEditingName] = useState(''); // Редактируемое название
+  const [tacticSearchText, setTacticSearchText] = useState(''); // Поисковый запрос для схем
 
   // Состояния для параметров наценок (загружаются из БД)
   const [markupParameters, setMarkupParameters] = useState<MarkupParameter[]>([]);
@@ -1262,6 +1261,72 @@ const MarkupConstructor: React.FC = () => {
     });
   };
 
+  // Функция копирования схемы наценок
+  const handleCopyTactic = async () => {
+    if (!currentTacticId) {
+      message.warning('Выберите схему для копирования');
+      return;
+    }
+
+    try {
+      // Найдем текущую тактику
+      const tacticToCopy = tactics.find(t => t.id === currentTacticId);
+      if (!tacticToCopy) {
+        message.error('Схема не найдена');
+        return;
+      }
+
+      // Определяем новое название с версионированием
+      let baseName = tacticToCopy.name || 'Схема';
+      let version = 2;
+
+      // Проверяем, есть ли уже версия в названии
+      const versionMatch = baseName.match(/^(.+)_v(\d+)$/);
+      if (versionMatch) {
+        baseName = versionMatch[1];
+        version = parseInt(versionMatch[2]) + 1;
+      }
+
+      // Находим следующую доступную версию
+      let newName = `${baseName}_v${version}`;
+      while (tactics.some(t => t.name === newName)) {
+        version++;
+        newName = `${baseName}_v${version}`;
+      }
+
+      // Создаем копию тактики
+      const { data: newTactic, error: tacticError } = await supabase
+        .from('markup_tactics')
+        .insert({
+          name: newName,
+          is_global: false, // Копии никогда не глобальные
+          works: tacticToCopy.works,
+          materials: tacticToCopy.materials,
+          subcontract_works: tacticToCopy.subcontract_works,
+          subcontract_materials: tacticToCopy.subcontract_materials,
+          work_comp: tacticToCopy.work_comp,
+          material_comp: tacticToCopy.material_comp,
+        })
+        .select()
+        .single();
+
+      if (tacticError) throw tacticError;
+
+      message.success(`Создана копия схемы: ${newName}`);
+
+      // Обновляем список тактик
+      await fetchTactics();
+
+      // Открываем новую схему для редактирования
+      if (newTactic) {
+        handleTacticChange(newTactic.id);
+      }
+    } catch (error) {
+      console.error('Ошибка копирования схемы:', error);
+      message.error('Не удалось создать копию схемы');
+    }
+  };
+
   // Функции для управления порядком наценок
   const addMarkup = (tabKey: TabKey) => {
     const baseIdx = insertPositions[tabKey];
@@ -1843,8 +1908,8 @@ const MarkupConstructor: React.FC = () => {
               precision={2}
               addonAfter="₽"
               placeholder="Введите базовую стоимость"
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-              parser={(value) => value?.replace(/\s/g, '') || ''}
+              formatter={formatNumberWithSpaces}
+              parser={parseNumberWithSpaces}
             />
           </div>
 
@@ -1879,7 +1944,7 @@ const MarkupConstructor: React.FC = () => {
                 let op1ValueNum: number;
                 if (step.operand1Type === 'markup' && step.operand1Key) {
                   const markup = markupParameters.find(m => m.key === step.operand1Key);
-                  op1Name = markup?.label || step.operand1Key;
+                  op1Name = markup?.label || String(step.operand1Key);
                   op1ValueNum = form.getFieldValue(step.operand1Key) || 0;
                 } else if (step.operand1Type === 'step' && step.operand1Index !== undefined) {
                   if (step.operand1Index === -1) {
@@ -1910,7 +1975,7 @@ const MarkupConstructor: React.FC = () => {
                   let op2ValueNum: number;
                   if (step.operand2Type === 'markup' && step.operand2Key) {
                     const markup = markupParameters.find(m => m.key === step.operand2Key);
-                    op2Name = markup?.label || step.operand2Key;
+                    op2Name = markup?.label || String(step.operand2Key);
                     op2ValueNum = form.getFieldValue(step.operand2Key) || 0;
                   } else if (step.operand2Type === 'step' && step.operand2Index !== undefined) {
                     if (step.operand2Index === -1) {
@@ -1938,7 +2003,7 @@ const MarkupConstructor: React.FC = () => {
                   let op3ValueNum: number;
                   if (step.operand3Type === 'markup' && step.operand3Key) {
                     const markup = markupParameters.find(m => m.key === step.operand3Key);
-                    op3Name = markup?.label || step.operand3Key;
+                    op3Name = markup?.label || String(step.operand3Key);
                     op3ValueNum = form.getFieldValue(step.operand3Key) || 0;
                   } else if (step.operand3Type === 'step' && step.operand3Index !== undefined) {
                     if (step.operand3Index === -1) {
@@ -1966,7 +2031,7 @@ const MarkupConstructor: React.FC = () => {
                   let op4ValueNum: number;
                   if (step.operand4Type === 'markup' && step.operand4Key) {
                     const markup = markupParameters.find(m => m.key === step.operand4Key);
-                    op4Name = markup?.label || step.operand4Key;
+                    op4Name = markup?.label || String(step.operand4Key);
                     op4ValueNum = form.getFieldValue(step.operand4Key) || 0;
                   } else if (step.operand4Type === 'step' && step.operand4Index !== undefined) {
                     if (step.operand4Index === -1) {
@@ -1994,7 +2059,7 @@ const MarkupConstructor: React.FC = () => {
                   let op5ValueNum: number;
                   if (step.operand5Type === 'markup' && step.operand5Key) {
                     const markup = markupParameters.find(m => m.key === step.operand5Key);
-                    op5Name = markup?.label || step.operand5Key;
+                    op5Name = markup?.label || String(step.operand5Key);
                     op5ValueNum = form.getFieldValue(step.operand5Key) || 0;
                   } else if (step.operand5Type === 'step' && step.operand5Index !== undefined) {
                     if (step.operand5Index === -1) {
@@ -2323,6 +2388,8 @@ const MarkupConstructor: React.FC = () => {
                           onChange={(value) => {
                             setOperand1Value(prev => ({ ...prev, [tabKey]: value || 0 }));
                           }}
+                          formatter={formatNumberWithSpaces}
+                          parser={parseNumberWithSpaces}
                           size="middle"
                         />
                       )}
@@ -2432,6 +2499,8 @@ const MarkupConstructor: React.FC = () => {
                               onChange={(value) => {
                                 setOperand2Value(prev => ({ ...prev, [tabKey]: value || 0 }));
                               }}
+                              formatter={formatNumberWithSpaces}
+                              parser={parseNumberWithSpaces}
                               size="middle"
                             />
                           )}
@@ -2542,6 +2611,8 @@ const MarkupConstructor: React.FC = () => {
                               onChange={(value) => {
                                 setOperand3Value(prev => ({ ...prev, [tabKey]: value || 0 }));
                               }}
+                              formatter={formatNumberWithSpaces}
+                              parser={parseNumberWithSpaces}
                               size="middle"
                             />
                           )}
@@ -2651,6 +2722,8 @@ const MarkupConstructor: React.FC = () => {
                               onChange={(value) => {
                                 setOperand4Value(prev => ({ ...prev, [tabKey]: value || 0 }));
                               }}
+                              formatter={formatNumberWithSpaces}
+                              parser={parseNumberWithSpaces}
                               size="middle"
                             />
                           )}
@@ -2759,6 +2832,8 @@ const MarkupConstructor: React.FC = () => {
                               onChange={(value) => {
                                 setOperand5Value(prev => ({ ...prev, [tabKey]: value || 0 }));
                               }}
+                              formatter={formatNumberWithSpaces}
+                              parser={parseNumberWithSpaces}
                               size="middle"
                             />
                           )}
@@ -2813,137 +2888,262 @@ const MarkupConstructor: React.FC = () => {
             label: 'Порядок применения наценок',
             children: (
               <div style={{ minHeight: '100%', overflow: 'visible' }}>
-                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1, maxWidth: '300px' }}>
-                    <Title level={4} style={{ margin: 0 }}>
-                      Порядок применения наценок
-                    </Title>
-                    <Text type="secondary" style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>
-                      Настройте последовательность расчета для каждого типа позиций
-                    </Text>
-                    <AutoComplete
-                      placeholder="Выберите или введите название порядка расчета"
-                      value={currentTacticName}
-                      onChange={(value) => setCurrentTacticName(value)}
-                      onSelect={(value, option) => {
-                        // Загружаем выбранную тактику
-                        if (option && option.tacticId) {
-                          handleTacticChange(option.tacticId);
+                {!isTacticSelected ? (
+                  // Список схем наценок
+                  <div>
+                    <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <Title level={4} style={{ margin: 0 }}>
+                          Схемы наценок
+                        </Title>
+                        <Text type="secondary" style={{ fontSize: '14px' }}>
+                          Выберите схему для редактирования или создайте новую
+                        </Text>
+                      </div>
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          // Создание новой тактики
+                          setSelectedTacticId(null);
+                          setCurrentTacticId(null);
+                          setCurrentTacticName('');
+                          setMarkupSequences({
+                            works: [],
+                            materials: [],
+                            subcontract_works: [],
+                            subcontract_materials: [],
+                            work_comp: [],
+                            material_comp: [],
+                          });
+                          setBaseCosts({
+                            works: 0,
+                            materials: 0,
+                            subcontract_works: 0,
+                            subcontract_materials: 0,
+                            work_comp: 0,
+                            material_comp: 0,
+                          });
+                          setIsTacticSelected(true);
+                          setIsDataLoaded(true);
+                          message.info('Создается новая схема наценок');
+                        }}
+                        size="large"
+                      >
+                        Создать новую схему
+                      </Button>
+                    </div>
+
+                    <Input
+                      placeholder="Поиск по названию схемы..."
+                      value={tacticSearchText}
+                      onChange={(e) => setTacticSearchText(e.target.value)}
+                      allowClear
+                      style={{ marginBottom: 16 }}
+                      prefix={<span style={{ color: token.colorTextTertiary }}>🔍</span>}
+                    />
+
+                    <Spin spinning={loadingTactics}>
+                      <List
+                        grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 4 }}
+                        dataSource={
+                          tactics
+                            .filter(t =>
+                              !tacticSearchText ||
+                              t.name?.toLowerCase().includes(tacticSearchText.toLowerCase())
+                            )
+                            .sort((a, b) => {
+                              // Глобальные схемы первыми
+                              if (a.is_global && !b.is_global) return -1;
+                              if (!a.is_global && b.is_global) return 1;
+                              // Затем по алфавиту
+                              return (a.name || '').localeCompare(b.name || '');
+                            })
                         }
-                      }}
-                      options={tactics.map(tactic => ({
-                        label: tactic.name || 'Без названия',
-                        value: tactic.name || 'Без названия',
-                        tacticId: tactic.id,
-                      }))}
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      style={{ width: '100%' }}
+                        locale={{ emptyText: 'Нет доступных схем наценок. Создайте новую схему.' }}
+                        renderItem={(tactic) => (
+                          <List.Item>
+                            <Card
+                              hoverable
+                              onClick={() => {
+                                handleTacticChange(tactic.id);
+                                setIsTacticSelected(true);
+                              }}
+                              style={{
+                                height: '100%',
+                                cursor: 'pointer',
+                                border: tactic.is_global ? `2px solid ${token.colorPrimary}` : undefined
+                              }}
+                              bodyStyle={{ padding: 16 }}
+                            >
+                              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <Title level={5} style={{ margin: 0, flex: 1 }}>
+                                    {tactic.name || 'Без названия'}
+                                  </Title>
+                                  {tactic.is_global && (
+                                    <Tag color="gold" style={{ margin: 0 }}>глобальная</Tag>
+                                  )}
+                                </div>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {tactic.created_at ? `Создана: ${dayjs(tactic.created_at).format('DD.MM.YYYY')}` : ''}
+                                </Text>
+                                {tactic.updated_at && (
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    Обновлена: {dayjs(tactic.updated_at).format('DD.MM.YYYY HH:mm')}
+                                  </Text>
+                                )}
+                              </Space>
+                            </Card>
+                          </List.Item>
+                        )}
+                      />
+                    </Spin>
+                  </div>
+                ) : (
+                  // Редактор схемы наценок
+                  <div>
+                    <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, maxWidth: '400px' }}>
+                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                          <Button
+                            type="primary"
+                            icon={<ArrowLeftOutlined />}
+                            onClick={handleBackToList}
+                          >
+                            К списку схем
+                          </Button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                            {isEditingName ? (
+                              <Input
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                onPressEnter={handleSaveName}
+                                style={{ flex: 1 }}
+                                suffix={
+                                  <Space size={4}>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<CheckOutlined />}
+                                      onClick={handleSaveName}
+                                      style={{ color: '#52c41a' }}
+                                    />
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<CloseOutlined />}
+                                      onClick={handleCancelEditingName}
+                                    />
+                                  </Space>
+                                }
+                              />
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Title level={4} style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                  {currentTacticName || 'Новая схема'}
+                                  {currentTacticId && tactics.find(t => t.id === currentTacticId)?.is_global && (
+                                    <Tag color="gold" style={{ margin: 0 }}>глобальная</Tag>
+                                  )}
+                                </Title>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={handleStartEditingName}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <Text type="secondary" style={{ fontSize: '14px' }}>
+                            Настройте последовательность расчета для каждого типа позиций
+                          </Text>
+                        </Space>
+                      </div>
+                      <Space>
+                        {currentTacticId && (
+                          <Button
+                            icon={<CopyOutlined />}
+                            onClick={handleCopyTactic}
+                          >
+                            Сделать копию
+                          </Button>
+                        )}
+                        {currentTacticId && !tactics.find(t => t.id === currentTacticId)?.is_global && (
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={handleDeleteTactic}
+                          >
+                            Удалить
+                          </Button>
+                        )}
+                        <Button
+                          type="primary"
+                          icon={<SaveOutlined />}
+                          onClick={handleSaveTactic}
+                        >
+                          Сохранить
+                        </Button>
+                      </Space>
+                    </div>
+
+                    {/* Панель с базовыми процентами наценок */}
+                    {markupParameters.length > 0 && (
+                      <Card
+                        size="small"
+                        title={<Text strong>Базовые проценты наценок</Text>}
+                        style={{ marginBottom: 16 }}
+                      >
+                        <Space wrap size="small">
+                          {markupParameters.map((param, index) => (
+                            <Tag key={param.id} color="blue">
+                              {index + 1}. {param.label}: <Text strong>{param.default_value || 0}%</Text>
+                            </Tag>
+                          ))}
+                        </Space>
+                      </Card>
+                    )}
+
+                    <Tabs
+                      activeKey={activeTab}
+                      onChange={(key) => setActiveTab(key as TabKey)}
+                      style={{ overflow: 'visible', marginTop: '-8px' }}
+                      items={[
+                        {
+                          key: 'works',
+                          label: 'Работы',
+                          children: renderMarkupSequenceTab('works'),
+                        },
+                        {
+                          key: 'materials',
+                          label: 'Материалы',
+                          children: renderMarkupSequenceTab('materials'),
+                        },
+                        {
+                          key: 'subcontract_works',
+                          label: 'Субподрядные работы',
+                          children: renderMarkupSequenceTab('subcontract_works'),
+                        },
+                        {
+                          key: 'subcontract_materials',
+                          label: 'Субподрядные материалы',
+                          children: renderMarkupSequenceTab('subcontract_materials'),
+                        },
+                        {
+                          key: 'work_comp',
+                          label: 'Раб-комп',
+                          children: renderMarkupSequenceTab('work_comp'),
+                        },
+                        {
+                          key: 'material_comp',
+                          label: 'Мат-комп',
+                          children: renderMarkupSequenceTab('material_comp'),
+                        },
+                      ]}
                     />
                   </div>
-                  <Space>
-                    <Button
-                      icon={<PlusOutlined />}
-                      onClick={() => {
-                        // Создание новой тактики
-                        setSelectedTacticId(null);
-                        setCurrentTacticId(null);
-                        setCurrentTacticName('');
-                        setMarkupSequences({
-                          works: [],
-                          materials: [],
-                          subcontract_works: [],
-                          subcontract_materials: [],
-                          work_comp: [],
-                          material_comp: [],
-                        });
-                        setBaseCosts({
-                          works: 0,
-                          materials: 0,
-                          subcontract_works: 0,
-                          subcontract_materials: 0,
-                          work_comp: 0,
-                          material_comp: 0,
-                        });
-                        message.info('Создается новый порядок расчета');
-                      }}
-                    >
-                      Создать новый
-                    </Button>
-                    {currentTacticId && (
-                      <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={handleDeleteTactic}
-                      >
-                        Удалить
-                      </Button>
-                    )}
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      onClick={handleSaveTactic}
-                    >
-                      Сохранить
-                    </Button>
-                  </Space>
-                </div>
-
-                {/* Панель с базовыми процентами наценок */}
-                {markupParameters.length > 0 && (
-                  <Card
-                    size="small"
-                    title={<Text strong>Базовые проценты наценок</Text>}
-                    style={{ marginBottom: 16 }}
-                  >
-                    <Space wrap size="small">
-                      {markupParameters.map((param, index) => (
-                        <Tag key={param.id} color="blue">
-                          {index + 1}. {param.label}: <Text strong>{param.default_value || 0}%</Text>
-                        </Tag>
-                      ))}
-                    </Space>
-                  </Card>
                 )}
-
-                <Tabs
-                  activeKey={activeTab}
-                  onChange={(key) => setActiveTab(key as TabKey)}
-                  style={{ overflow: 'visible', marginTop: '-8px' }}
-                  items={[
-                    {
-                      key: 'works',
-                      label: 'Работы',
-                      children: renderMarkupSequenceTab('works'),
-                    },
-                    {
-                      key: 'materials',
-                      label: 'Материалы',
-                      children: renderMarkupSequenceTab('materials'),
-                    },
-                    {
-                      key: 'subcontract_works',
-                      label: 'Субподрядные работы',
-                      children: renderMarkupSequenceTab('subcontract_works'),
-                    },
-                    {
-                      key: 'subcontract_materials',
-                      label: 'Субподрядные материалы',
-                      children: renderMarkupSequenceTab('subcontract_materials'),
-                    },
-                    {
-                      key: 'work_comp',
-                      label: 'Раб-комп',
-                      children: renderMarkupSequenceTab('work_comp'),
-                    },
-                    {
-                      key: 'material_comp',
-                      label: 'Мат-комп',
-                      children: renderMarkupSequenceTab('material_comp'),
-                    },
-                  ]}
-                />
               </div>
             ),
           },
