@@ -18,6 +18,7 @@ import {
   Tooltip,
   Row,
   Col,
+  Tabs,
 } from 'antd';
 import {
   PlusOutlined,
@@ -35,6 +36,7 @@ import type {
   WorkLibraryFull,
   MaterialLibraryFull,
 } from '../../lib/supabase';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -64,6 +66,7 @@ interface TemplateItemWithDetails extends TemplateItem {
   parent_work_name?: string;
   detail_cost_category_name?: string;
   detail_cost_category_full?: string; // Format: "Category / Detail / Location"
+  manual_cost_override?: boolean; // Флаг ручного изменения затраты
 }
 
 interface CostCategoryOption {
@@ -73,10 +76,20 @@ interface CostCategoryOption {
   location: string;
 }
 
+interface TemplateWithDetails extends Template {
+  cost_category_name?: string;
+  detail_category_name?: string;
+  location?: string;
+  cost_category_full?: string; // Format: "Category / Detail / Location"
+}
+
 const Templates: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('list');
+  const { theme: currentTheme } = useTheme();
+  const [templates, setTemplates] = useState<TemplateWithDetails[]>([]);
+  const [tempIdCounter, setTempIdCounter] = useState(0);
   const [templateItems, setTemplateItems] = useState<TemplateItemWithDetails[]>([]);
   const [loadedTemplateItems, setLoadedTemplateItems] = useState<Record<string, TemplateItemWithDetails[]>>({});
   const [works, setWorks] = useState<WorkLibraryFull[]>([]);
@@ -103,22 +116,48 @@ const Templates: React.FC = () => {
   const [editingSelectedWork, setEditingSelectedWork] = useState<string | null>(null);
   const [editingSelectedMaterial, setEditingSelectedMaterial] = useState<string | null>(null);
 
+  // Состояния для поиска и фильтрации шаблонов
+  const [templateSearchText, setTemplateSearchText] = useState('');
+  const [filterCostCategory, setFilterCostCategory] = useState<string | null>(null);
+  const [filterDetailCategory, setFilterDetailCategory] = useState<string | null>(null);
+  const [openedTemplate, setOpenedTemplate] = useState<string | null>(null);
+
   useEffect(() => {
     fetchTemplates();
     fetchWorks();
     fetchMaterials();
     fetchCostCategories();
+    fetchAllTemplateItems();
   }, []);
 
   const fetchTemplates = async () => {
     try {
       const { data, error } = await supabase
         .from('templates')
-        .select('*')
+        .select('*, detail_cost_categories(name, location, cost_categories(name))')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTemplates(data || []);
+
+      // Форматируем данные для добавления полной строки затрат
+      const formattedTemplates: TemplateWithDetails[] = (data || []).map((item: any) => {
+        const costCategoryName = item.detail_cost_categories?.cost_categories?.name || '';
+        const detailCategoryName = item.detail_cost_categories?.name || '';
+        const location = item.detail_cost_categories?.location || '';
+        const costCategoryFull = costCategoryName && detailCategoryName && location
+          ? `${costCategoryName} / ${detailCategoryName} / ${location}`
+          : '';
+
+        return {
+          ...item,
+          cost_category_name: costCategoryName,
+          detail_category_name: detailCategoryName,
+          location: location,
+          cost_category_full: costCategoryFull,
+        };
+      });
+
+      setTemplates(formattedTemplates);
     } catch (error: any) {
       message.error('Ошибка загрузки шаблонов: ' + error.message);
     }
@@ -197,8 +236,17 @@ const Templates: React.FC = () => {
     const work = works.find((w) => w.id === selectedWork);
     if (!work) return;
 
+    // Получаем затрату шаблона
+    const templateCostCategoryId = form.getFieldValue('detail_cost_category_id');
+    const selectedCategory = costCategories.find(c => c.value === templateCostCategoryId);
+    const categoryLabel = selectedCategory?.label || '';
+
+    // Генерируем уникальный ID
+    const newId = `temp-${Date.now()}-${tempIdCounter}`;
+    setTempIdCounter(prev => prev + 1);
+
     const newItem: TemplateItemWithDetails = {
-      id: `temp-${Date.now()}`,
+      id: newId,
       template_id: '',
       kind: 'work',
       work_library_id: work.id,
@@ -214,6 +262,10 @@ const Templates: React.FC = () => {
       work_item_type: work.item_type,
       work_unit_rate: work.unit_rate,
       work_currency_type: work.currency_type,
+      // Автоматически применяем затрату шаблона
+      detail_cost_category_id: templateCostCategoryId || null,
+      detail_cost_category_full: categoryLabel || undefined,
+      manual_cost_override: false,
     };
 
     setTemplateItems([...templateItems, newItem]);
@@ -230,8 +282,17 @@ const Templates: React.FC = () => {
     const material = materials.find((m) => m.id === selectedMaterial);
     if (!material) return;
 
+    // Получаем затрату шаблона
+    const templateCostCategoryId = form.getFieldValue('detail_cost_category_id');
+    const selectedCategory = costCategories.find(c => c.value === templateCostCategoryId);
+    const categoryLabel = selectedCategory?.label || '';
+
+    // Генерируем уникальный ID
+    const newId = `temp-${Date.now()}-${tempIdCounter}`;
+    setTempIdCounter(prev => prev + 1);
+
     const newItem: TemplateItemWithDetails = {
-      id: `temp-${Date.now()}`,
+      id: newId,
       template_id: '',
       kind: 'material',
       work_library_id: null,
@@ -251,6 +312,10 @@ const Templates: React.FC = () => {
       material_currency_type: material.currency_type,
       material_delivery_price_type: material.delivery_price_type,
       material_delivery_amount: material.delivery_amount,
+      // Автоматически применяем затрату шаблона
+      detail_cost_category_id: templateCostCategoryId || null,
+      detail_cost_category_full: categoryLabel || undefined,
+      manual_cost_override: false,
     };
 
     setTemplateItems([...templateItems, newItem]);
@@ -259,7 +324,27 @@ const Templates: React.FC = () => {
   };
 
   const handleDeleteItem = (id: string) => {
-    setTemplateItems(templateItems.filter((item) => item.id !== id));
+    const itemToDelete = templateItems.find(item => item.id === id);
+
+    // Если удаляется работа, очистить привязку у всех материалов
+    if (itemToDelete?.kind === 'work') {
+      const updatedItems = templateItems
+        .filter((item) => item.id !== id)
+        .map((item) => {
+          if (item.kind === 'material' && item.parent_work_item_id === id) {
+            // Очистить привязку к удаляемой работе
+            return {
+              ...item,
+              parent_work_item_id: null,
+              conversation_coeff: null,
+            };
+          }
+          return item;
+        });
+      setTemplateItems(updatedItems);
+    } else {
+      setTemplateItems(templateItems.filter((item) => item.id !== id));
+    }
   };
 
   const handleSaveTemplate = async () => {
@@ -268,6 +353,18 @@ const Templates: React.FC = () => {
 
       if (templateItems.length === 0) {
         message.warning('Добавьте хотя бы один элемент в шаблон');
+        return;
+      }
+
+      // Проверка: материалы привязанные к работе должны иметь коэффициент перевода
+      const invalidMaterials = templateItems.filter(
+        item => item.kind === 'material' &&
+        item.parent_work_item_id &&
+        !item.conversation_coeff
+      );
+
+      if (invalidMaterials.length > 0) {
+        message.error('Введите коэффициент перевода');
         return;
       }
 
@@ -351,7 +448,9 @@ const Templates: React.FC = () => {
       setCostCategorySearchText('');
       setSelectedWork(null);
       setSelectedMaterial(null);
+      setTempIdCounter(0);
       fetchTemplates();
+      fetchAllTemplateItems();
     } catch (error: any) {
       message.error('Ошибка создания шаблона: ' + error.message);
     } finally {
@@ -367,11 +466,10 @@ const Templates: React.FC = () => {
     setCostCategorySearchText('');
     setSelectedWork(null);
     setSelectedMaterial(null);
+    setTempIdCounter(0);
   };
 
-  const fetchTemplateItems = async (templateId: string) => {
-    if (loadedTemplateItems[templateId]) return;
-
+  const fetchAllTemplateItems = async () => {
     try {
       const { data, error } = await supabase
         .from('template_items')
@@ -381,12 +479,18 @@ const Templates: React.FC = () => {
           materials_library:material_library_id(*, material_names(name, unit)),
           detail_cost_categories:detail_cost_category_id(name, location, cost_categories(name))
         `)
-        .eq('template_id', templateId)
         .order('position');
 
       if (error) throw error;
 
-      const formatted: TemplateItemWithDetails[] = (data || []).map((item: any) => {
+      // Группируем элементы по template_id
+      const itemsByTemplate: Record<string, TemplateItemWithDetails[]> = {};
+
+      (data || []).forEach((item: any) => {
+        if (!itemsByTemplate[item.template_id]) {
+          itemsByTemplate[item.template_id] = [];
+        }
+
         // Найти название родительской работы
         let parentWorkName = undefined;
         if (item.parent_work_item_id) {
@@ -403,7 +507,7 @@ const Templates: React.FC = () => {
           detailCostCategoryFull = `${categoryName} / ${detailName} / ${location}`;
         }
 
-        return {
+        const formatted: TemplateItemWithDetails = {
           ...item,
           work_name: item.works_library?.work_names?.name,
           work_unit: item.works_library?.work_names?.unit,
@@ -423,11 +527,13 @@ const Templates: React.FC = () => {
           detail_cost_category_name: item.detail_cost_categories?.name,
           detail_cost_category_full: detailCostCategoryFull,
         };
+
+        itemsByTemplate[item.template_id].push(formatted);
       });
 
-      setLoadedTemplateItems(prev => ({ ...prev, [templateId]: formatted }));
+      setLoadedTemplateItems(itemsByTemplate);
     } catch (error: any) {
-      message.error('Ошибка загрузки элементов шаблона: ' + error.message);
+      message.error('Ошибка загрузки элементов шаблонов: ' + error.message);
     }
   };
 
@@ -442,11 +548,7 @@ const Templates: React.FC = () => {
 
       message.success('Шаблон удален');
       fetchTemplates();
-      setLoadedTemplateItems(prev => {
-        const updated = { ...prev };
-        delete updated[templateId];
-        return updated;
-      });
+      fetchAllTemplateItems();
     } catch (error: any) {
       message.error('Ошибка удаления шаблона: ' + error.message);
     }
@@ -509,15 +611,17 @@ const Templates: React.FC = () => {
       editingTemplateForm.resetFields();
       setEditingTemplateCostCategorySearchText('');
       setEditingItems([]);
+      // Сохраняем открытый шаблон
+      setOpenedTemplate(templateId);
       fetchTemplates();
-      // Перезагрузить элементы обновленного шаблона
-      fetchTemplateItems(templateId);
+      // Перезагрузить все элементы шаблонов
+      fetchAllTemplateItems();
     } catch (error: any) {
       message.error('Ошибка обновления шаблона: ' + error.message);
     }
   };
 
-  const handleUpdateItemCoeff = (id: string, value: number | null) => {
+  const handleUpdateItemCoeff = (id: string, value: number | null, templateId?: string) => {
     if (editingTemplate) {
       // Режим редактирования сохраненного шаблона
       setEditingItems(
@@ -525,8 +629,16 @@ const Templates: React.FC = () => {
           item.id === id ? { ...item, conversation_coeff: value } : item
         )
       );
+    } else if (templateId) {
+      // Режим добавления элементов в существующий шаблон (когда есть templateId)
+      setLoadedTemplateItems(prev => ({
+        ...prev,
+        [templateId]: (prev[templateId] || []).map((item) =>
+          item.id === id ? { ...item, conversation_coeff: value } : item
+        ),
+      }));
     } else {
-      // Режим создания нового шаблона
+      // Режим создания нового шаблона (когда templateId = undefined)
       setTemplateItems(
         templateItems.map((item) =>
           item.id === id ? { ...item, conversation_coeff: value } : item
@@ -535,7 +647,7 @@ const Templates: React.FC = () => {
     }
   };
 
-  const handleUpdateItemParent = (id: string, parentId: string | null) => {
+  const handleUpdateItemParent = (id: string, parentId: string | null, templateId?: string) => {
     if (editingTemplate) {
       // Режим редактирования сохраненного шаблона
       setEditingItems(
@@ -543,8 +655,16 @@ const Templates: React.FC = () => {
           item.id === id ? { ...item, parent_work_item_id: parentId } : item
         )
       );
+    } else if (templateId) {
+      // Режим добавления элементов в существующий шаблон (когда есть templateId)
+      setLoadedTemplateItems(prev => ({
+        ...prev,
+        [templateId]: (prev[templateId] || []).map((item) =>
+          item.id === id ? { ...item, parent_work_item_id: parentId } : item
+        ),
+      }));
     } else {
-      // Режим создания нового шаблона
+      // Режим создания нового шаблона (когда templateId = undefined)
       setTemplateItems(
         templateItems.map((item) =>
           item.id === id ? { ...item, parent_work_item_id: parentId } : item
@@ -566,7 +686,7 @@ const Templates: React.FC = () => {
       const currentItems = loadedTemplateItems[templateId] || [];
       const newPosition = currentItems.length;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('template_items')
         .insert({
           template_id: templateId,
@@ -577,20 +697,36 @@ const Templates: React.FC = () => {
           conversation_coeff: null,
           position: newPosition,
           note: null,
-        });
+        })
+        .select(`
+          *,
+          works_library:work_library_id(*, work_names(name, unit)),
+          detail_cost_categories:detail_cost_category_id(name, location, cost_categories(name))
+        `)
+        .single();
 
       if (error) throw error;
+
+      // Добавить новый элемент в кеш вместо полной перезагрузки
+      if (data) {
+        const newItem: TemplateItemWithDetails = {
+          ...data,
+          work_name: data.works_library?.work_names?.name,
+          work_unit: data.works_library?.work_names?.unit,
+          work_item_type: data.works_library?.item_type,
+          work_unit_rate: data.works_library?.unit_rate,
+          work_currency_type: data.works_library?.currency_type,
+        };
+
+        setLoadedTemplateItems(prev => ({
+          ...prev,
+          [templateId]: [...currentItems, newItem],
+        }));
+      }
 
       message.success('Работа добавлена');
       setEditingSelectedWork(null);
       setEditingWorkSearchText('');
-      // Перезагрузить элементы шаблона
-      setLoadedTemplateItems(prev => {
-        const updated = { ...prev };
-        delete updated[templateId];
-        return updated;
-      });
-      fetchTemplateItems(templateId);
     } catch (error: any) {
       message.error('Ошибка добавления работы: ' + error.message);
     }
@@ -609,7 +745,7 @@ const Templates: React.FC = () => {
       const currentItems = loadedTemplateItems[templateId] || [];
       const newPosition = currentItems.length;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('template_items')
         .insert({
           template_id: templateId,
@@ -620,20 +756,40 @@ const Templates: React.FC = () => {
           conversation_coeff: null,
           position: newPosition,
           note: null,
-        });
+        })
+        .select(`
+          *,
+          materials_library:material_library_id(*, material_names(name, unit)),
+          detail_cost_categories:detail_cost_category_id(name, location, cost_categories(name))
+        `)
+        .single();
 
       if (error) throw error;
+
+      // Добавить новый элемент в кеш вместо полной перезагрузки
+      if (data) {
+        const newItem: TemplateItemWithDetails = {
+          ...data,
+          material_name: data.materials_library?.material_names?.name,
+          material_unit: data.materials_library?.material_names?.unit,
+          material_item_type: data.materials_library?.item_type,
+          material_type: data.materials_library?.material_type,
+          material_consumption_coefficient: data.materials_library?.consumption_coefficient,
+          material_unit_rate: data.materials_library?.unit_rate,
+          material_currency_type: data.materials_library?.currency_type,
+          material_delivery_price_type: data.materials_library?.delivery_price_type,
+          material_delivery_amount: data.materials_library?.delivery_amount,
+        };
+
+        setLoadedTemplateItems(prev => ({
+          ...prev,
+          [templateId]: [...currentItems, newItem],
+        }));
+      }
 
       message.success('Материал добавлен');
       setEditingSelectedMaterial(null);
       setEditingMaterialSearchText('');
-      // Перезагрузить элементы шаблона
-      setLoadedTemplateItems(prev => {
-        const updated = { ...prev };
-        delete updated[templateId];
-        return updated;
-      });
-      fetchTemplateItems(templateId);
     } catch (error: any) {
       message.error('Ошибка добавления материала: ' + error.message);
     }
@@ -641,6 +797,30 @@ const Templates: React.FC = () => {
 
   const handleDeleteTemplateItem = async (templateId: string, itemId: string) => {
     try {
+      const currentItems = loadedTemplateItems[templateId] || [];
+      const itemToDelete = currentItems.find(item => item.id === itemId);
+
+      // Если удаляется работа, сначала очистить привязку у всех материалов
+      if (itemToDelete?.kind === 'work') {
+        const linkedMaterials = currentItems.filter(
+          item => item.kind === 'material' && item.parent_work_item_id === itemId
+        );
+
+        // Обновить привязанные материалы в базе данных
+        for (const material of linkedMaterials) {
+          const { error: updateError } = await supabase
+            .from('template_items')
+            .update({
+              parent_work_item_id: null,
+              conversation_coeff: null,
+            })
+            .eq('id', material.id);
+
+          if (updateError) throw updateError;
+        }
+      }
+
+      // Удалить саму работу/материал
       const { error } = await supabase
         .from('template_items')
         .delete()
@@ -649,13 +829,28 @@ const Templates: React.FC = () => {
       if (error) throw error;
 
       message.success('Элемент удален');
-      // Перезагрузить элементы шаблона
+
+      // Обновить кеш: удалить элемент и очистить привязки у материалов
       setLoadedTemplateItems(prev => {
-        const updated = { ...prev };
-        delete updated[templateId];
-        return updated;
+        const items = prev[templateId] || [];
+        const updatedItems = items
+          .filter(item => item.id !== itemId)
+          .map(item => {
+            if (item.kind === 'material' && item.parent_work_item_id === itemId) {
+              return {
+                ...item,
+                parent_work_item_id: null,
+                conversation_coeff: null,
+              };
+            }
+            return item;
+          });
+
+        return {
+          ...prev,
+          [templateId]: updatedItems,
+        };
       });
-      fetchTemplateItems(templateId);
     } catch (error: any) {
       message.error('Ошибка удаления элемента: ' + error.message);
     }
@@ -668,6 +863,17 @@ const Templates: React.FC = () => {
       id: c.value,
       label: c.label,
     }));
+
+  // Функция для получения опций затрат с фильтрацией по тексту
+  const getCostCategoryOptions = (searchText: string) => {
+    return costCategories
+      .filter((c) => c.label.toLowerCase().includes(searchText.toLowerCase()))
+      .map((c) => ({
+        value: c.label,
+        id: c.value,
+        label: c.label,
+      }));
+  };
 
   const workOptions = works
     .filter((w) => w.work_name.toLowerCase().includes(workSearchText.toLowerCase()))
@@ -718,7 +924,8 @@ const Templates: React.FC = () => {
     isCreating: boolean = false,
     currentItems: TemplateItemWithDetails[] = [],
     templateId?: string,
-    isEditing: boolean = false
+    isEditing: boolean = false,
+    isAddingItems: boolean = false
   ) => {
     const workItemsForSelect = currentItems.filter((item) => item.kind === 'work');
 
@@ -796,15 +1003,15 @@ const Templates: React.FC = () => {
         align: 'center' as const,
         editable: true,
         render: (record: TemplateItemWithDetails) => {
-          if (isCreating || isEditing) {
-            // Режим создания/редактирования шаблона
+          if (isCreating || isEditing || isAddingItems) {
+            // Режим создания/редактирования шаблона или добавления элементов
             return (
               <div style={{ textAlign: 'left' }}>
                 <div>{record.kind === 'work' ? record.work_name : record.material_name}</div>
                 {record.kind === 'material' && (
                   <Select
                     value={record.parent_work_item_id}
-                    onChange={(value) => handleUpdateItemParent(record.id, value)}
+                    onChange={(value) => handleUpdateItemParent(record.id, value, templateId)}
                     placeholder="Привязка к работе"
                     allowClear
                     style={{ width: '100%', marginTop: 4 }}
@@ -854,11 +1061,11 @@ const Templates: React.FC = () => {
         render: (record: TemplateItemWithDetails) => {
           if (record.kind === 'work') return '-';
 
-          if (isCreating || isEditing) {
+          if (isCreating || isEditing || isAddingItems) {
             return (
               <InputNumber
                 value={record.conversation_coeff}
-                onChange={(value) => handleUpdateItemCoeff(record.id, value)}
+                onChange={(value) => handleUpdateItemCoeff(record.id, value, templateId)}
                 placeholder="0.0000"
                 precision={4}
                 style={{ width: '100%' }}
@@ -936,7 +1143,11 @@ const Templates: React.FC = () => {
         align: 'center' as const,
         editable: true,
         render: (record: TemplateItemWithDetails) => {
-          if (isCreating || isEditing) {
+          if (isCreating || isEditing || isAddingItems) {
+            // Получаем опции динамически на основе текущего значения поля
+            const currentSearchText = record.detail_cost_category_full || '';
+            const dynamicOptions = getCostCategoryOptions(currentSearchText);
+
             return (
               <AutoComplete
                 value={record.detail_cost_category_full || ''}
@@ -950,32 +1161,75 @@ const Templates: React.FC = () => {
                   });
                   if (isEditing) {
                     setEditingItems(updatedItems);
+                  } else if (templateId) {
+                    // Добавление элементов в существующий шаблон
+                    setLoadedTemplateItems(prev => ({
+                      ...prev,
+                      [templateId]: updatedItems,
+                    }));
                   } else {
+                    // Создание нового шаблона
                     setTemplateItems(updatedItems);
                   }
                 }}
-                onSelect={(value, option: any) => {
+                onSelect={(_value, option: any) => {
                   const updatedItems = currentItems.map((item) => {
                     if (item.id === record.id) {
                       return {
                         ...item,
                         detail_cost_category_id: option.id,
                         detail_cost_category_full: option.label,
+                        manual_cost_override: true, // Помечаем что затрата изменена вручную
                       };
                     }
                     return item;
                   });
                   if (isEditing) {
                     setEditingItems(updatedItems);
+                  } else if (templateId) {
+                    // Добавление элементов в существующий шаблон
+                    setLoadedTemplateItems(prev => ({
+                      ...prev,
+                      [templateId]: updatedItems,
+                    }));
                   } else {
+                    // Создание нового шаблона
                     setTemplateItems(updatedItems);
                   }
                 }}
-                options={costCategoryOptions}
+                onClear={() => {
+                  // Очистить затрату элемента
+                  const updatedItems = currentItems.map((item) => {
+                    if (item.id === record.id) {
+                      return {
+                        ...item,
+                        detail_cost_category_id: null,
+                        detail_cost_category_full: undefined,
+                        manual_cost_override: true, // Помечаем что затрата изменена вручную
+                      };
+                    }
+                    return item;
+                  });
+                  if (isEditing) {
+                    setEditingItems(updatedItems);
+                  } else if (templateId) {
+                    // Добавление элементов в существующий шаблон
+                    setLoadedTemplateItems(prev => ({
+                      ...prev,
+                      [templateId]: updatedItems,
+                    }));
+                  } else {
+                    // Создание нового шаблона
+                    setTemplateItems(updatedItems);
+                  }
+                }}
+                options={dynamicOptions}
                 placeholder="Выберите затрату"
                 style={{ width: '100%' }}
                 size="small"
                 filterOption={false}
+                allowClear
+                popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
               />
             );
           } else {
@@ -989,8 +1243,8 @@ const Templates: React.FC = () => {
         width: 100,
         align: 'center' as const,
         render: (record: TemplateItemWithDetails) => {
-          if (isCreating || isEditing) {
-            // Режим создания/редактирования шаблона
+          if (isCreating || isEditing || isAddingItems) {
+            // Режим создания/редактирования шаблона или добавления элементов
             return (
               <Popconfirm
                 title="Удалить элемент?"
@@ -1023,13 +1277,401 @@ const Templates: React.FC = () => {
     ];
   };
 
+  // Фильтрация шаблонов
+  const filteredTemplates = templates.filter((template) => {
+    // Фильтр по наименованию (от 2 символов)
+    if (templateSearchText.length >= 2) {
+      if (!template.name.toLowerCase().includes(templateSearchText.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // Фильтр по категории затрат
+    if (filterCostCategory) {
+      if (template.cost_category_name !== filterCostCategory) {
+        return false;
+      }
+    }
+
+    // Фильтр по детализации затрат
+    if (filterDetailCategory) {
+      if (template.detail_category_name !== filterDetailCategory) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Получаем уникальные категории и детализации для фильтров
+  const uniqueCostCategories = Array.from(new Set(templates.map(t => t.cost_category_name).filter(Boolean)));
+  const uniqueDetailCategories = Array.from(new Set(templates.map(t => t.detail_category_name).filter(Boolean)));
+
   return (
     <div>
-      {/* Форма создания шаблона */}
-      <Card
-        title="Создание шаблона"
-        style={{ marginBottom: 24 }}
-      >
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'list',
+            label: 'Список шаблонов',
+            children: (
+              <Card>
+                <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <AutoComplete
+                        placeholder="Поиск по названию (мин. 2 символа)..."
+                        value={templateSearchText}
+                        onChange={(value) => setTemplateSearchText(value)}
+                        options={templates
+                          .filter((t) =>
+                            !templateSearchText ||
+                            templateSearchText.length < 2 ||
+                            t.name.toLowerCase().includes(templateSearchText.toLowerCase())
+                          )
+                          .map((t) => ({
+                            value: t.name,
+                            label: t.name,
+                          }))}
+                        allowClear
+                        style={{ width: '100%' }}
+                        filterOption={false}
+                        popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <AutoComplete
+                        placeholder="Категория затрат (начните вводить...)"
+                        value={filterCostCategory || undefined}
+                        onChange={(value) => {
+                          // Если значение пустое, сбрасываем фильтр
+                          if (!value) {
+                            setFilterCostCategory(null);
+                          }
+                        }}
+                        onSelect={(value) => {
+                          setFilterCostCategory(value);
+                        }}
+                        options={uniqueCostCategories
+                          .filter((category) =>
+                            category && (!filterCostCategory || category.toLowerCase().includes(filterCostCategory.toLowerCase()))
+                          )
+                          .map((category) => ({
+                            value: category!,
+                            label: category!,
+                          }))}
+                        allowClear
+                        style={{ width: '100%' }}
+                        filterOption={false}
+                        popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <AutoComplete
+                        placeholder="Детализация затрат (начните вводить...)"
+                        value={filterDetailCategory || undefined}
+                        onChange={(value) => {
+                          // Если значение пустое, сбрасываем фильтр
+                          if (!value) {
+                            setFilterDetailCategory(null);
+                          }
+                        }}
+                        onSelect={(value) => {
+                          setFilterDetailCategory(value);
+                        }}
+                        options={uniqueDetailCategories
+                          .filter((detail) =>
+                            detail && (!filterDetailCategory || detail.toLowerCase().includes(filterDetailCategory.toLowerCase()))
+                          )
+                          .map((detail) => ({
+                            value: detail!,
+                            label: detail!,
+                          }))}
+                        allowClear
+                        style={{ width: '100%' }}
+                        filterOption={false}
+                        popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
+                      />
+                    </Col>
+                  </Row>
+                </Space>
+
+                <Collapse
+                  accordion
+                  activeKey={openedTemplate || undefined}
+                  onChange={(key) => {
+                    const templateId = typeof key === 'string' ? key : (Array.isArray(key) && key.length > 0 ? key[0] : null);
+                    setOpenedTemplate(templateId);
+                  }}
+                >
+                  {filteredTemplates.map((template) => {
+                    const items = loadedTemplateItems[template.id] || [];
+                    const worksCount = items.filter(i => i.kind === 'work').length;
+                    const materialsCount = items.filter(i => i.kind === 'material').length;
+
+                    return (
+                      <Panel
+                        header={
+                          editingTemplate === template.id ? (
+                            <Form
+                              form={editingTemplateForm}
+                              layout="inline"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ width: '100%' }}
+                            >
+                              <Form.Item
+                                name="name"
+                                rules={[{ required: true, message: 'Введите название' }]}
+                                style={{ flex: 1, marginRight: 8 }}
+                              >
+                                <Input placeholder="Название шаблона" />
+                              </Form.Item>
+                              <Form.Item style={{ flex: 1, marginRight: 8 }}>
+                                <AutoComplete
+                                  options={costCategories
+                                    .filter((c) => c.label.toLowerCase().includes(editingTemplateCostCategorySearchText.toLowerCase()))
+                                    .map((c) => ({
+                                      value: c.label,
+                                      id: c.value,
+                                      label: c.label,
+                                    }))}
+                                  placeholder="Затрата на строительство..."
+                                  value={editingTemplateCostCategorySearchText}
+                                  onChange={setEditingTemplateCostCategorySearchText}
+                                  onSelect={(value, option: any) => {
+                                    setEditingTemplateCostCategorySearchText(value);
+                                    editingTemplateForm.setFieldValue('detail_cost_category_id', option.id);
+
+                                    // Автоматически применяем затрату ко всем элементам (кроме тех, где manual_cost_override = true)
+                                    const updatedItems = editingItems.map((item) => {
+                                      if (!item.manual_cost_override) {
+                                        return {
+                                          ...item,
+                                          detail_cost_category_id: option.id,
+                                          detail_cost_category_full: option.label,
+                                        };
+                                      }
+                                      return item;
+                                    });
+                                    setEditingItems(updatedItems);
+                                  }}
+                                  onClear={() => {
+                                    setEditingTemplateCostCategorySearchText('');
+                                    editingTemplateForm.setFieldValue('detail_cost_category_id', null);
+
+                                    // Очистить затрату у всех элементов (кроме тех, где manual_cost_override = true)
+                                    const updatedItems = editingItems.map((item) => {
+                                      if (!item.manual_cost_override) {
+                                        return {
+                                          ...item,
+                                          detail_cost_category_id: null,
+                                          detail_cost_category_full: undefined,
+                                        };
+                                      }
+                                      return item;
+                                    });
+                                    setEditingItems(updatedItems);
+                                  }}
+                                  filterOption={false}
+                                  showSearch
+                                  allowClear
+                                  style={{ width: '100%' }}
+                                  popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
+                                />
+                                <Form.Item
+                                  name="detail_cost_category_id"
+                                  noStyle
+                                  rules={[{ required: true, message: 'Выберите затрату' }]}
+                                >
+                                  <Input type="hidden" />
+                                </Form.Item>
+                              </Form.Item>
+                              <Space>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<SaveOutlined />}
+                                  onClick={() => handleSaveEditTemplate(template.id)}
+                                />
+                                <Button
+                                  size="small"
+                                  icon={<CloseOutlined />}
+                                  onClick={handleCancelEditTemplate}
+                                />
+                              </Space>
+                            </Form>
+                          ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Space direction="vertical" size={0}>
+                                <div>
+                                  <Text strong>{template.name}</Text>
+                                  {template.cost_category_full && (
+                                    <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                                      ({template.cost_category_full})
+                                    </Text>
+                                  )}
+                                </div>
+                                {items.length > 0 && (
+                                  <Text type="secondary" style={{ fontSize: 11 }}>
+                                    Работ: {worksCount} | Материалов: {materialsCount}
+                                  </Text>
+                                )}
+                              </Space>
+                              <Space onClick={(e) => e.stopPropagation()}>
+                                <Tooltip title="Добавить работы/материалы в шаблон">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<AppstoreAddOutlined />}
+                                    onClick={() => {
+                                      if (editingTemplateItems === template.id) {
+                                        setEditingTemplateItems(null);
+                                        setEditingWorkSearchText('');
+                                        setEditingMaterialSearchText('');
+                                        setEditingSelectedWork(null);
+                                        setEditingSelectedMaterial(null);
+                                      } else {
+                                        setEditingTemplateItems(template.id);
+                                      }
+                                    }}
+                                    style={{
+                                      color: editingTemplateItems === template.id ? '#1890ff' : undefined
+                                    }}
+                                  />
+                                </Tooltip>
+                                <Tooltip title="Редактировать шаблон">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<EditOutlined />}
+                                    onClick={() => handleEditTemplate(template)}
+                                  />
+                                </Tooltip>
+                                <Popconfirm
+                                  title="Удалить шаблон?"
+                                  onConfirm={() => handleDeleteTemplate(template.id)}
+                                  okText="Да"
+                                  cancelText="Нет"
+                                >
+                                  <Tooltip title="Удалить шаблон">
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      danger
+                                      icon={<DeleteOutlined />}
+                                    />
+                                  </Tooltip>
+                                </Popconfirm>
+                              </Space>
+                            </div>
+                          )
+                        }
+                        key={template.id}
+                      >
+                        {items.length > 0 ? (
+                          <>
+                            {editingTemplateItems === template.id && (
+                              <Row gutter={16} style={{ marginBottom: 16 }}>
+                                <Col span={12}>
+                                  <Space.Compact style={{ width: '100%' }}>
+                                    <AutoComplete
+                                      style={{ width: '100%' }}
+                                      options={works
+                                        .filter((w) => w.work_name.toLowerCase().includes(editingWorkSearchText.toLowerCase()))
+                                        .map((w) => ({
+                                          value: `${w.work_name} (${w.unit})`,
+                                          id: w.id,
+                                          label: `${w.work_name} (${w.unit})`,
+                                        }))}
+                                      value={editingWorkSearchText}
+                                      onChange={setEditingWorkSearchText}
+                                      onSelect={(value, option: any) => {
+                                        setEditingWorkSearchText(value);
+                                        setEditingSelectedWork(option.id);
+                                      }}
+                                      placeholder="Введите работу (2+ символа)..."
+                                      filterOption={false}
+                                      popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
+                                    />
+                                    <Button
+                                      type="primary"
+                                      icon={<PlusOutlined />}
+                                      onClick={() => handleAddWorkToTemplate(template.id)}
+                                    />
+                                  </Space.Compact>
+                                </Col>
+
+                                <Col span={12}>
+                                  <Space.Compact style={{ width: '100%' }}>
+                                    <AutoComplete
+                                      style={{ width: '100%' }}
+                                      options={materials
+                                        .filter((m) => m.material_name.toLowerCase().includes(editingMaterialSearchText.toLowerCase()))
+                                        .map((m) => ({
+                                          value: `${m.material_name} (${m.unit})`,
+                                          id: m.id,
+                                          label: `${m.material_name} (${m.unit})`,
+                                        }))}
+                                      value={editingMaterialSearchText}
+                                      onChange={setEditingMaterialSearchText}
+                                      onSelect={(value, option: any) => {
+                                        setEditingMaterialSearchText(value);
+                                        setEditingSelectedMaterial(option.id);
+                                      }}
+                                      placeholder="Введите материал (2+ символа)..."
+                                      filterOption={false}
+                                      popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
+                                    />
+                                    <Button
+                                      type="primary"
+                                      icon={<PlusOutlined />}
+                                      onClick={() => handleAddMaterialToTemplate(template.id)}
+                                    />
+                                  </Space.Compact>
+                                </Col>
+                              </Row>
+                            )}
+
+                            <Table
+                              dataSource={editingTemplate === template.id ? editingItems : items}
+                              columns={getColumns(
+                                false,
+                                editingTemplate === template.id ? editingItems : items,
+                                template.id,
+                                editingTemplate === template.id,
+                                editingTemplateItems === template.id
+                              )}
+                              rowKey="id"
+                              rowClassName={getRowClassName}
+                              pagination={false}
+                              size="small"
+                            />
+                          </>
+                        ) : (
+                          <Text type="secondary">Загрузка...</Text>
+                        )}
+                      </Panel>
+                    );
+                  })}
+                </Collapse>
+
+                {filteredTemplates.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                    <Text type="secondary">
+                      {templates.length === 0 ? 'Нет созданных шаблонов' : 'Нет шаблонов, соответствующих критериям поиска'}
+                    </Text>
+                  </div>
+                )}
+              </Card>
+            ),
+          },
+          {
+            key: 'create',
+            label: 'Создание шаблона',
+            children: (
+              <Card>
         <Form form={form} layout="vertical">
           <Row gutter={16}>
             <Col span={12}>
@@ -1062,9 +1704,41 @@ const Templates: React.FC = () => {
                   onSelect={(value, option: any) => {
                     setCostCategorySearchText(value);
                     form.setFieldValue('detail_cost_category_id', option.id);
+
+                    // Автоматически применяем затрату ко всем элементам (кроме тех, где manual_cost_override = true)
+                    const updatedItems = templateItems.map((item) => {
+                      if (!item.manual_cost_override) {
+                        return {
+                          ...item,
+                          detail_cost_category_id: option.id,
+                          detail_cost_category_full: option.label,
+                        };
+                      }
+                      return item;
+                    });
+                    setTemplateItems(updatedItems);
+                  }}
+                  onClear={() => {
+                    setCostCategorySearchText('');
+                    form.setFieldValue('detail_cost_category_id', null);
+
+                    // Очистить затрату у всех элементов (кроме тех, где manual_cost_override = true)
+                    const updatedItems = templateItems.map((item) => {
+                      if (!item.manual_cost_override) {
+                        return {
+                          ...item,
+                          detail_cost_category_id: null,
+                          detail_cost_category_full: undefined,
+                        };
+                      }
+                      return item;
+                    });
+                    setTemplateItems(updatedItems);
                   }}
                   filterOption={false}
                   showSearch
+                  allowClear
+                  popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
                 />
                 <Form.Item
                   name="detail_cost_category_id"
@@ -1077,7 +1751,7 @@ const Templates: React.FC = () => {
             </Col>
           </Row>
 
-          <Divider orientation="left" style={{ color: '#1890ff' }}>
+          <Divider orientation="center" style={{ color: '#1890ff' }}>
             Добавление работ и материалов
           </Divider>
 
@@ -1095,6 +1769,7 @@ const Templates: React.FC = () => {
                   }}
                   placeholder="Введите работу (2+ символа)..."
                   filterOption={false}
+                  popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
                 />
                 <Button
                   type="primary"
@@ -1117,6 +1792,7 @@ const Templates: React.FC = () => {
                   }}
                   placeholder="Введите материал (2+ символа)..."
                   filterOption={false}
+                  popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : ''}
                 />
                 <Button
                   type="primary"
@@ -1127,7 +1803,7 @@ const Templates: React.FC = () => {
             </Col>
           </Row>
 
-          <Divider orientation="left" style={{ color: '#1890ff' }}>
+          <Divider orientation="center" style={{ color: '#1890ff' }}>
             Элементы шаблона
           </Divider>
 
@@ -1155,230 +1831,11 @@ const Templates: React.FC = () => {
             </Button>
           </Space>
         </Form>
-      </Card>
-
-      {/* Список шаблонов */}
-      <Card title="Список шаблонов">
-        <Collapse
-          accordion
-          onChange={(key) => {
-            if (key && typeof key === 'string') {
-              fetchTemplateItems(key);
-            } else if (Array.isArray(key) && key.length > 0) {
-              fetchTemplateItems(key[0]);
-            }
-          }}
-        >
-          {templates.map((template) => {
-            const items = loadedTemplateItems[template.id] || [];
-            const worksCount = items.filter(i => i.kind === 'work').length;
-            const materialsCount = items.filter(i => i.kind === 'material').length;
-
-            return (
-              <Panel
-                header={
-                  editingTemplate === template.id ? (
-                    <Form
-                      form={editingTemplateForm}
-                      layout="inline"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ width: '100%' }}
-                    >
-                      <Form.Item
-                        name="name"
-                        rules={[{ required: true, message: 'Введите название' }]}
-                        style={{ flex: 1, marginRight: 8 }}
-                      >
-                        <Input placeholder="Название шаблона" />
-                      </Form.Item>
-                      <Form.Item style={{ flex: 1, marginRight: 8 }}>
-                        <AutoComplete
-                          options={costCategories
-                            .filter((c) => c.label.toLowerCase().includes(editingTemplateCostCategorySearchText.toLowerCase()))
-                            .map((c) => ({
-                              value: c.label,
-                              id: c.value,
-                              label: c.label,
-                            }))}
-                          placeholder="Затрата на строительство..."
-                          value={editingTemplateCostCategorySearchText}
-                          onChange={setEditingTemplateCostCategorySearchText}
-                          onSelect={(value, option: any) => {
-                            setEditingTemplateCostCategorySearchText(value);
-                            editingTemplateForm.setFieldValue('detail_cost_category_id', option.id);
-                          }}
-                          filterOption={false}
-                          showSearch
-                          style={{ width: '100%' }}
-                        />
-                        <Form.Item
-                          name="detail_cost_category_id"
-                          noStyle
-                          rules={[{ required: true, message: 'Выберите затрату' }]}
-                        >
-                          <Input type="hidden" />
-                        </Form.Item>
-                      </Form.Item>
-                      <Space>
-                        <Button
-                          type="primary"
-                          size="small"
-                          icon={<SaveOutlined />}
-                          onClick={() => handleSaveEditTemplate(template.id)}
-                        />
-                        <Button
-                          size="small"
-                          icon={<CloseOutlined />}
-                          onClick={handleCancelEditTemplate}
-                        />
-                      </Space>
-                    </Form>
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Space direction="vertical" size={0}>
-                        <Text strong>{template.name}</Text>
-                        {items.length > 0 && (
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            Работ: {worksCount} | Материалов: {materialsCount}
-                          </Text>
-                        )}
-                      </Space>
-                      <Space onClick={(e) => e.stopPropagation()}>
-                        <Tooltip title="Добавить работы/материалы в шаблон">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<AppstoreAddOutlined />}
-                            onClick={() => {
-                              if (editingTemplateItems === template.id) {
-                                setEditingTemplateItems(null);
-                                setEditingWorkSearchText('');
-                                setEditingMaterialSearchText('');
-                                setEditingSelectedWork(null);
-                                setEditingSelectedMaterial(null);
-                              } else {
-                                setEditingTemplateItems(template.id);
-                              }
-                            }}
-                            style={{
-                              color: editingTemplateItems === template.id ? '#1890ff' : undefined
-                            }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="Редактировать шаблон">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => handleEditTemplate(template)}
-                          />
-                        </Tooltip>
-                        <Popconfirm
-                          title="Удалить шаблон?"
-                          onConfirm={() => handleDeleteTemplate(template.id)}
-                          okText="Да"
-                          cancelText="Нет"
-                        >
-                          <Tooltip title="Удалить шаблон">
-                            <Button
-                              type="text"
-                              size="small"
-                              danger
-                              icon={<DeleteOutlined />}
-                            />
-                          </Tooltip>
-                        </Popconfirm>
-                      </Space>
-                    </div>
-                  )
-                }
-                key={template.id}
-              >
-                {items.length > 0 ? (
-                  <>
-                    {editingTemplateItems === template.id && (
-                      <Row gutter={16} style={{ marginBottom: 16 }}>
-                        <Col span={12}>
-                          <Space.Compact style={{ width: '100%' }}>
-                            <AutoComplete
-                              style={{ width: '100%' }}
-                              options={works
-                                .filter((w) => w.work_name.toLowerCase().includes(editingWorkSearchText.toLowerCase()))
-                                .map((w) => ({
-                                  value: `${w.work_name} (${w.unit})`,
-                                  id: w.id,
-                                  label: `${w.work_name} (${w.unit})`,
-                                }))}
-                              value={editingWorkSearchText}
-                              onChange={setEditingWorkSearchText}
-                              onSelect={(value, option: any) => {
-                                setEditingWorkSearchText(value);
-                                setEditingSelectedWork(option.id);
-                              }}
-                              placeholder="Введите работу (2+ символа)..."
-                              filterOption={false}
-                            />
-                            <Button
-                              type="primary"
-                              icon={<PlusOutlined />}
-                              onClick={() => handleAddWorkToTemplate(template.id)}
-                            />
-                          </Space.Compact>
-                        </Col>
-
-                        <Col span={12}>
-                          <Space.Compact style={{ width: '100%' }}>
-                            <AutoComplete
-                              style={{ width: '100%' }}
-                              options={materials
-                                .filter((m) => m.material_name.toLowerCase().includes(editingMaterialSearchText.toLowerCase()))
-                                .map((m) => ({
-                                  value: `${m.material_name} (${m.unit})`,
-                                  id: m.id,
-                                  label: `${m.material_name} (${m.unit})`,
-                                }))}
-                              value={editingMaterialSearchText}
-                              onChange={setEditingMaterialSearchText}
-                              onSelect={(value, option: any) => {
-                                setEditingMaterialSearchText(value);
-                                setEditingSelectedMaterial(option.id);
-                              }}
-                              placeholder="Введите материал (2+ символа)..."
-                              filterOption={false}
-                            />
-                            <Button
-                              type="primary"
-                              icon={<PlusOutlined />}
-                              onClick={() => handleAddMaterialToTemplate(template.id)}
-                            />
-                          </Space.Compact>
-                        </Col>
-                      </Row>
-                    )}
-
-                    <Table
-                      dataSource={editingTemplate === template.id ? editingItems : items}
-                      columns={getColumns(false, editingTemplate === template.id ? editingItems : items, template.id, editingTemplate === template.id)}
-                      rowKey="id"
-                      rowClassName={getRowClassName}
-                      pagination={false}
-                      size="small"
-                    />
-                  </>
-                ) : (
-                  <Text type="secondary">Загрузка...</Text>
-                )}
-              </Panel>
-            );
-          })}
-        </Collapse>
-
-        {templates.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <Text type="secondary">Нет созданных шаблонов</Text>
-          </div>
-        )}
-      </Card>
+              </Card>
+            ),
+          },
+        ]}
+      />
 
       {/* CSS for row colors */}
       <style>{`
@@ -1417,6 +1874,25 @@ const Templates: React.FC = () => {
         }
         .template-row-mat-comp:hover > td {
           background-color: rgba(0, 137, 123, 0.25) !important;
+        }
+
+        /* Dark theme for AutoComplete dropdown */
+        .autocomplete-dark .rc-virtual-list-holder {
+          background-color: #1f1f1f !important;
+        }
+        .autocomplete-dark .ant-select-item {
+          color: rgba(255, 255, 255, 0.85) !important;
+          background-color: #1f1f1f !important;
+        }
+        .autocomplete-dark .ant-select-item-option-selected {
+          background-color: #177ddc !important;
+          color: #fff !important;
+        }
+        .autocomplete-dark .ant-select-item-option-active {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        .autocomplete-dark .ant-select-dropdown {
+          background-color: #1f1f1f !important;
         }
       `}</style>
     </div>
