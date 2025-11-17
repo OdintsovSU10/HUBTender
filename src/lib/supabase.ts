@@ -500,3 +500,36 @@ export interface BoqItemFull extends BoqItem {
   // Данные из units
   unit_name?: string;
 }
+
+// =============================================
+// Типы для таблицы client_positions (позиции заказчика)
+// =============================================
+
+export interface ClientPositionInsert {
+  tender_id: string;
+  position_number: number;
+  unit_code?: string | null;
+  volume?: number | null;
+  client_note?: string | null;
+  item_no?: string | null;
+  work_name: string;
+  manual_volume?: number | null;
+  manual_note?: string | null;
+  hierarchy_level?: number;
+  is_additional?: boolean;
+  parent_position_id?: string | null;
+  total_material?: number;
+  total_works?: number;
+  material_cost_per_unit?: number;
+  work_cost_per_unit?: number;
+  total_commercial_material?: number;
+  total_commercial_work?: number;
+  total_commercial_material_per_unit?: number;
+  total_commercial_work_per_unit?: number;
+}
+
+export interface ClientPosition extends ClientPositionInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}

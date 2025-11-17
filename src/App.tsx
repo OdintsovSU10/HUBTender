@@ -11,6 +11,7 @@ import MarkupConstructor from './pages/Admin/MarkupConstructor/MarkupConstructor
 import MarkupPercentages from './pages/Admin/MarkupPercentages/MarkupPercentages';
 import Library from './pages/Library';
 import Templates from './pages/Library/Templates';
+import ClientPositions from './pages/ClientPositions/ClientPositions';
 import './App.css';
 
 // Временный импорт для тестирования Supabase (удалить после проверки)
@@ -35,7 +36,7 @@ function AppContent() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="positions" element={<div>Позиции заказчика</div>} />
+            <Route path="positions" element={<ClientPositions />} />
             <Route path="commerce" element={<div>Коммерция</div>} />
             <Route path="library" element={<Library />} />
             <Route path="library/templates" element={<Templates />} />

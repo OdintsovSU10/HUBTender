@@ -1,5 +1,5 @@
 -- Database Schema SQL Export
--- Generated: 2025-11-17T11:27:54.779649
+-- Generated: 2025-11-17T14:48:54.962540
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -348,6 +348,67 @@ CREATE TABLE IF NOT EXISTS auth.users (
 );
 COMMENT ON TABLE auth.users IS 'Auth: Stores user login data within a secure schema.';
 COMMENT ON COLUMN auth.users.is_sso_user IS 'Auth: Set this column to true when the account comes from SSO. These accounts can have duplicate emails.';
+
+-- Table: public.boq_items
+-- Description: Элементы позиций заказчика (Bill of Quantities Items)
+CREATE TABLE IF NOT EXISTS public.boq_items (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    tender_id uuid NOT NULL,
+    client_position_id uuid NOT NULL,
+    sort_number integer(32) NOT NULL DEFAULT 0,
+    boq_item_type USER-DEFINED NOT NULL,
+    material_type USER-DEFINED,
+    material_name_id uuid,
+    work_name_id uuid,
+    unit_code text,
+    quantity numeric(18,6),
+    base_quantity numeric(18,6),
+    consumption_coefficient numeric(10,4),
+    conversion_coefficient numeric(10,4),
+    delivery_price_type USER-DEFINED,
+    delivery_amount numeric(15,2) DEFAULT 0.00,
+    currency_type USER-DEFINED DEFAULT 'RUB'::currency_type,
+    total_amount numeric(18,2),
+    detail_cost_category_id uuid,
+    quote_link text,
+    commercial_markup numeric(10,4),
+    total_commercial_material_cost numeric(18,2),
+    total_commercial_work_cost numeric(18,2),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT boq_items_client_position_id_fkey FOREIGN KEY (client_position_id) REFERENCES None.None(None),
+    CONSTRAINT boq_items_detail_cost_category_id_fkey FOREIGN KEY (detail_cost_category_id) REFERENCES None.None(None),
+    CONSTRAINT boq_items_material_name_id_fkey FOREIGN KEY (material_name_id) REFERENCES None.None(None),
+    CONSTRAINT boq_items_pkey PRIMARY KEY (id),
+    CONSTRAINT boq_items_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None),
+    CONSTRAINT boq_items_unit_code_fkey FOREIGN KEY (unit_code) REFERENCES None.None(None),
+    CONSTRAINT boq_items_work_name_id_fkey FOREIGN KEY (work_name_id) REFERENCES None.None(None)
+);
+COMMENT ON TABLE public.boq_items IS 'Элементы позиций заказчика (Bill of Quantities Items)';
+COMMENT ON COLUMN public.boq_items.id IS 'Уникальный идентификатор элемента позиции (UUID)';
+COMMENT ON COLUMN public.boq_items.tender_id IS 'Привязка к таблице tenders';
+COMMENT ON COLUMN public.boq_items.client_position_id IS 'Привязка к таблице client_positions';
+COMMENT ON COLUMN public.boq_items.sort_number IS 'Сортировка элементов позиций заказчика';
+COMMENT ON COLUMN public.boq_items.boq_item_type IS 'Тип строки в виде enum (мат, суб-мат, мат-комп., раб, суб-раб, раб-комп.)';
+COMMENT ON COLUMN public.boq_items.material_type IS 'Тип материала (основной/вспомогательный)';
+COMMENT ON COLUMN public.boq_items.material_name_id IS 'Наименование материала, связан с таблицей material_names';
+COMMENT ON COLUMN public.boq_items.work_name_id IS 'Наименование работы, связан с таблицей work_names';
+COMMENT ON COLUMN public.boq_items.unit_code IS 'Единица измерения, связана с таблицей units';
+COMMENT ON COLUMN public.boq_items.quantity IS 'Количество';
+COMMENT ON COLUMN public.boq_items.base_quantity IS 'Базовое количество для непривязанного материала к работе';
+COMMENT ON COLUMN public.boq_items.consumption_coefficient IS 'Коэффициент расхода материала';
+COMMENT ON COLUMN public.boq_items.conversion_coefficient IS 'Коэффициент перевода материала';
+COMMENT ON COLUMN public.boq_items.delivery_price_type IS 'Тип доставки (в цене, не в цене, суммой)';
+COMMENT ON COLUMN public.boq_items.delivery_amount IS 'Стоимость доставки';
+COMMENT ON COLUMN public.boq_items.currency_type IS 'Тип валюты (RUB, USD, EUR, CNY)';
+COMMENT ON COLUMN public.boq_items.total_amount IS 'Итоговая сумма';
+COMMENT ON COLUMN public.boq_items.detail_cost_category_id IS 'Затрата на строительство, связь с таблицей detail_cost_categories';
+COMMENT ON COLUMN public.boq_items.quote_link IS 'Примечание';
+COMMENT ON COLUMN public.boq_items.commercial_markup IS 'Коэффициент наценки';
+COMMENT ON COLUMN public.boq_items.total_commercial_material_cost IS 'Итоговая стоимость материала в коммерческой стоимости';
+COMMENT ON COLUMN public.boq_items.total_commercial_work_cost IS 'Итоговая стоимость работы в коммерческой стоимости';
+COMMENT ON COLUMN public.boq_items.created_at IS 'Дата и время создания записи';
+COMMENT ON COLUMN public.boq_items.updated_at IS 'Дата и время последнего обновления';
 
 -- Table: public.client_positions
 -- Description: Позиции заказчика из ВОРа (Bill of Quantities)
@@ -838,6 +899,23 @@ CREATE TABLE IF NOT EXISTS storage.s3_multipart_uploads_parts (
     CONSTRAINT s3_multipart_uploads_parts_upload_id_fkey FOREIGN KEY (upload_id) REFERENCES None.None(None)
 );
 
+-- Table: supabase_migrations.schema_migrations
+-- Description: Auth: Manages updates to the auth system.
+CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+    version text NOT NULL,
+    statements ARRAY,
+    name text,
+    CONSTRAINT schema_migrations_pkey PRIMARY KEY (version)
+);
+COMMENT ON TABLE supabase_migrations.schema_migrations IS 'Auth: Manages updates to the auth system.';
+
+-- Table: supabase_migrations.seed_files
+CREATE TABLE IF NOT EXISTS supabase_migrations.seed_files (
+    path text NOT NULL,
+    hash text NOT NULL,
+    CONSTRAINT seed_files_pkey PRIMARY KEY (path)
+);
+
 -- Table: vault.secrets
 -- Description: Table with encrypted `secret` column for storing sensitive information on disk.
 CREATE TABLE IF NOT EXISTS vault.secrets (
@@ -1063,7 +1141,7 @@ $function$
 
 
 -- Function: extensions.armor
-CREATE OR REPLACE FUNCTION extensions.armor(bytea, text[], text[])
+CREATE OR REPLACE FUNCTION extensions.armor(bytea)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1071,7 +1149,7 @@ AS '$libdir/pgcrypto', $function$pg_armor$function$
 
 
 -- Function: extensions.armor
-CREATE OR REPLACE FUNCTION extensions.armor(bytea)
+CREATE OR REPLACE FUNCTION extensions.armor(bytea, text[], text[])
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1374,7 +1452,7 @@ AS '$libdir/pgcrypto', $function$pgp_key_id_w$function$
 
 
 -- Function: extensions.pgp_pub_decrypt
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1382,7 +1460,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
 
 
 -- Function: extensions.pgp_pub_decrypt
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt(bytea, bytea, text)
  RETURNS text
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1398,7 +1476,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_text$function$
 
 
 -- Function: extensions.pgp_pub_decrypt_bytea
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea, text)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1414,7 +1492,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
 
 
 -- Function: extensions.pgp_pub_decrypt_bytea
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_decrypt_bytea(bytea, bytea)
  RETURNS bytea
  LANGUAGE c
  IMMUTABLE PARALLEL SAFE STRICT
@@ -1422,7 +1500,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_decrypt_bytea$function$
 
 
 -- Function: extensions.pgp_pub_encrypt
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea, text)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1430,7 +1508,7 @@ AS '$libdir/pgcrypto', $function$pgp_pub_encrypt_text$function$
 
 
 -- Function: extensions.pgp_pub_encrypt
-CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea, text)
+CREATE OR REPLACE FUNCTION extensions.pgp_pub_encrypt(text, bytea)
  RETURNS bytea
  LANGUAGE c
  PARALLEL SAFE STRICT
@@ -1845,6 +1923,18 @@ AS $function$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
+END;
+$function$
+
+
+-- Function: public.update_boq_items_updated_at
+CREATE OR REPLACE FUNCTION public.update_boq_items_updated_at()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
 END;
 $function$
 
@@ -3570,6 +3660,9 @@ $function$
 -- TRIGGERS
 -- ============================================
 
+-- Trigger: boq_items_updated_at_trigger on public.boq_items
+CREATE TRIGGER boq_items_updated_at_trigger BEFORE UPDATE ON public.boq_items FOR EACH ROW EXECUTE FUNCTION update_boq_items_updated_at()
+
 -- Trigger: trigger_update_client_positions_updated_at on public.client_positions
 CREATE TRIGGER trigger_update_client_positions_updated_at BEFORE UPDATE ON public.client_positions FOR EACH ROW EXECUTE FUNCTION update_client_positions_updated_at()
 
@@ -3802,6 +3895,27 @@ CREATE INDEX users_is_anonymous_idx ON auth.users USING btree (is_anonymous);
 
 -- Index on auth.users
 CREATE UNIQUE INDEX users_phone_key ON auth.users USING btree (phone);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_boq_item_type ON public.boq_items USING btree (boq_item_type);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_client_position_id ON public.boq_items USING btree (client_position_id);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_detail_cost_category_id ON public.boq_items USING btree (detail_cost_category_id);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_material_name_id ON public.boq_items USING btree (material_name_id);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_sort_number ON public.boq_items USING btree (client_position_id, sort_number);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_tender_id ON public.boq_items USING btree (tender_id);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_work_name_id ON public.boq_items USING btree (work_name_id);
 
 -- Index on public.client_positions
 CREATE INDEX idx_client_positions_is_additional ON public.client_positions USING btree (tender_id, is_additional);
@@ -4060,6 +4174,14 @@ GRANT service_role TO authenticator;
 -- Schema privileges for authenticator:
 -- GRANT USAGE ON SCHEMA public TO authenticator;
 
+-- Role: cli_login_postgres
+CREATE ROLE cli_login_postgres WITH LOGIN NOINHERIT VALID UNTIL '2025-11-17 09:27:18.914634+00';
+GRANT postgres TO cli_login_postgres;
+-- Database privileges for cli_login_postgres:
+-- GRANT CONNECT, TEMP ON DATABASE postgres TO cli_login_postgres;
+-- Schema privileges for cli_login_postgres:
+-- GRANT USAGE ON SCHEMA public TO cli_login_postgres;
+
 -- Role: dashboard_user
 CREATE ROLE dashboard_user WITH CREATEDB CREATEROLE REPLICATION;
 -- Database privileges for dashboard_user:
@@ -4081,6 +4203,8 @@ GRANT pg_read_all_data TO postgres WITH ADMIN OPTION;
 GRANT pg_signal_backend TO postgres WITH ADMIN OPTION;
 GRANT service_role TO postgres WITH ADMIN OPTION;
 GRANT supabase_realtime_admin TO postgres;
+-- Members of role postgres:
+-- - cli_login_postgres
 -- Database privileges for postgres:
 -- GRANT CONNECT, CREATE, TEMP ON DATABASE postgres TO postgres;
 -- Schema privileges for postgres:
@@ -4107,6 +4231,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_40 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_42 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_43 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_44 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_46 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_48 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_49 TO postgres;
@@ -4135,6 +4260,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_40 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_42 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_43 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_44 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_46 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_48 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_49 TO postgres;
@@ -4148,6 +4274,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT CREATE, USAGE ON SCHEMA public TO postgres;
 -- GRANT CREATE, USAGE ON SCHEMA realtime TO postgres;
 -- GRANT USAGE ON SCHEMA storage TO postgres;
+-- GRANT CREATE, USAGE ON SCHEMA supabase_migrations TO postgres;
 -- GRANT USAGE ON SCHEMA vault TO postgres;
 
 -- Role: service_role
@@ -4195,6 +4322,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_40 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_42 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_43 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_44 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_46 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_48 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_49 TO supabase_admin;
@@ -4223,6 +4351,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_40 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_42 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_43 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_44 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_46 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_48 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_49 TO supabase_admin;
@@ -4236,6 +4365,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA public TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA realtime TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA storage TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA supabase_migrations TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA vault TO supabase_admin;
 
 -- Role: supabase_auth_admin
@@ -4276,6 +4406,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_40 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_42 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_43 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_44 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_46 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_48 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_49 TO supabase_etl_admin;
@@ -4304,6 +4435,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_40 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_42 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_43 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_44 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_46 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_48 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_49 TO supabase_etl_admin;
@@ -4317,6 +4449,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA public TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA realtime TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA storage TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA supabase_migrations TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA vault TO supabase_etl_admin;
 
 -- Role: supabase_read_only_user
@@ -4349,6 +4482,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_40 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_42 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_43 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_44 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_46 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_48 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_49 TO supabase_read_only_user;
@@ -4377,6 +4511,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_40 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_42 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_43 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_44 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_46 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_48 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_49 TO supabase_read_only_user;
@@ -4390,6 +4525,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA public TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA realtime TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA storage TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA supabase_migrations TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA vault TO supabase_read_only_user;
 
 -- Role: supabase_realtime_admin
