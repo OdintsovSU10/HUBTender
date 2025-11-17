@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, theme, Input, Tag, Button, Space, message, Card, Progress } from 'antd';
+import { Table, Typography, theme, Input, Tag, Button, Space, message, Card, Progress, Tooltip } from 'antd';
 import {
   SearchOutlined,
   CheckCircleFilled,
@@ -114,7 +114,7 @@ const Dashboard: React.FC = () => {
       title: 'Номер тендера',
       dataIndex: 'number',
       key: 'number',
-      width: 110,
+      width: '10%',
       render: (text: string) => (
         <Text strong style={{ fontSize: 13 }}>{text || '-'}</Text>
       ),
@@ -123,10 +123,14 @@ const Dashboard: React.FC = () => {
       title: 'Название',
       dataIndex: 'name',
       key: 'name',
+      width: '20%',
       ellipsis: true,
       render: (text: string, record: TenderTableData) => (
         <div>
-          <Text strong style={{ fontSize: 13 }}>{text}</Text>
+          <Space size={4}>
+            <Text strong style={{ fontSize: 13 }}>{text}</Text>
+            <Tag color="blue" style={{ fontSize: 11 }}>v{record.version || 1}</Tag>
+          </Space>
           {record.client && (
             <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
               {record.client}
@@ -136,18 +140,11 @@ const Dashboard: React.FC = () => {
       ),
     },
     {
-      title: 'Версия',
-      dataIndex: 'version',
-      key: 'version',
-      width: 60,
-      align: 'center' as const,
-      render: (version: number) => version || 1,
-    },
-    {
       title: 'Статус дедлайна',
       dataIndex: 'deadline',
       key: 'status_deadline',
-      width: 180,
+      width: '30%',
+      align: 'center' as const,
       render: (deadline: string, record: TenderTableData) => {
         if (!deadline) {
           return <Tag color="default">Дедлайн не указан</Tag>;
@@ -206,76 +203,78 @@ const Dashboard: React.FC = () => {
         }
 
         return (
-          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <Text style={{ fontSize: 11, color: progressColor, fontWeight: 500, display: 'block', marginBottom: 2 }}>
+              <ClockCircleOutlined /> Осталось: {remainingText}
+            </Text>
             <Progress
               percent={progressPercent}
               strokeColor={progressColor}
-              format={() => (
-                <Text style={{ fontSize: 11 }}>
-                  <ClockCircleOutlined /> {remainingText}
-                </Text>
-              )}
+              showInfo={false}
               size="small"
             />
-          </Space>
+          </div>
         );
       },
     },
     {
-      title: 'Площадь СП',
+      title: <div style={{ textAlign: 'center' }}>Площадь СП</div>,
       dataIndex: 'construction_area',
       key: 'construction_area',
-      width: 100,
+      width: '8%',
       align: 'right' as const,
       render: (value: number) => (
         <Text style={{ fontSize: 12 }}>{formatNumberWithSpaces(value)} м²</Text>
       ),
     },
     {
-      title: 'BOQ стоимость',
+      title: <div style={{ textAlign: 'center' }}>BOQ стоимость</div>,
       dataIndex: 'boq_cost',
       key: 'boq_cost',
-      width: 120,
+      width: '10%',
       align: 'right' as const,
       render: (value: number) => (
         <Text strong style={{ fontSize: 12 }}>{formatNumberWithSpaces(value)} ₽</Text>
       ),
     },
     {
-      title: 'Стоимость за м²',
+      title: <div style={{ textAlign: 'center' }}>Стоимость за м²</div>,
       dataIndex: 'cost_per_sqm',
       key: 'cost_per_sqm',
-      width: 110,
+      width: '10%',
       align: 'right' as const,
       render: (value: number) => (
         <Text style={{ fontSize: 12 }}>{formatNumberWithSpaces(Math.round(value))} ₽/м²</Text>
       ),
     },
     {
-      title: 'Крайний срок',
+      title: <div style={{ textAlign: 'center' }}>Крайний срок</div>,
       dataIndex: 'deadline',
       key: 'deadline',
-      width: 95,
+      width: '8%',
+      align: 'center' as const,
       render: (date: string) => (
         <Text style={{ fontSize: 12 }}>{date ? dayjs(date).format('DD.MM.YYYY') : '-'}</Text>
       ),
     },
     {
-      title: 'Обновить расчет',
+      title: '',
       key: 'action',
-      width: 50,
+      width: '4%',
       align: 'center' as const,
       render: (_: any, record: TenderTableData) => (
-        <Button
-          type="text"
-          size="small"
-          icon={<SyncOutlined />}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleUpdateCalculation(record.id);
-          }}
-          style={{ color: token.colorPrimary }}
-        />
+        <Tooltip title="Обновить расчет">
+          <Button
+            type="text"
+            size="small"
+            icon={<SyncOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleUpdateCalculation(record.id);
+            }}
+            style={{ color: token.colorPrimary }}
+          />
+        </Tooltip>
       ),
     },
   ];
@@ -343,6 +342,34 @@ const Dashboard: React.FC = () => {
             },
             style: { cursor: 'pointer' },
           })}
+          rowClassName={(record) => {
+            if (!record.deadline) return '';
+
+            const now = dayjs();
+            const deadlineDate = dayjs(record.deadline);
+            const createdDate = dayjs(record.created_at);
+
+            // Если дедлайн прошел
+            if (deadlineDate.isBefore(now)) {
+              return 'deadline-completed';
+            }
+
+            // Рассчитываем процент прогресса
+            const totalDuration = deadlineDate.diff(createdDate, 'millisecond');
+            const elapsedDuration = now.diff(createdDate, 'millisecond');
+            const progressPercent = Math.min(Math.round((elapsedDuration / totalDuration) * 100), 99);
+
+            // Определяем класс в зависимости от прогресса
+            if (progressPercent > 90) {
+              return 'deadline-critical'; // Красный
+            } else if (progressPercent > 75) {
+              return 'deadline-warning'; // Оранжевый
+            } else if (progressPercent > 50) {
+              return 'deadline-caution'; // Желтый
+            }
+
+            return '';
+          }}
           scroll={{ x: 1200 }}
         />
       </Card>

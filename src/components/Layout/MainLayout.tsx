@@ -43,11 +43,11 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
   } = theme.useToken();
 
   const menuItems: MenuProps['items'] = [
-    {
-      key: '/',
-      icon: <HomeOutlined />,
-      label: 'Главная',
-    },
+    // {
+    //   key: '/',
+    //   icon: <HomeOutlined />,
+    //   label: 'Главная',
+    // },
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
@@ -151,7 +151,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       >
         <div
           className={`logo logo-${currentTheme}`}
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/dashboard')}
           style={{ cursor: 'pointer' }}
         >
           {collapsed ? (

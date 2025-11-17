@@ -23,6 +23,7 @@ import {
   QuestionCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { useSearchParams } from 'react-router-dom';
 import { supabase, type Tender, type ClientPosition } from '../../lib/supabase';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
@@ -45,6 +46,7 @@ const currencySymbols: Record<string, string> = {
 };
 
 const ClientPositions: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
@@ -57,6 +59,22 @@ const ClientPositions: React.FC = () => {
   useEffect(() => {
     fetchTenders();
   }, []);
+
+  // Обработка параметра tenderId из URL
+  useEffect(() => {
+    const tenderId = searchParams.get('tenderId');
+    if (tenderId && tenders.length > 0) {
+      const tender = tenders.find(t => t.id === tenderId);
+      if (tender) {
+        // Автоматически устанавливаем заказчика, тендер и версию
+        setSelectedClientName(tender.client_name);
+        setSelectedTender(tender);
+        setSelectedTenderId(tender.id);
+        setSelectedVersion(tender.version || 1);
+        fetchClientPositions(tender.id);
+      }
+    }
+  }, [searchParams, tenders]);
 
   const fetchTenders = async () => {
     try {
@@ -387,6 +405,7 @@ const ClientPositions: React.FC = () => {
               style={{ width: '100%', marginTop: 8 }}
               placeholder="Выберите заказчика..."
               options={getClientNames()}
+              value={selectedClientName}
               onChange={handleClientChange}
               showSearch
               filterOption={(input, option) =>

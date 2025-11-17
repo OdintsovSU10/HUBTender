@@ -88,6 +88,74 @@
   background-color: #262626 !important;
 }
 
+/* Deadline Status Row Colors */
+.dashboard-table .ant-table-tbody > tr.deadline-caution > td {
+  background-color: #fffbe6 !important; /* Светло-желтый фон */
+}
+
+.dashboard-table .ant-table-tbody > tr.deadline-warning > td {
+  background-color: #fff7e6 !important; /* Светло-оранжевый фон */
+}
+
+.dashboard-table .ant-table-tbody > tr.deadline-critical > td {
+  background-color: #fff1f0 !important; /* Светло-красный фон */
+}
+
+.dashboard-table .ant-table-tbody > tr.deadline-completed > td {
+  background-color: #f6ffed !important; /* Светло-зеленый фон */
+}
+
+/* Dark Theme Deadline Status Row Colors */
+.dark .dashboard-table .ant-table-tbody > tr.deadline-caution > td {
+  background-color: rgba(234, 179, 8, 0.1) !important; /* Желтоватый фон */
+}
+
+.dark .dashboard-table .ant-table-tbody > tr.deadline-warning > td {
+  background-color: rgba(249, 115, 22, 0.1) !important; /* Оранжевый фон */
+}
+
+.dark .dashboard-table .ant-table-tbody > tr.deadline-critical > td {
+  background-color: rgba(239, 68, 68, 0.1) !important; /* Красноватый фон */
+}
+
+.dark .dashboard-table .ant-table-tbody > tr.deadline-completed > td {
+  background-color: rgba(16, 185, 129, 0.1) !important; /* Зеленоватый фон */
+}
+
+/* Hover effects for deadline rows */
+.dashboard-table .ant-table-tbody > tr.deadline-caution:hover > td {
+  background-color: #fff8cc !important;
+}
+
+.dashboard-table .ant-table-tbody > tr.deadline-warning:hover > td {
+  background-color: #ffedd5 !important;
+}
+
+.dashboard-table .ant-table-tbody > tr.deadline-critical:hover > td {
+  background-color: #fee2e2 !important;
+}
+
+.dashboard-table .ant-table-tbody > tr.deadline-completed:hover > td {
+  background-color: #ecfccb !important;
+}
+
+/* Dark Theme Hover effects for deadline rows */
+.dark .dashboard-table .ant-table-tbody > tr.deadline-caution:hover > td {
+  background-color: rgba(234, 179, 8, 0.2) !important;
+}
+
+.dark .dashboard-table .ant-table-tbody > tr.deadline-warning:hover > td {
+  background-color: rgba(249, 115, 22, 0.2) !important;
+}
+
+.dark .dashboard-table .ant-table-tbody > tr.deadline-critical:hover > td {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.dark .dashboard-table .ant-table-tbody > tr.deadline-completed:hover > td {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+}
+
 /* Compact table rows */
 .dashboard-table.ant-table-small .ant-table-thead > tr > th {
   padding: 8px 8px;
