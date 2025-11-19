@@ -45,13 +45,16 @@ supabase/schemas/prod.sql
 - `work_names` - Work name library with units
 - `materials_library` - Material records with pricing (without cost categories)
 - `works_library` - Work records with pricing (without cost categories)
-- `locations` - Construction site locations
 - `cost_categories` - Cost category definitions
 - `detail_cost_categories` - Detailed cost items per location with location reference
 - `units` - Unit of measurement reference table
-- `work_material_templates` - Templates linking works and materials (DEPRECATED - being replaced by templates/template_items)
 - `templates` - Template container (name + cost category link)
 - `template_items` - Universal table for works and materials with hierarchical structure (kind: 'work' | 'material')
+- `client_positions` - Client position records for BOQ (hierarchical with parent_id)
+- `boq_items` - Works and materials for each client position (linked to works_library/materials_library)
+- `markup_parameters` - Markup calculation parameters
+- `markup_tactics` - Markup strategies and rules
+- `tender_markup_percentage` - Tender-specific markup percentages
 - ENUM: `boq_item_type` ('мат', 'суб-мат', 'мат-комп.', 'раб', 'суб-раб', 'раб-комп.')
 
 ## Architecture & Patterns
@@ -69,12 +72,18 @@ App.tsx
 ```
 
 ### Implemented Routes
-- `/` and `/dashboard` - Feature card grid with 8 modules (✅ complete)
+- `/` and `/dashboard` - Tender dashboard with statistics and tender table (✅ complete)
 - `/admin/nomenclatures` - Materials, Works, Locations, Cost Categories (✅ complete, Supabase integrated)
 - `/admin/tenders` - Tender management table (✅ UI complete, Supabase ready)
 - `/admin/construction_cost` - Cost calculation interface (✅ UI complete, mock data)
+- `/admin/markup_constructor` - Markup calculation constructor (✅ complete, Supabase integrated)
+- `/admin/markup` - Markup percentages management (✅ complete, Supabase integrated)
 - `/library` - Materials/Works library with inline editing (✅ complete, Supabase integrated)
-- `/positions`, `/commerce`, `/costs`, `/users`, `/settings` - Placeholder pages
+- `/library/templates` - Template management with works/materials (✅ complete, Supabase integrated)
+- `/positions` - Client positions with hierarchical structure (✅ complete, Supabase integrated)
+- `/positions/:positionId/items` - BOQ items management for each position (✅ complete, Supabase integrated)
+- `/settings` - Application settings and configuration (✅ complete)
+- `/commerce`, `/costs`, `/users` - Placeholder pages
 
 ### Theme System
 - **Context**: `src/contexts/ThemeContext.tsx`
@@ -164,23 +173,28 @@ Each card has:
 
 ## Database Migration Status
 
-### Implemented (in migrations/)
-1. `001_create_tenders_table.sql` - Core tender entity with currency rates
-2. `002_create_material_work_tables.sql` - Name libraries with units, materials_library, works_library
-3. `003_create_location_and_cost_categories_tables.sql` - Locations and cost categories
-4. `004_fix_detail_cost_categories_foreign_key.sql` - Added location_id foreign key
-5. `005_migrate_enum_to_units_table.sql` - Created units reference table
-6. `006_remove_name_short_from_units.sql` - Cleanup migration
-7. `007_merge_item_types_to_boq_item_type.sql` - Merged item_type and work_item_type into boq_item_type
-8. `008_remove_detail_cost_category_from_libraries.sql` - Removed cost category links from libraries
-9. `009_create_work_material_templates.sql` - Created flat templates table (DEPRECATED)
-10. `010_create_templates_tables.sql` - Created templates + template_items (universal structure)
+### Implemented (all migrations applied to prod.sql)
+All database migrations have been executed and consolidated into `supabase/schemas/prod.sql`.
 
-### Planned but Not Created
-- users (5 roles: administrator, moderator, engineer, manager, director)
-- organizations, material_categories
-- boq_sections, boq_positions (hierarchical BOQ)
-- tender_participants, audit_log, comments
+**Key migrations history:**
+1. Tenders table with currency rates
+2. Material/work name libraries and pricing tables
+3. Locations and cost categories
+4. Units reference table
+5. BOQ item type enum consolidation
+6. Template system (templates + template_items with universal structure)
+7. Client positions (hierarchical with parent_id)
+8. BOQ items (works/materials for positions)
+9. Markup system (tactics, parameters, tender percentages)
+10. Parent work item linking (soft delete with ON DELETE SET NULL)
+11. RLS disabled for development (migration 014)
+
+### Planned but Not Yet Implemented
+- Authentication system with user roles (administrator, moderator, engineer, manager, director)
+- Organizations and material categories
+- Tender participants and collaboration features
+- Audit log and comment system
+- RLS policies (currently disabled for development)
 
 ### Key Database Patterns
 - UUID primary keys with uuid_generate_v4()
@@ -199,45 +213,57 @@ Each card has:
 
 ### UI Implementation Status
 **Fully Implemented with Supabase:**
-- `/dashboard` - 8-card feature grid with gradients and hover effects
+- `/dashboard` - Tender dashboard with tender statistics and management table
 - `/admin/nomenclatures` - CRUD for Materials, Works, Locations, Cost Categories
+- `/admin/markup_constructor` - Markup calculation constructor with tactics and parameters
+- `/admin/markup` - Markup percentages management (base percentages and tender-specific)
 - `/library` - Materials/Works library with inline editing, pagination, search
+- `/library/templates` - Template management with hierarchical works/materials structure
+- `/positions` - Client positions with hierarchical structure and inline editing
+- `/positions/:positionId/items` - BOQ items (works/materials) for each position with instant add and inline editing
+- `/settings` - Application settings (font configuration, etc.)
 
 **UI Complete (Supabase Ready):**
 - `/admin/tenders` - Complex tender management table with filters and actions
 - `/admin/construction_cost` - Cost calculations with statistics and deviation analysis
 
 **Placeholder Pages:**
-- `/positions` - BOQ management
 - `/commerce` - Commercial calculations
 - `/costs` - Construction costs
 - `/users` - User management
-- `/settings` - System configuration
 
 ## Next Development Steps
 
 ### Immediate Priorities
-1. **Refactor Library components** - MaterialsTab.tsx and WorksTab.tsx exceed 600-line limit
+1. **Price Calculation System**
+   - Implement price calculations for BOQ items
+   - Apply markup percentages to positions
+   - Calculate totals and subtotals
+   - Currency conversion handling
+
+2. **Refactor Large Components**
+   - MaterialsTab.tsx (~970 lines) and WorksTab.tsx (~770 lines) exceed 600-line limit
    - Extract EditableCell components
    - Create separate form components
    - Use barrel exports
 
-2. **Connect Tenders page to Supabase**
-   - Implement CRUD operations
-   - Add form validation
-   - Handle currency rate updates
+3. **Connect Remaining Pages to Supabase**
+   - Tenders page CRUD operations
+   - Construction Cost with real data
+   - Add form validation throughout
 
-3. **Build Authentication**
+4. **Build Authentication System**
    - Login/signup pages
    - User context provider
    - Protected route wrapper
+   - Enable RLS policies
 
 ### Feature Development Priority
-1. Build `/positions` page (BOQ CRUD with hierarchical structure)
-2. Connect `/admin/construction_cost` to real data
-3. Add react-hook-form for complex forms
-4. Implement TanStack Query for server state management
-5. Add Excel export functionality using xlsx library
+1. Implement price calculation engine for BOQ items
+2. Add Excel import/export for positions and BOQ items
+3. Build reporting and analytics features
+4. Add tender comparison features
+5. Implement collaboration tools (comments, notifications)
 
 ## Vite Configuration Notes
 
@@ -379,6 +405,101 @@ Applied to:
 - Row background colors (15% opacity, 25% on hover)
 - Form border colors during inline editing
 - Add form border color (dynamic)
+
+## Markup System Architecture
+
+### Markup Constructor (`/admin/markup_constructor`)
+**Complex markup calculation system with tactics and parameters**
+
+**Three-Level Structure:**
+1. **Markup Tactics** (`markup_tactics` table)
+   - Named calculation strategies (e.g., "Схема 1", "Схема 2")
+   - Each tactic contains multiple parameters
+   - Can be copied/duplicated
+   - Tender-specific or global
+
+2. **Markup Parameters** (`markup_parameters` table)
+   - Individual calculation rules within a tactic
+   - Fields:
+     - `order_number` - calculation sequence
+     - `parameter_name` - display name
+     - `base_value` - calculation base (options: "Материалы", "Работы", "Итого материалов + работ", etc.)
+     - `coefficient` - multiplier for calculation
+     - `is_percentage` - whether result is percentage
+   - Supports complex calculation chains
+
+3. **Tender Markup Percentages** (`tender_markup_percentage` table)
+   - Links tactic to specific tender
+   - Stores calculated base percentages per tender
+   - Multiple percentages per tender (from different parameters)
+
+**Key Features:**
+- Drag-and-drop reordering of parameters
+- Copy tactics functionality
+- Tender-specific overrides
+- Calculation order matters (sequential processing)
+
+### Markup Percentages (`/admin/markup`)
+**Base markup percentages management**
+- Global base percentages (not tender-specific)
+- Grid-based editing interface
+- Used as foundation for tender-specific calculations
+
+## Client Positions & BOQ Items Architecture
+
+### Client Positions (`/positions`)
+**Hierarchical position management for tenders**
+- Self-referencing hierarchy with `parent_id` (supports unlimited nesting)
+- Each position belongs to a tender (`tender_id`)
+- Two volume fields:
+  - `volume` - Volume from client
+  - `manual_volume` - Manual volume (ГП - general contractor volume)
+- Navigation: Click on leaf position name → opens `/positions/:positionId/items`
+- Return navigation preserves context with URL params and highlights edited row
+- Inline editing for manual_volume and manual_note
+
+### BOQ Items (`/positions/:positionId/items`)
+**Works and materials management for each client position**
+
+**Instant Add Interface:**
+- Two AutoComplete fields side-by-side (works | materials)
+- Green + buttons for instant addition
+- Auto-populates data from `works_library` and `materials_library`
+- No intermediate forms - select and it's added immediately
+
+**Works Auto-Population** (from `works_library`):
+- `boq_item_type` (раб/суб-раб/раб-комп.)
+- `unit_code` (unit of measurement)
+- `currency_type`
+- Default `quantity` = 1
+
+**Materials Auto-Population** (from `materials_library`):
+- `boq_item_type` (мат/суб-мат/мат-комп.)
+- `material_type` (material classification)
+- `unit_code`
+- `consumption_coefficient` (К расх)
+- `currency_type`
+- `delivery_price_type`
+- `delivery_amount`
+- Default `quantity` = 1
+
+**Inline Editing:**
+- EditableCell component for editable columns
+- Editable fields: `conversion_coefficient`, `quantity`, `parent_work_item_id`, `quote_link`
+- Select dropdown for `parent_work_item_id` shows only works from current position
+- Edit/Save/Cancel buttons per row
+
+**Material-to-Work Linking:**
+- `parent_work_item_id` - soft link to work (ON DELETE SET NULL)
+- `conversion_coefficient` - material consumption per work unit
+- Materials can be standalone or linked to specific works
+- Same pattern as templates architecture
+
+### Table Structure
+- 13 columns: Тип, Наименование, К перв, К расх, Кол-во, Ед.изм., Цена, Доставка, Сумма, Привязка к работе, Категория затрат, Ссылка на КП, Примечание, Действия
+- Color-coded item types (orange/purple/red for different types)
+- Icon indication for linked materials (LinkOutlined)
+- No pagination, vertical scroll only
 
 ## Templates Architecture
 

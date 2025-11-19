@@ -13,6 +13,7 @@ import {
   Select,
   Popconfirm,
   Form,
+  Tooltip,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -23,7 +24,6 @@ import {
   SaveOutlined,
   CloseOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   supabase,
@@ -37,6 +37,8 @@ import {
   type CurrencyType,
   type DeliveryPriceType,
 } from '../../lib/supabase';
+import WorkEditForm from './WorkEditForm';
+import MaterialEditForm from './MaterialEditForm';
 
 const { Text, Title } = Typography;
 
@@ -61,8 +63,12 @@ const PositionItems: React.FC = () => {
   const [workSearchText, setWorkSearchText] = useState<string>('');
   const [materialSearchText, setMaterialSearchText] = useState<string>('');
 
-  const [form] = Form.useForm();
-  const [editingKey, setEditingKey] = useState<string>('');
+  // Состояния для expandable форм
+  const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
+  const [currencyRates, setCurrencyRates] = useState<{ usd: number; eur: number; cny: number }>({ usd: 0, eur: 0, cny: 0 });
+  const [costCategories, setCostCategories] = useState<any[]>([]);
+  const [workNames, setWorkNames] = useState<any[]>([]);
+  const [materialNames, setMaterialNames] = useState<any[]>([]);
 
   useEffect(() => {
     if (positionId) {
@@ -70,19 +76,46 @@ const PositionItems: React.FC = () => {
       fetchItems();
       fetchWorks();
       fetchMaterials();
+      fetchCostCategories();
+      fetchWorkNames();
+      fetchMaterialNames();
     }
   }, [positionId]);
+
+  // Функция для получения курса валюты
+  const getCurrencyRate = (currency: CurrencyType): number => {
+    switch (currency) {
+      case 'USD':
+        return currencyRates.usd;
+      case 'EUR':
+        return currencyRates.eur;
+      case 'CNY':
+        return currencyRates.cny;
+      case 'RUB':
+      default:
+        return 1;
+    }
+  };
 
   const fetchPositionData = async () => {
     try {
       const { data, error } = await supabase
         .from('client_positions')
-        .select('*')
+        .select('*, tenders(usd_rate, eur_rate, cny_rate)')
         .eq('id', positionId)
         .single();
 
       if (error) throw error;
       setPosition(data);
+
+      // Сохранить курсы валют
+      if (data.tenders) {
+        setCurrencyRates({
+          usd: data.tenders.usd_rate || 0,
+          eur: data.tenders.eur_rate || 0,
+          cny: data.tenders.cny_rate || 0,
+        });
+      }
     } catch (error: any) {
       message.error('Ошибка загрузки позиции: ' + error.message);
     }
@@ -202,6 +235,62 @@ const PositionItems: React.FC = () => {
     }
   };
 
+  const fetchCostCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('detail_cost_categories')
+        .select(`
+          id,
+          name,
+          cost_category_id,
+          location,
+          cost_categories(name)
+        `)
+        .order('order_num', { ascending: true });
+
+      if (error) throw error;
+
+      const options = (data || []).map((item: any) => ({
+        value: item.id,
+        label: `${item.cost_categories?.name} / ${item.name} / ${item.location}`,
+        cost_category_name: item.cost_categories?.name || '',
+        location: item.location || '',
+      }));
+
+      setCostCategories(options);
+    } catch (error: any) {
+      message.error('Ошибка загрузки категорий затрат: ' + error.message);
+    }
+  };
+
+  const fetchWorkNames = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('work_names')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setWorkNames(data || []);
+    } catch (error: any) {
+      message.error('Ошибка загрузки наименований работ: ' + error.message);
+    }
+  };
+
+  const fetchMaterialNames = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('material_names')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setMaterialNames(data || []);
+    } catch (error: any) {
+      message.error('Ошибка загрузки наименований материалов: ' + error.message);
+    }
+  };
+
   const handleAddWork = async (workNameId: string) => {
     if (!workNameId || !position) {
       message.error('Выберите работу');
@@ -289,59 +378,54 @@ const PositionItems: React.FC = () => {
     }
   };
 
-  const isEditing = (record: BoqItemFull) => record.id === editingKey;
-
-  const edit = (record: BoqItemFull) => {
-    form.setFieldsValue({
-      conversion_coefficient: record.conversion_coefficient,
-      consumption_coefficient: record.consumption_coefficient,
-      quantity: record.quantity,
-      parent_work_item_id: record.parent_work_item_id,
-      quote_link: record.quote_link,
-      ...record,
-    });
-    setEditingKey(record.id);
+  // Обработчики для expandable форм
+  const handleEditClick = (record: BoqItemFull) => {
+    setExpandedRowKeys([record.id]);
   };
 
-  const cancel = () => {
-    setEditingKey('');
-  };
-
-  const save = async (id: string) => {
+  const handleFormSave = async (data: any) => {
     try {
-      const row = await form.validateFields();
+      const recordId = expandedRowKeys[0];
+      if (!recordId) return;
 
       const { error } = await supabase
         .from('boq_items')
-        .update({
-          conversion_coefficient: row.conversion_coefficient,
-          consumption_coefficient: row.consumption_coefficient,
-          quantity: row.quantity,
-          parent_work_item_id: row.parent_work_item_id || null,
-          quote_link: row.quote_link,
-        })
-        .eq('id', id);
+        .update(data)
+        .eq('id', recordId);
 
       if (error) throw error;
 
       message.success('Изменения сохранены');
-      setEditingKey('');
+      setExpandedRowKeys([]);
       fetchItems();
     } catch (error: any) {
       message.error('Ошибка сохранения: ' + error.message);
     }
   };
 
-  const getTypeColor = (type: BoqItemType): string => {
-    const colors: Record<BoqItemType, string> = {
-      'мат': 'orange',
-      'суб-мат': 'purple',
-      'мат-комп.': 'red',
-      'раб': 'blue',
-      'суб-раб': 'cyan',
-      'раб-комп.': 'geekblue',
-    };
-    return colors[type] || 'default';
+  const handleFormCancel = () => {
+    setExpandedRowKeys([]);
+  };
+
+  const getRowClassName = (record: BoqItemFull): string => {
+    const itemType = record.boq_item_type;
+
+    switch (itemType) {
+      case 'раб':
+        return 'boq-row-rab';
+      case 'суб-раб':
+        return 'boq-row-sub-rab';
+      case 'раб-комп.':
+        return 'boq-row-rab-comp';
+      case 'мат':
+        return 'boq-row-mat';
+      case 'суб-мат':
+        return 'boq-row-sub-mat';
+      case 'мат-комп.':
+        return 'boq-row-mat-comp';
+      default:
+        return '';
+    }
   };
 
   const getAvailableWorks = () => {
@@ -371,131 +455,163 @@ const PositionItems: React.FC = () => {
     return record.total_amount || 0;
   };
 
-  interface EditableCellProps {
-    editing: boolean;
-    dataIndex: string;
-    title: any;
-    inputType: 'number' | 'text' | 'select';
-    record: BoqItemFull;
-    index: number;
-    children: React.ReactNode;
-    selectOptions?: { value: string; label: string }[];
-  }
-
-  const EditableCell: React.FC<EditableCellProps> = ({
-    editing,
-    dataIndex,
-    title,
-    inputType,
-    record,
-    index,
-    children,
-    selectOptions,
-    ...restProps
-  }) => {
-    let inputNode: React.ReactNode;
-
-    if (inputType === 'number') {
-      inputNode = <InputNumber style={{ width: '100%' }} min={0} step={0.01} />;
-    } else if (inputType === 'select') {
-      inputNode = (
-        <Select
-          style={{ width: '100%' }}
-          placeholder="Выберите работу"
-          allowClear
-          options={selectOptions}
-        />
-      );
-    } else {
-      inputNode = <Input />;
-    }
-
-    return (
-      <td {...restProps}>
-        {editing ? (
-          <Form.Item
-            name={dataIndex}
-            style={{ margin: 0 }}
-            rules={[
-              {
-                required: dataIndex === 'quantity',
-                message: `Пожалуйста, введите ${title}!`,
-              },
-            ]}
-          >
-            {inputNode}
-          </Form.Item>
-        ) : (
-          children
-        )}
-      </td>
-    );
-  };
 
   const columns: any[] = [
     {
       title: <div style={{ textAlign: 'center' }}>Тип</div>,
       key: 'type',
-      width: 90,
+      width: 80,
       align: 'center',
-      render: (_, record) => (
-        <Tag color={getTypeColor(record.boq_item_type)}>
-          {record.boq_item_type}
-        </Tag>
-      ),
+      render: (_: any, record: BoqItemFull) => {
+        const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(record.boq_item_type);
+        const itemType = record.boq_item_type;
+
+        // Цвета из Templates (точное соответствие)
+        let bgColor = '';
+        let textColor = '';
+
+        if (['раб', 'суб-раб', 'раб-комп.'].includes(itemType)) {
+          switch (itemType) {
+            case 'раб':
+              bgColor = 'rgba(239, 108, 0, 0.12)';
+              textColor = '#f57c00';
+              break;
+            case 'суб-раб':
+              bgColor = 'rgba(106, 27, 154, 0.12)';
+              textColor = '#7b1fa2';
+              break;
+            case 'раб-комп.':
+              bgColor = 'rgba(198, 40, 40, 0.12)';
+              textColor = '#d32f2f';
+              break;
+          }
+        } else {
+          switch (itemType) {
+            case 'мат':
+              bgColor = 'rgba(21, 101, 192, 0.12)';
+              textColor = '#1976d2';
+              break;
+            case 'суб-мат':
+              bgColor = 'rgba(104, 159, 56, 0.12)';
+              textColor = '#7cb342';
+              break;
+            case 'мат-комп.':
+              bgColor = 'rgba(0, 105, 92, 0.12)';
+              textColor = '#00897b';
+              break;
+          }
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <Tag style={{ backgroundColor: bgColor, color: textColor, border: 'none', margin: 0 }}>
+              {itemType}
+            </Tag>
+            {isMaterial && record.material_type && (
+              <Tag
+                style={{
+                  backgroundColor: record.material_type === 'основн.' ? 'rgba(255, 152, 0, 0.12)' : 'rgba(21, 101, 192, 0.12)',
+                  color: record.material_type === 'основн.' ? '#fb8c00' : '#1976d2',
+                  border: 'none',
+                  margin: 0,
+                  fontSize: 11,
+                }}
+              >
+                {record.material_type}
+              </Tag>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: <div style={{ textAlign: 'center' }}>Наименование</div>,
       key: 'name',
-      width: 250,
-      render: (_, record) => (
-        <div style={{ paddingLeft: record.parent_work_item_id ? 24 : 0 }}>
-          {record.parent_work_item_id && (
-            <LinkOutlined style={{ marginRight: 8, color: '#888' }} />
-          )}
-          <Text>{record.work_name || record.material_name}</Text>
-        </div>
-      ),
+      width: 200,
+      render: (_: any, record: BoqItemFull) => {
+        const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(record.boq_item_type);
+        const parentWork = record.parent_work_item_id
+          ? items.find(item => item.id === record.parent_work_item_id)
+          : null;
+
+        return (
+          <div style={{ textAlign: 'left' }}>
+            <div>{record.work_name || record.material_name}</div>
+            {isMaterial && parentWork && (
+              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                <LinkOutlined style={{ marginRight: 4 }} />
+                {parentWork.work_name}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: <div style={{ textAlign: 'center' }}>К перв</div>,
       dataIndex: 'conversion_coefficient',
       key: 'conversion',
-      width: 80,
+      width: 70,
       align: 'center',
-      editable: true,
-      render: (value) => value?.toFixed(3) || '-',
+      render: (value: number) => value?.toFixed(3) || '-',
     },
     {
       title: <div style={{ textAlign: 'center' }}>К расх</div>,
       dataIndex: 'consumption_coefficient',
       key: 'consumption',
-      width: 80,
+      width: 70,
       align: 'center',
-      render: (value) => value?.toFixed(4) || '-',
+      render: (value: number) => value?.toFixed(4) || '-',
     },
     {
       title: <div style={{ textAlign: 'center' }}>Кол-во</div>,
       dataIndex: 'quantity',
       key: 'quantity',
-      width: 100,
+      width: 90,
       align: 'center',
-      editable: true,
-      render: (value) => value?.toFixed(2) || '-',
+      render: (value: number, record: BoqItemFull) => {
+        const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(record.boq_item_type);
+        const displayValue = value?.toFixed(2) || '-';
+
+        if (isMaterial && value) {
+          let tooltipTitle = '';
+          if (record.parent_work_item_id) {
+            // Материал привязан к работе
+            const parentWork = items.find(item => item.id === record.parent_work_item_id);
+            const workQty = parentWork?.quantity || 0;
+            const convCoef = record.conversion_coefficient || 1;
+            const consCoef = record.consumption_coefficient || 1;
+            tooltipTitle = `Кол-во = ${workQty.toFixed(2)} (кол-во работы) × ${convCoef.toFixed(3)} (К перв) × ${consCoef.toFixed(4)} (К расх) = ${displayValue}`;
+          } else if (record.base_quantity) {
+            // Материал не привязан к работе
+            const baseQty = record.base_quantity;
+            const consCoef = record.consumption_coefficient || 1;
+            tooltipTitle = `Кол-во = ${baseQty.toFixed(2)} (базовое кол-во) × ${consCoef.toFixed(4)} (К расх) = ${displayValue}`;
+          }
+
+          return (
+            <Tooltip title={tooltipTitle}>
+              <span style={{ cursor: 'help', borderBottom: '1px dotted' }}>{displayValue}</span>
+            </Tooltip>
+          );
+        }
+
+        return displayValue;
+      },
     },
     {
       title: <div style={{ textAlign: 'center' }}>Ед.изм.</div>,
       dataIndex: 'unit_code',
       key: 'unit',
-      width: 80,
+      width: 70,
       align: 'center',
     },
     {
-      title: <div style={{ textAlign: 'center' }}>Цена</div>,
+      title: <div style={{ textAlign: 'center' }}>Цена за ед.</div>,
       key: 'price',
-      width: 110,
+      width: 100,
       align: 'center',
-      render: (_, record) => {
+      render: (_: any, record: BoqItemFull) => {
         const symbol = currencySymbols[record.currency_type || 'RUB'];
         return record.unit_rate
           ? `${record.unit_rate.toLocaleString('ru-RU')} ${symbol}`
@@ -505,89 +621,88 @@ const PositionItems: React.FC = () => {
     {
       title: <div style={{ textAlign: 'center' }}>Доставка</div>,
       key: 'delivery',
-      width: 130,
-      align: 'center',
-      render: (_, record) => getDeliveryText(record),
-    },
-    {
-      title: <div style={{ textAlign: 'center' }}>Сумма</div>,
-      key: 'total',
       width: 110,
       align: 'center',
-      render: (_, record) => {
+      render: (_: any, record: BoqItemFull) => getDeliveryText(record),
+    },
+    {
+      title: <div style={{ textAlign: 'center' }}>Итого</div>,
+      key: 'total',
+      width: 100,
+      align: 'center',
+      render: (_: any, record: BoqItemFull) => {
         const total = calculateTotal(record);
-        const symbol = currencySymbols[record.currency_type || 'RUB'];
-        return total > 0
-          ? `${total.toLocaleString('ru-RU')} ${symbol}`
-          : '-';
+        const displayValue = total > 0 ? `${total.toLocaleString('ru-RU')}` : '-';
+
+        if (total > 0) {
+          const qty = record.quantity || 0;
+          const price = record.unit_rate || 0;
+          const rate = getCurrencyRate(record.currency_type || 'RUB');
+
+          const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(record.boq_item_type);
+          let tooltipTitle = '';
+
+          if (isMaterial) {
+            let deliveryPrice = 0;
+            if (record.delivery_price_type === 'не в цене') {
+              deliveryPrice = price * rate * 0.03;
+            } else if (record.delivery_price_type === 'суммой') {
+              deliveryPrice = record.delivery_amount || 0;
+            }
+
+            tooltipTitle = `${total.toFixed(2)} = ${qty.toFixed(2)} × (${price.toFixed(2)} * ${rate.toFixed(2)} + ${deliveryPrice.toFixed(2)})`;
+          } else {
+            // Для работ
+            tooltipTitle = `${total.toFixed(2)} = ${qty.toFixed(2)} × (${price.toFixed(2)} * ${rate.toFixed(2)} + 0)`;
+          }
+
+          return (
+            <Tooltip title={tooltipTitle}>
+              <span style={{ cursor: 'help', borderBottom: '1px dotted' }}>{displayValue}</span>
+            </Tooltip>
+          );
+        }
+
+        return displayValue;
       },
     },
     {
-      title: <div style={{ textAlign: 'center' }}>Привязка к работе</div>,
-      dataIndex: 'parent_work_item_id',
-      key: 'parent_work',
-      width: 200,
-      align: 'center',
-      editable: true,
-      render: (value: string | null) => {
-        if (!value) return '-';
-        const parentWork = items.find(item => item.id === value);
-        return parentWork ? parentWork.work_name : '-';
-      },
-    },
-    {
-      title: <div style={{ textAlign: 'center' }}>Категория затрат</div>,
+      title: <div style={{ textAlign: 'center' }}>Затрата на стр-во</div>,
       key: 'cost_category',
-      width: 180,
+      width: 150,
       align: 'center',
-      render: (_, record) => record.detail_cost_category_full || '-',
+      render: (_: any, record: BoqItemFull) => record.detail_cost_category_full || '-',
     },
     {
       title: <div style={{ textAlign: 'center' }}>Ссылка на КП</div>,
       dataIndex: 'quote_link',
       key: 'quote_link',
-      width: 120,
+      width: 100,
       align: 'center',
-      editable: true,
-      render: (value) => value || '-',
+      render: (value: string) => value || '-',
     },
     {
       title: <div style={{ textAlign: 'center' }}>Примечание</div>,
-      key: 'note',
-      width: 150,
+      dataIndex: 'description',
+      key: 'description',
+      width: 120,
       align: 'center',
-      render: () => '-',
+      render: (value: string) => value || '-',
     },
     {
       title: <div style={{ textAlign: 'center' }}>Действия</div>,
       key: 'actions',
-      width: 120,
+      width: 100,
       align: 'center',
-      render: (_, record) => {
-        const editable = isEditing(record);
-        return editable ? (
-          <Space>
-            <Button
-              type="link"
-              size="small"
-              icon={<SaveOutlined />}
-              onClick={() => save(record.id)}
-            />
-            <Button
-              type="link"
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={cancel}
-            />
-          </Space>
-        ) : (
+      render: (_: any, record: BoqItemFull) => {
+        return (
           <Space>
             <Button
               type="link"
               size="small"
               icon={<EditOutlined />}
-              disabled={editingKey !== ''}
-              onClick={() => edit(record)}
+              onClick={() => handleEditClick(record)}
+              disabled={expandedRowKeys.length > 0 && !expandedRowKeys.includes(record.id)}
             />
             <Popconfirm
               title="Удалить элемент?"
@@ -602,34 +717,6 @@ const PositionItems: React.FC = () => {
       },
     },
   ];
-
-  const mergedColumns = columns.map((col: any) => {
-    if (!col.editable) {
-      return col;
-    }
-    return {
-      ...col,
-      onCell: (record: BoqItemFull) => ({
-        record,
-        inputType:
-          col.dataIndex === 'parent_work_item_id'
-            ? 'select'
-            : col.dataIndex === 'quote_link'
-            ? 'text'
-            : 'number',
-        dataIndex: col.dataIndex,
-        title: col.title,
-        editing: isEditing(record),
-        selectOptions:
-          col.dataIndex === 'parent_work_item_id'
-            ? getAvailableWorks().map(w => ({
-                value: w.id,
-                label: w.work_name || '',
-              }))
-            : [],
-      }),
-    };
-  });
 
   if (!position) {
     return <div>Загрузка...</div>;
@@ -665,6 +752,17 @@ const PositionItems: React.FC = () => {
                 <Text type="secondary">|</Text>
                 <Text type="secondary">
                   Кол-во ГП: <Text strong>{position.manual_volume?.toFixed(2) || '-'}</Text> {position.unit_code}
+                </Text>
+                <Text type="secondary">|</Text>
+                <Text type="secondary">
+                  Итого: <Text strong>{items.reduce((sum, item) => sum + calculateTotal(item), 0).toLocaleString('ru-RU')}</Text> ₽
+                </Text>
+                <Text type="secondary">|</Text>
+                <Text type="secondary">
+                  <Text strong>
+                    Р {items.filter(item => ['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type)).length},
+                    М {items.filter(item => ['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)).length}
+                  </Text>
                 </Text>
               </Space>
             </div>
@@ -753,25 +851,124 @@ const PositionItems: React.FC = () => {
       </Card>
 
       <Card title="Элементы позиции">
-        <Form form={form} component={false}>
-          <Table
-            components={{
-              body: {
-                cell: EditableCell,
-              },
-            }}
-            columns={mergedColumns}
-            dataSource={items}
-            rowKey="id"
-            loading={loading}
-            pagination={false}
-            scroll={{ y: 'calc(100vh - 500px)' }}
-            size="small"
-          />
-        </Form>
+        <Table
+          columns={columns}
+          dataSource={items}
+          rowKey="id"
+          rowClassName={getRowClassName}
+          loading={loading}
+          pagination={false}
+          scroll={{ y: 'calc(100vh - 500px)' }}
+          size="small"
+          summary={() => {
+            const totalSum = items.reduce((sum, item) => sum + calculateTotal(item), 0);
+            return (
+              <Table.Summary fixed>
+                <Table.Summary.Row style={{ backgroundColor: '#1a1a1a', fontWeight: 'bold' }}>
+                  <Table.Summary.Cell index={0} colSpan={10} align="right">
+                    ИТОГО:
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={10} align="center">
+                    {totalSum.toLocaleString('ru-RU')}
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={11} colSpan={3} />
+                </Table.Summary.Row>
+              </Table.Summary>
+            );
+          }}
+          expandable={{
+            showExpandColumn: false,
+            expandedRowKeys: expandedRowKeys,
+            onExpand: (expanded, record) => {
+              setExpandedRowKeys(expanded ? [record.id] : []);
+            },
+            expandedRowRender: (record: BoqItemFull) => {
+              const isWork = ['раб', 'суб-раб', 'раб-комп.'].includes(record.boq_item_type);
+
+              if (isWork) {
+                return (
+                  <WorkEditForm
+                    record={record}
+                    workNames={workNames}
+                    costCategories={costCategories}
+                    currencyRates={currencyRates}
+                    onSave={handleFormSave}
+                    onCancel={handleFormCancel}
+                  />
+                );
+              } else {
+                // Material form
+                const workItems = items.filter(
+                  item => item.boq_item_type === 'раб' ||
+                    item.boq_item_type === 'суб-раб' ||
+                    item.boq_item_type === 'раб-комп.'
+                );
+
+                return (
+                  <MaterialEditForm
+                    record={record}
+                    materialNames={materialNames}
+                    workItems={workItems}
+                    costCategories={costCategories}
+                    currencyRates={currencyRates}
+                    onSave={handleFormSave}
+                    onCancel={handleFormCancel}
+                  />
+                );
+              }
+            },
+          }}
+        />
       </Card>
     </div>
   );
 };
+
+// Стили для подсветки строк по типу (из Templates.tsx)
+const styles = `
+  .boq-row-rab {
+    background-color: rgba(255, 152, 0, 0.15) !important;
+  }
+  .boq-row-rab:hover > td {
+    background-color: rgba(255, 152, 0, 0.25) !important;
+  }
+  .boq-row-sub-rab {
+    background-color: rgba(156, 39, 176, 0.15) !important;
+  }
+  .boq-row-sub-rab:hover > td {
+    background-color: rgba(156, 39, 176, 0.25) !important;
+  }
+  .boq-row-rab-comp {
+    background-color: rgba(244, 67, 54, 0.15) !important;
+  }
+  .boq-row-rab-comp:hover > td {
+    background-color: rgba(244, 67, 54, 0.25) !important;
+  }
+  .boq-row-mat {
+    background-color: rgba(33, 150, 243, 0.15) !important;
+  }
+  .boq-row-mat:hover > td {
+    background-color: rgba(33, 150, 243, 0.25) !important;
+  }
+  .boq-row-sub-mat {
+    background-color: rgba(156, 204, 101, 0.15) !important;
+  }
+  .boq-row-sub-mat:hover > td {
+    background-color: rgba(156, 204, 101, 0.25) !important;
+  }
+  .boq-row-mat-comp {
+    background-color: rgba(0, 137, 123, 0.15) !important;
+  }
+  .boq-row-mat-comp:hover > td {
+    background-color: rgba(0, 137, 123, 0.25) !important;
+  }
+`;
+
+// Inject styles into the document
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = styles;
+  document.head.appendChild(styleElement);
+}
 
 export default PositionItems;

@@ -466,6 +466,7 @@ export interface BoqItemInsert {
 
   // Валюта и суммы
   currency_type?: CurrencyType;
+  unit_rate?: number | null;
   total_amount?: number | null;
 
   // Затрата на строительство
@@ -473,6 +474,7 @@ export interface BoqItemInsert {
 
   // Примечание
   quote_link?: string | null;
+  description?: string | null;
 
   // Коммерческие показатели
   commercial_markup?: number | null;
@@ -507,9 +509,6 @@ export interface BoqItemFull extends BoqItem {
   parent_work_name?: string;
   parent_work_unit?: UnitType;
   parent_work_quantity?: number;
-
-  // Цена за единицу из библиотеки
-  unit_rate?: number;
 }
 
 // =============================================

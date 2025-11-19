@@ -1,5 +1,5 @@
 -- Database Schema SQL Export
--- Generated: 2025-11-17T14:48:54.962540
+-- Generated: 2025-11-19T09:05:39.853253
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -371,14 +371,17 @@ CREATE TABLE IF NOT EXISTS public.boq_items (
     total_amount numeric(18,2),
     detail_cost_category_id uuid,
     quote_link text,
+    description text,
     commercial_markup numeric(10,4),
     total_commercial_material_cost numeric(18,2),
     total_commercial_work_cost numeric(18,2),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    parent_work_item_id uuid,
     CONSTRAINT boq_items_client_position_id_fkey FOREIGN KEY (client_position_id) REFERENCES None.None(None),
     CONSTRAINT boq_items_detail_cost_category_id_fkey FOREIGN KEY (detail_cost_category_id) REFERENCES None.None(None),
     CONSTRAINT boq_items_material_name_id_fkey FOREIGN KEY (material_name_id) REFERENCES None.None(None),
+    CONSTRAINT boq_items_parent_work_item_id_fkey FOREIGN KEY (parent_work_item_id) REFERENCES public.boq_items(id),
     CONSTRAINT boq_items_pkey PRIMARY KEY (id),
     CONSTRAINT boq_items_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None),
     CONSTRAINT boq_items_unit_code_fkey FOREIGN KEY (unit_code) REFERENCES None.None(None),
@@ -403,12 +406,14 @@ COMMENT ON COLUMN public.boq_items.delivery_amount IS 'Стоимость дос
 COMMENT ON COLUMN public.boq_items.currency_type IS 'Тип валюты (RUB, USD, EUR, CNY)';
 COMMENT ON COLUMN public.boq_items.total_amount IS 'Итоговая сумма';
 COMMENT ON COLUMN public.boq_items.detail_cost_category_id IS 'Затрата на строительство, связь с таблицей detail_cost_categories';
-COMMENT ON COLUMN public.boq_items.quote_link IS 'Примечание';
+COMMENT ON COLUMN public.boq_items.quote_link IS 'Ссылка на КП';
+COMMENT ON COLUMN public.boq_items.description IS 'Примечание к элементу позиции';
 COMMENT ON COLUMN public.boq_items.commercial_markup IS 'Коэффициент наценки';
 COMMENT ON COLUMN public.boq_items.total_commercial_material_cost IS 'Итоговая стоимость материала в коммерческой стоимости';
 COMMENT ON COLUMN public.boq_items.total_commercial_work_cost IS 'Итоговая стоимость работы в коммерческой стоимости';
 COMMENT ON COLUMN public.boq_items.created_at IS 'Дата и время создания записи';
 COMMENT ON COLUMN public.boq_items.updated_at IS 'Дата и время последнего обновления';
+COMMENT ON COLUMN public.boq_items.parent_work_item_id IS 'Привязка материала к работе (FK к boq_items.id, NULL если материал независимый)';
 
 -- Table: public.client_positions
 -- Description: Позиции заказчика из ВОРа (Bill of Quantities)
@@ -3909,6 +3914,9 @@ CREATE INDEX idx_boq_items_detail_cost_category_id ON public.boq_items USING btr
 CREATE INDEX idx_boq_items_material_name_id ON public.boq_items USING btree (material_name_id);
 
 -- Index on public.boq_items
+CREATE INDEX idx_boq_items_parent_work_item_id ON public.boq_items USING btree (parent_work_item_id);
+
+-- Index on public.boq_items
 CREATE INDEX idx_boq_items_sort_number ON public.boq_items USING btree (client_position_id, sort_number);
 
 -- Index on public.boq_items
@@ -4175,7 +4183,7 @@ GRANT service_role TO authenticator;
 -- GRANT USAGE ON SCHEMA public TO authenticator;
 
 -- Role: cli_login_postgres
-CREATE ROLE cli_login_postgres WITH LOGIN NOINHERIT VALID UNTIL '2025-11-17 09:27:18.914634+00';
+CREATE ROLE cli_login_postgres WITH LOGIN NOINHERIT VALID UNTIL '2025-11-17 12:34:07.223578+00';
 GRANT postgres TO cli_login_postgres;
 -- Database privileges for cli_login_postgres:
 -- GRANT CONNECT, TEMP ON DATABASE postgres TO cli_login_postgres;
@@ -4214,6 +4222,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA graphql_public TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_1 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_11 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_12 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_14 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_17 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_2 TO postgres;
@@ -4238,11 +4247,13 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_50 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_52 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_55 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_57 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_58 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_7 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_8 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_1 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_11 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_12 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_14 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_17 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_2 TO postgres;
@@ -4267,6 +4278,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_50 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_52 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_55 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_57 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_58 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_7 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_8 TO postgres;
@@ -4305,6 +4317,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA graphql_public TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_1 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_11 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_12 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_14 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_17 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_2 TO supabase_admin;
@@ -4329,11 +4342,13 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_50 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_52 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_55 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_57 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_58 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_7 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_8 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_1 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_11 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_12 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_14 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_17 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_2 TO supabase_admin;
@@ -4358,6 +4373,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_50 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_52 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_55 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_57 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_58 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_7 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_8 TO supabase_admin;
@@ -4389,6 +4405,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA graphql_public TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_1 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_11 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_12 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_14 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_17 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_2 TO supabase_etl_admin;
@@ -4413,11 +4430,13 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_50 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_52 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_55 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_57 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_58 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_7 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_8 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_1 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_11 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_12 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_14 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_17 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_2 TO supabase_etl_admin;
@@ -4442,6 +4461,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_50 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_52 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_55 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_57 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_58 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_7 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_8 TO supabase_etl_admin;
@@ -4465,6 +4485,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA graphql_public TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_1 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_11 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_12 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_14 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_17 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_2 TO supabase_read_only_user;
@@ -4489,11 +4510,13 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_50 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_52 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_55 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_57 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_58 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_7 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_8 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_1 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_11 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_12 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_14 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_17 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_2 TO supabase_read_only_user;
@@ -4518,6 +4541,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_50 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_52 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_55 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_57 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_58 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_7 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_8 TO supabase_read_only_user;
