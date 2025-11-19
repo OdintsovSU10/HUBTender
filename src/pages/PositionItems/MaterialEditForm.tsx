@@ -358,7 +358,14 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
           <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Доставка</div>
           <Select
             value={formData.delivery_price_type}
-            onChange={(value) => setFormData({ ...formData, delivery_price_type: value })}
+            onChange={(value) => {
+              // При смене типа доставки устанавливаем значение по умолчанию
+              // Для 'не в цене' используется фиксированный 3%, поэтому delivery_amount = null
+              // Для 'суммой' нужна сумма, по умолчанию 100
+              // Для 'в цене' доставка включена, поэтому delivery_amount = null
+              const newDeliveryAmount = value === 'суммой' ? 100 : null;
+              setFormData({ ...formData, delivery_price_type: value, delivery_amount: newDeliveryAmount });
+            }}
             style={{ width: '100%' }}
             size="small"
             options={[

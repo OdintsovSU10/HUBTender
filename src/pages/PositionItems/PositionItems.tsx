@@ -188,9 +188,12 @@ const PositionItems: React.FC = () => {
         work_name: item.work_names?.name,
         work_unit: item.work_names?.unit,
         parent_work_name: item.parent_work?.work_names?.name,
-        unit_rate: item.material_name_id
-          ? materialRates[item.material_name_id]
-          : workRates[item.work_name_id],
+        // Используем unit_rate из item, если он установлен, иначе берем из библиотеки
+        unit_rate: (item.unit_rate !== null && item.unit_rate !== undefined)
+          ? item.unit_rate
+          : (item.material_name_id
+            ? materialRates[item.material_name_id]
+            : workRates[item.work_name_id]),
       }));
 
       // Сортировка: работы с их материалами, потом непривязанные материалы
@@ -655,8 +658,7 @@ const PositionItems: React.FC = () => {
     } else if (record.delivery_price_type === 'не в цене' && record.delivery_amount) {
       return `Не включена (${record.delivery_amount}%)`;
     } else if (record.delivery_price_type === 'суммой' && record.delivery_amount) {
-      const symbol = currencySymbols[record.currency_type || 'RUB'];
-      return `${record.delivery_amount.toLocaleString('ru-RU')} ${symbol}`;
+      return `${record.delivery_amount.toLocaleString('ru-RU')}`;
     }
     return '-';
   };
@@ -834,7 +836,37 @@ const PositionItems: React.FC = () => {
       key: 'delivery',
       width: 110,
       align: 'center',
-      render: (_: any, record: BoqItemFull) => getDeliveryText(record),
+      render: (_: any, record: BoqItemFull) => {
+        const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(record.boq_item_type);
+
+        if (!isMaterial || !record.delivery_price_type) {
+          return '-';
+        }
+
+        if (record.delivery_price_type === 'в цене') {
+          return 'Включена';
+        } else if (record.delivery_price_type === 'не в цене') {
+          // Расчет стоимости доставки
+          const unitRate = record.unit_rate || 0;
+          const rate = getCurrencyRate(record.currency_type as CurrencyType);
+          const unitPriceInRub = unitRate * rate;
+          const deliveryAmount = unitPriceInRub * 0.03;
+
+          const tooltipTitle = `${deliveryAmount.toFixed(2)} = ${unitPriceInRub.toFixed(2)} × 3%`;
+
+          return (
+            <Tooltip title={tooltipTitle}>
+              <span style={{ cursor: 'help', borderBottom: '1px dotted' }}>
+                {deliveryAmount.toFixed(2)}
+              </span>
+            </Tooltip>
+          );
+        } else if (record.delivery_price_type === 'суммой' && record.delivery_amount) {
+          return `${record.delivery_amount.toLocaleString('ru-RU')}`;
+        }
+
+        return '-';
+      },
     },
     {
       title: <div style={{ textAlign: 'center' }}>Итого</div>,
@@ -978,12 +1010,11 @@ const PositionItems: React.FC = () => {
                 />
                 <Text type="secondary">{position.unit_code}</Text>
               </div>
-              <Tag color="success" style={{ fontSize: 14, padding: '4px 12px' }}>
-                Итого: {items.reduce((sum, item) => sum + calculateTotal(item), 0).toLocaleString('ru-RU')} ₽
+              <Tag color="success" style={{ fontSize: 14, padding: '4px 12px', fontWeight: 600 }}>
+                Итого: {Math.round(items.reduce((sum, item) => sum + calculateTotal(item), 0)).toLocaleString('ru-RU')}
               </Tag>
-              <Tag color="success" style={{ fontSize: 14, padding: '4px 12px' }}>
-                Р {items.filter(item => ['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type)).length},
-                М {items.filter(item => ['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)).length}
+              <Tag color="success" style={{ fontSize: 14, padding: '4px 12px', fontWeight: 600 }}>
+                Р {items.filter(item => ['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type)).length} М {items.filter(item => ['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)).length}
               </Tag>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
@@ -1115,7 +1146,7 @@ const PositionItems: React.FC = () => {
                     Итого:
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={8} align="center">
-                    {totalSum.toLocaleString('ru-RU')}
+                    {Math.round(totalSum).toLocaleString('ru-RU')}
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={9} colSpan={4} />
                 </Table.Summary.Row>

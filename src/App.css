@@ -48,3 +48,14 @@
 .highlight-row {
   animation: highlight-fade 2s ease-in-out;
 }
+
+/* Применяем подсветку ко всем ячейкам строки, включая фиксированные */
+.highlight-row > td {
+  animation: highlight-fade 2s ease-in-out !important;
+}
+
+/* Для фиксированных колонок Ant Design */
+.ant-table-cell-fix-left.highlight-row,
+.ant-table-cell-fix-right.highlight-row {
+  animation: highlight-fade 2s ease-in-out !important;
+}
