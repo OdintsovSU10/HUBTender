@@ -96,32 +96,58 @@ const Tenders: React.FC = () => {
         console.error('Ошибка загрузки тендеров:', error);
         message.error('Ошибка загрузки тендеров');
       } else if (data) {
-        // Преобразование данных из БД в формат для таблицы
-        const formattedData: TenderRecord[] = data.map((tender: Tender) => ({
-          key: tender.id,
-          id: tender.id,
-          tender: tender.title,
-          tenderNumber: tender.tender_number,
-          deadline: tender.submission_deadline ? dayjs(tender.submission_deadline).format('DD.MM.YYYY') : '',
-          daysUntilDeadline: tender.submission_deadline ?
-            dayjs(tender.submission_deadline).diff(dayjs(), 'day') : 0,
-          client: tender.client_name,
-          estimatedCost: 0, // Это поле не хранится в БД
-          areaClient: tender.area_client || 0,
-          areaSp: tender.area_sp || 0,
-          areaZakazchik: tender.area_client || 0,
-          usdRate: tender.usd_rate || 0,
-          eurRate: tender.eur_rate || 0,
-          cnyRate: tender.cny_rate || 0,
-          hasLinks: !!(tender.upload_folder || tender.bsm_link || tender.tz_link || tender.qa_form_link),
-          uploadFolder: tender.upload_folder || undefined,
-          bsmLink: tender.bsm_link || undefined,
-          tzLink: tender.tz_link || undefined,
-          qaFormLink: tender.qa_form_link || undefined,
-          createdAt: dayjs(tender.created_at).format('DD.MM.YYYY'),
-          description: tender.description || '',
-          status: 'in_progress' as const,
-          version: tender.version?.toString() || '1'
+        // Для каждого тендера загружаем коммерческую стоимость
+        const formattedData: TenderRecord[] = await Promise.all(data.map(async (tender: Tender) => {
+          // Загружаем позиции тендера
+          const { data: positions } = await supabase
+            .from('client_positions')
+            .select('id')
+            .eq('tender_id', tender.id);
+
+          let totalCommercialCost = 0;
+
+          if (positions && positions.length > 0) {
+            // Загружаем все элементы BOQ для всех позиций тендера
+            const positionIds = positions.map(p => p.id);
+            const { data: boqItems } = await supabase
+              .from('boq_items')
+              .select('total_commercial_material_cost, total_commercial_work_cost')
+              .in('client_position_id', positionIds);
+
+            // Суммируем коммерческие стоимости
+            if (boqItems) {
+              totalCommercialCost = boqItems.reduce((sum, item) => {
+                return sum + (item.total_commercial_material_cost || 0) + (item.total_commercial_work_cost || 0);
+              }, 0);
+            }
+          }
+
+          return {
+            key: tender.id,
+            id: tender.id,
+            tender: tender.title,
+            tenderNumber: tender.tender_number,
+            deadline: tender.submission_deadline ? dayjs(tender.submission_deadline).format('DD.MM.YYYY') : '',
+            daysUntilDeadline: tender.submission_deadline ?
+              dayjs(tender.submission_deadline).diff(dayjs(), 'day') : 0,
+            client: tender.client_name,
+            estimatedCost: totalCommercialCost,
+            areaClient: tender.area_client || 0,
+            areaSp: tender.area_sp || 0,
+            areaZakazchik: tender.area_client || 0,
+            usdRate: tender.usd_rate || 0,
+            eurRate: tender.eur_rate || 0,
+            cnyRate: tender.cny_rate || 0,
+            hasLinks: !!(tender.upload_folder || tender.bsm_link || tender.tz_link || tender.qa_form_link),
+            uploadFolder: tender.upload_folder || undefined,
+            bsmLink: tender.bsm_link || undefined,
+            tzLink: tender.tz_link || undefined,
+            qaFormLink: tender.qa_form_link || undefined,
+            createdAt: dayjs(tender.created_at).format('DD.MM.YYYY'),
+            description: tender.description || '',
+            status: 'in_progress' as const,
+            version: tender.version?.toString() || '1'
+          };
         }));
         setTendersData(formattedData);
       }
@@ -316,7 +342,7 @@ const Tenders: React.FC = () => {
       width: 110,
       align: 'right',
       render: (cost: number) => (
-        <Text strong style={{ fontSize: 12 }}>{cost.toLocaleString('ru-RU')}</Text>
+        <Text strong style={{ fontSize: 12 }}>{cost.toLocaleString('ru-RU')} ₽</Text>
       ),
     },
     {

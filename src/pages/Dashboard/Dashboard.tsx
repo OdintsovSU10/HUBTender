@@ -59,20 +59,41 @@ const Dashboard: React.FC = () => {
 
       if (error) throw error;
 
-      const formattedData: TenderTableData[] = (data || []).map((tender: Tender) => ({
-        key: tender.id,
-        id: tender.id,
-        number: tender.tender_number || '',
-        name: tender.title || '',
-        version: tender.version || 1,
-        status_deadline: tender.submission_deadline ?
-          new Date(tender.submission_deadline) < new Date() : false,
-        construction_area: tender.area_sp || 0,
-        boq_cost: 0, // TODO: Это поле нужно будет рассчитать на основе BOQ позиций
-        cost_per_sqm: 0, // TODO: Рассчитать после получения boq_cost
-        deadline: tender.submission_deadline || '',
-        client: tender.client_name || '',
-        created_at: tender.created_at || '',
+      // Для каждого тендера загружаем стоимость BOQ
+      const formattedData: TenderTableData[] = await Promise.all((data || []).map(async (tender: Tender) => {
+        // Загружаем позиции тендера
+        const { data: positions } = await supabase
+          .from('client_positions')
+          .select('total_material, total_works')
+          .eq('tender_id', tender.id);
+
+        // Рассчитываем итоговую стоимость BOQ (сумма материалов и работ всех позиций)
+        let boqCost = 0;
+        if (positions && positions.length > 0) {
+          boqCost = positions.reduce((sum, position) => {
+            return sum + (position.total_material || 0) + (position.total_works || 0);
+          }, 0);
+        }
+
+        // Рассчитываем стоимость за м²
+        const constructionArea = tender.area_sp || 0;
+        const costPerSqm = constructionArea > 0 ? boqCost / constructionArea : 0;
+
+        return {
+          key: tender.id,
+          id: tender.id,
+          number: tender.tender_number || '',
+          name: tender.title || '',
+          version: tender.version || 1,
+          status_deadline: tender.submission_deadline ?
+            new Date(tender.submission_deadline) < new Date() : false,
+          construction_area: constructionArea,
+          boq_cost: boqCost,
+          cost_per_sqm: costPerSqm,
+          deadline: tender.submission_deadline || '',
+          client: tender.client_name || '',
+          created_at: tender.created_at || '',
+        };
       }));
 
       setTenders(formattedData);
@@ -105,8 +126,13 @@ const Dashboard: React.FC = () => {
 
   // Обновление расчета для тендера
   const handleUpdateCalculation = async (tenderId: string) => {
-    message.info('Обновление расчета для тендера ' + tenderId);
-    // TODO: Реализовать логику обновления расчета
+    try {
+      // Перезагружаем данные тендеров для обновления расчетов
+      await fetchTenders();
+      message.success('Расчет обновлен');
+    } catch (error) {
+      message.error('Ошибка обновления расчета');
+    }
   };
 
   const columns = [
@@ -322,6 +348,7 @@ const Dashboard: React.FC = () => {
 
       {/* Таблица тендеров */}
       <Card
+        bordered={false}
         className="dashboard-table-card"
         style={{
           borderRadius: 8,

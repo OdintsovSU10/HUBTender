@@ -11,12 +11,19 @@ import {
   Spin,
   Row,
   Col,
+  Tag,
 } from 'antd';
-import { SaveOutlined, ReloadOutlined } from '@ant-design/icons';
+import { SaveOutlined, ReloadOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupTactic } from '../../../lib/supabase';
 import { parseNumberInput, formatNumberInput } from '../../../utils/numberFormat';
 
 const { Title, Text } = Typography;
+
+interface TenderOption {
+  value: string;
+  label: string;
+  clientName: string;
+}
 
 const MarkupPercentages: React.FC = () => {
   const [form] = Form.useForm();
@@ -25,6 +32,8 @@ const MarkupPercentages: React.FC = () => {
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [tactics, setTactics] = useState<MarkupTactic[]>([]);
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
+  const [selectedTenderTitle, setSelectedTenderTitle] = useState<string | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [selectedTacticId, setSelectedTacticId] = useState<string | null>(null);
   const [currentMarkupId, setCurrentMarkupId] = useState<string | null>(null);
   const [markupParameters, setMarkupParameters] = useState<MarkupParameter[]>([]);
@@ -127,6 +136,56 @@ const MarkupPercentages: React.FC = () => {
     }
   };
 
+  // Получение уникальных наименований тендеров
+  const getTenderTitles = (): TenderOption[] => {
+    const uniqueTitles = new Map<string, TenderOption>();
+
+    tenders.forEach(tender => {
+      if (!uniqueTitles.has(tender.title)) {
+        uniqueTitles.set(tender.title, {
+          value: tender.title,
+          label: tender.title,
+          clientName: tender.client_name,
+        });
+      }
+    });
+
+    return Array.from(uniqueTitles.values());
+  };
+
+  // Получение версий для выбранного наименования тендера
+  const getVersionsForTitle = (title: string): { value: number; label: string }[] => {
+    return tenders
+      .filter(tender => tender.title === title)
+      .map(tender => ({
+        value: tender.version || 1,
+        label: `Версия ${tender.version || 1}`,
+      }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  // Обработка выбора наименования тендера
+  const handleTenderTitleChange = (title: string) => {
+    setSelectedTenderTitle(title);
+    setSelectedTenderId(null);
+    setSelectedVersion(null);
+    form.resetFields();
+  };
+
+  // Обработка выбора версии тендера
+  const handleVersionChange = async (version: number) => {
+    setSelectedVersion(version);
+    const tender = tenders.find(t => t.title === selectedTenderTitle && t.version === version);
+    if (tender) {
+      setSelectedTenderId(tender.id);
+      const tacticId = await fetchTacticFromSupabase(tender.id);
+      if (tacticId) {
+        setSelectedTacticId(tacticId);
+      }
+      fetchMarkupData(tender.id);
+    }
+  };
+
   // Загрузка данных наценок для выбранного тендера
   const fetchMarkupData = async (tenderId: string) => {
     setLoading(true);
@@ -166,17 +225,6 @@ const MarkupPercentages: React.FC = () => {
     }
   };
 
-  // Обработка выбора тендера
-  const handleTenderChange = async (tenderId: string) => {
-    setSelectedTenderId(tenderId);
-
-    const tacticId = await fetchTacticFromSupabase(tenderId);
-    if (tacticId) {
-      setSelectedTacticId(tacticId);
-    }
-
-    fetchMarkupData(tenderId);
-  };
 
   // Обработка выбора тактики
   const handleTacticChange = async (tacticId: string) => {
@@ -250,36 +298,173 @@ const MarkupPercentages: React.FC = () => {
     fetchMarkupParameters();
   }, []);
 
+  // Если тендер не выбран, показываем только выбор тендера
+  if (!selectedTenderId) {
+    return (
+      <Card bordered={false} style={{ height: '100%' }}>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <Title level={4} style={{ marginBottom: 24 }}>
+            Проценты наценок
+          </Title>
+          <Text type="secondary" style={{ fontSize: 16, marginBottom: 24, display: 'block' }}>
+            Выберите тендер для корректирования процентов
+          </Text>
+          <Select
+            style={{ width: 400, marginBottom: 32 }}
+            placeholder="Выберите тендер"
+            value={selectedTenderTitle}
+            onChange={handleTenderTitleChange}
+            showSearch
+            optionFilterProp="children"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={getTenderTitles()}
+            size="large"
+          />
+
+          {selectedTenderTitle && (
+            <Select
+              style={{ width: 200, marginBottom: 32, marginLeft: 16 }}
+              placeholder="Выберите версию"
+              value={selectedVersion}
+              onChange={handleVersionChange}
+              options={getVersionsForTitle(selectedTenderTitle)}
+              size="large"
+            />
+          )}
+
+          {/* Быстрый выбор через карточки */}
+          {tenders.length > 0 && (
+            <div style={{ marginTop: 32 }}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                Или выберите из списка:
+              </Text>
+              <Row gutter={[16, 16]} justify="center">
+                {tenders.slice(0, 6).map(tender => (
+                  <Col key={tender.id}>
+                    <Card
+                      hoverable
+                      style={{
+                        width: 200,
+                        textAlign: 'center',
+                        cursor: 'pointer'
+                      }}
+                      onClick={async () => {
+                        setSelectedTenderId(tender.id);
+                        setSelectedTenderTitle(tender.title);
+                        setSelectedVersion(tender.version || 1);
+                        const tacticId = await fetchTacticFromSupabase(tender.id);
+                        if (tacticId) {
+                          setSelectedTacticId(tacticId);
+                        }
+                        fetchMarkupData(tender.id);
+                      }}
+                    >
+                      <div style={{ marginBottom: 8 }}>
+                        <Tag color="blue">{tender.tender_number}</Tag>
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text strong style={{ marginRight: 8 }}>
+                          {tender.title}
+                        </Text>
+                        <Tag color="orange">v{tender.version || 1}</Tag>
+                      </div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {tender.client_name}
+                      </Text>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card
+      bordered={false}
+      headStyle={{ borderBottom: 'none', paddingBottom: 0 }}
       title={
-        <Space direction="vertical" size={0}>
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            type="primary"
+            onClick={() => {
+              setSelectedTenderId(null);
+              setSelectedTenderTitle(null);
+              setSelectedVersion(null);
+              setSelectedTacticId(null);
+              form.resetFields();
+            }}
+            style={{
+              padding: '4px 15px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              width: 'fit-content',
+              backgroundColor: '#10b981',
+              borderColor: '#10b981'
+            }}
+          >
+            Назад к выбору
+          </Button>
           <Title level={4} style={{ margin: 0 }}>
             Проценты наценок
           </Title>
-          <Text type="secondary" style={{ fontSize: '14px' }}>
-            Задайте значения процентов
-          </Text>
-        </Space>
-      }
-      extra={
-        <Space>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleReset}
-            disabled={!selectedTenderId}
-          >
-            Сбросить
-          </Button>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            onClick={handleSave}
-            loading={saving}
-            disabled={!selectedTenderId}
-          >
-            Сохранить
-          </Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <Space size="middle" wrap>
+              <Space size="small">
+                <Text type="secondary" style={{ fontSize: 16 }}>Тендер:</Text>
+                <Select
+                  placeholder="Выберите тендер"
+                  value={selectedTenderTitle}
+                  onChange={handleTenderTitleChange}
+                  showSearch
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={getTenderTitles()}
+                  style={{ width: 350, fontSize: 16 }}
+                  allowClear
+                />
+              </Space>
+              <Space size="small">
+                <Text type="secondary" style={{ fontSize: 16 }}>Версия:</Text>
+                <Select
+                  placeholder="Версия"
+                  value={selectedVersion}
+                  onChange={handleVersionChange}
+                  disabled={!selectedTenderTitle}
+                  options={selectedTenderTitle ? getVersionsForTitle(selectedTenderTitle) : []}
+                  style={{ width: 140 }}
+                />
+              </Space>
+            </Space>
+            <div>
+              <Space>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleReset}
+                  disabled={!selectedTenderId}
+                >
+                  Сбросить
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={handleSave}
+                  loading={saving}
+                  disabled={!selectedTenderId}
+                >
+                  Сохранить
+                </Button>
+              </Space>
+            </div>
+          </div>
         </Space>
       }
     >
@@ -303,31 +488,10 @@ const MarkupPercentages: React.FC = () => {
                 ...acc,
                 [param.key]: param.default_value || 0
               }), {}),
-              tender_id: undefined
+              tender_id: selectedTenderId
             }}
           >
             <div style={{ marginBottom: '24px' }}>
-              <Form.Item
-                label="Тендер"
-                name="tender_id"
-                rules={[{ required: true, message: 'Выберите тендер' }]}
-                style={{ marginBottom: '12px' }}
-              >
-                <Select
-                  placeholder="Выберите тендер"
-                  onChange={handleTenderChange}
-                  showSearch
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                  }
-                  options={tenders.map(tender => ({
-                    label: tender.title,
-                    value: tender.id,
-                  }))}
-                  style={{ width: '250px' }}
-                />
-              </Form.Item>
               <Form.Item
                 label="Порядок расчета"
                 style={{ marginBottom: 0 }}
@@ -337,10 +501,23 @@ const MarkupPercentages: React.FC = () => {
                   value={selectedTacticId}
                   onChange={handleTacticChange}
                   showSearch
-                  optionFilterProp="children"
+                  optionFilterProp="label"
                   filterOption={(input, option) =>
                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
+                  optionRender={(option) => {
+                    const tactic = tactics.find(t => t.id === option.value);
+                    return (
+                      <span>
+                        {option.label}
+                        {tactic?.is_global && (
+                          <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>
+                            Глобальная
+                          </Tag>
+                        )}
+                      </span>
+                    );
+                  }}
                   options={tactics.map(tactic => ({
                     label: tactic.name || 'Без названия',
                     value: tactic.id,

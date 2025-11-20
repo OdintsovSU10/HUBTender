@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Card, Tabs, Input, Button, Space } from 'antd';
+import { Tabs, Input, Button, Space, Typography } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import MaterialsTab from './MaterialsTab';
 import WorksTab from './WorksTab';
+
+const { Title } = Typography;
 
 const Library: React.FC = () => {
   const [activeTab, setActiveTab] = useState('materials');
@@ -32,10 +34,19 @@ const Library: React.FC = () => {
   ];
 
   return (
-    <div>
-      <Card
-        title="Библиотека материалов и работ"
-        extra={
+    <div style={{ margin: '-16px', padding: '24px' }}>
+      <Title level={4} style={{ margin: '0 0 16px 0' }}>
+        Библиотека материалов и работ
+      </Title>
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => {
+          setActiveTab(key);
+          setSearchText(''); // Очищаем поиск при смене вкладки
+        }}
+        items={tabItems}
+        size="large"
+        tabBarExtraContent={
           <Space>
             <Input
               placeholder="Поиск..."
@@ -54,17 +65,7 @@ const Library: React.FC = () => {
             </Button>
           </Space>
         }
-      >
-        <Tabs
-          activeKey={activeTab}
-          onChange={(key) => {
-            setActiveTab(key);
-            setSearchText(''); // Очищаем поиск при смене вкладки
-          }}
-          items={tabItems}
-          size="large"
-        />
-      </Card>
+      />
     </div>
   );
 };

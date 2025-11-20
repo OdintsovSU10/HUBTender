@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tabs, Table, Button, Space, Input, Tag, Tooltip, message, Modal, Form, InputNumber, Switch, Select, AutoComplete } from 'antd';
+import { Card, Tabs, Table, Button, Space, Input, Tag, Tooltip, message, Modal, Form, InputNumber, Switch, Select, AutoComplete, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import type { TabsProps } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { supabase } from '../../../lib/supabase';
+
+const { Title } = Typography;
 
 const { confirm } = Modal;
 
@@ -730,42 +732,42 @@ const Nomenclatures: React.FC = () => {
   ];
 
   return (
-    <div>
-      <Card
-        title="Номенклатуры"
-        extra={
-          <Space>
-            <Input
-              placeholder="Поиск..."
-              prefix={<SearchOutlined />}
-              style={{ width: 200 }}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                if (activeTab === 'materials') {
-                  handleAddMaterial();
-                } else if (activeTab === 'works') {
-                  handleAddWork();
-                } else if (activeTab === 'units') {
-                  handleAddUnit();
-                }
-              }}
-            >
-              Добавить
-            </Button>
-          </Space>
-        }
-      >
+    <div style={{ margin: '-16px', padding: '24px' }}>
+      <Title level={4} style={{ margin: '0 0 16px 0' }}>
+        Номенклатуры
+      </Title>
         <Tabs
           defaultActiveKey="materials"
           items={tabItems}
           size="large"
           onChange={(key) => setActiveTab(key)}
+          tabBarExtraContent={
+            <Space>
+              <Input
+                placeholder="Поиск..."
+                prefix={<SearchOutlined />}
+                style={{ width: 200 }}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  if (activeTab === 'materials') {
+                    handleAddMaterial();
+                  } else if (activeTab === 'works') {
+                    handleAddWork();
+                  } else if (activeTab === 'units') {
+                    handleAddUnit();
+                  }
+                }}
+              >
+                Добавить
+              </Button>
+            </Space>
+          }
         />
-      </Card>
+      </div>
 
       {/* Модальное окно для добавления/редактирования единицы измерения */}
       <Modal
@@ -973,7 +975,7 @@ const Nomenclatures: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </>
   );
 };
 

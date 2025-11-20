@@ -25,7 +25,8 @@ import {
   ReloadOutlined,
   CalculatorOutlined,
   DollarOutlined,
-  FileExcelOutlined
+  FileExcelOutlined,
+  ArrowLeftOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { supabase } from '../../lib/supabase';
@@ -58,12 +59,20 @@ interface MarkupTactic {
   base_costs?: any;
 }
 
+interface TenderOption {
+  value: string;
+  label: string;
+  clientName: string;
+}
+
 export default function Commerce() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [selectedTenderId, setSelectedTenderId] = useState<string | undefined>();
+  const [selectedTenderTitle, setSelectedTenderTitle] = useState<string | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [positions, setPositions] = useState<PositionWithCommercialCost[]>([]);
   const [markupTactics, setMarkupTactics] = useState<MarkupTactic[]>([]);
   const [selectedTacticId, setSelectedTacticId] = useState<string | undefined>();
@@ -106,10 +115,7 @@ export default function Commerce() {
       if (error) throw error;
       setTenders(data || []);
 
-      // Если есть тендеры, выбираем первый
-      if (data && data.length > 0) {
-        setSelectedTenderId(data[0].id);
-      }
+      // НЕ выбираем автоматически первый тендер - пользователь должен выбрать
     } catch (error) {
       console.error('Ошибка загрузки тендеров:', error);
       message.error('Не удалось загрузить список тендеров');
@@ -129,6 +135,51 @@ export default function Commerce() {
     } catch (error) {
       console.error('Ошибка загрузки тактик наценок:', error);
       message.error('Не удалось загрузить список тактик');
+    }
+  };
+
+  // Получение уникальных наименований тендеров
+  const getTenderTitles = (): TenderOption[] => {
+    const uniqueTitles = new Map<string, TenderOption>();
+
+    tenders.forEach(tender => {
+      if (!uniqueTitles.has(tender.title)) {
+        uniqueTitles.set(tender.title, {
+          value: tender.title,
+          label: tender.title,
+          clientName: tender.client_name,
+        });
+      }
+    });
+
+    return Array.from(uniqueTitles.values());
+  };
+
+  // Получение версий для выбранного наименования тендера
+  const getVersionsForTitle = (title: string): { value: number; label: string }[] => {
+    return tenders
+      .filter(tender => tender.title === title)
+      .map(tender => ({
+        value: tender.version || 1,
+        label: `Версия ${tender.version || 1}`,
+      }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  // Обработка выбора наименования тендера
+  const handleTenderTitleChange = (title: string) => {
+    setSelectedTenderTitle(title);
+    setSelectedTenderId(undefined);
+    setSelectedVersion(null);
+    setPositions([]);
+  };
+
+  // Обработка выбора версии тендера
+  const handleVersionChange = (version: number) => {
+    setSelectedVersion(version);
+    const tender = tenders.find(t => t.title === selectedTenderTitle && t.version === version);
+    if (tender) {
+      setSelectedTenderId(tender.id);
     }
   };
 
@@ -405,16 +456,9 @@ export default function Commerce() {
 
   const columns: ColumnsType<PositionWithCommercialCost> = [
     {
-      title: '№',
-      dataIndex: 'position_number',
-      key: 'position_number',
-      width: 60,
-      sorter: (a, b) => (a.position_number || 0) - (b.position_number || 0),
-    },
-    {
-      title: 'Раздел / Наименование',
+      title: 'Наименование',
       key: 'work_name',
-      ellipsis: true,
+      width: 350,
       render: (_, record, index) => {
         // Определяем, является ли позиция конечной (на основе иерархии)
         const isLeaf = isLeafPosition(record, index);
@@ -426,6 +470,8 @@ export default function Commerce() {
               display: 'flex',
               alignItems: 'center',
               cursor: isLeaf ? 'pointer' : 'default',
+              whiteSpace: 'normal',
+              wordBreak: 'break-word'
             }}
             onClick={() => {
               if (isLeaf && selectedTenderId) {
@@ -455,6 +501,21 @@ export default function Commerce() {
           </div>
         </div>
       ),
+    },
+    {
+      title: 'Цена за единицу',
+      key: 'per_unit',
+      width: 150,
+      align: 'right',
+      render: (_, record) => {
+        if (!record.volume || record.volume === 0) return '-';
+        const perUnit = (record.commercial_total || 0) / record.volume;
+        return (
+          <Text type="secondary">
+            {formatCommercialCost(perUnit)}
+          </Text>
+        );
+      },
     },
     {
       title: 'Базовая стоимость',
@@ -501,56 +562,159 @@ export default function Commerce() {
       sorter: (a, b) => (a.markup_percentage || 0) - (b.markup_percentage || 0),
     },
     {
-      title: 'За единицу',
-      key: 'per_unit',
-      width: 150,
-      align: 'right',
-      responsive: ['xl'],
-      render: (_, record) => {
-        if (!record.volume || record.volume === 0) return '-';
-        const perUnit = (record.commercial_total || 0) / record.volume;
-        return (
-          <Text type="secondary">
-            {formatCommercialCost(perUnit)}
-          </Text>
-        );
-      },
-    },
-    {
-      title: 'Примечание',
-      dataIndex: 'client_note',
-      key: 'client_note',
-      ellipsis: true,
+      title: 'Примечание ГП',
+      dataIndex: 'manual_note',
+      key: 'manual_note',
+      width: 200,
       responsive: ['lg'],
     },
   ];
 
   const selectedTender = tenders.find(t => t.id === selectedTenderId);
 
+  // Если тендер не выбран, показываем только выбор тендера
+  if (!selectedTenderId) {
+    return (
+      <Card bordered={false} style={{ height: '100%' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <Title level={3} style={{ marginBottom: 24 }}>
+              <DollarOutlined /> Коммерция
+            </Title>
+            <Text type="secondary" style={{ fontSize: 16, marginBottom: 24, display: 'block' }}>
+              Выберите тендер для просмотра коммерческих стоимостей
+            </Text>
+            <Select
+              style={{ width: 400, marginBottom: 32 }}
+              placeholder="Выберите тендер"
+              value={selectedTenderTitle}
+              onChange={handleTenderTitleChange}
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={getTenderTitles()}
+              size="large"
+            />
+
+            {selectedTenderTitle && (
+              <Select
+                style={{ width: 200, marginBottom: 32, marginLeft: 16 }}
+                placeholder="Выберите версию"
+                value={selectedVersion}
+                onChange={handleVersionChange}
+                options={getVersionsForTitle(selectedTenderTitle)}
+                size="large"
+              />
+            )}
+
+            {/* Быстрый выбор тендера через карточки */}
+            {tenders.length > 0 && (
+              <div style={{ marginTop: 32 }}>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                  Или выберите из списка:
+                </Text>
+                <Row gutter={[16, 16]} justify="center">
+                  {tenders.slice(0, 6).map(tender => (
+                    <Col key={tender.id}>
+                      <Card
+                        hoverable
+                        style={{
+                          width: 200,
+                          textAlign: 'center',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          setSelectedTenderTitle(tender.title);
+                          setSelectedVersion(tender.version || 1);
+                          setSelectedTenderId(tender.id);
+                        }}
+                      >
+                        <div style={{ marginBottom: 8 }}>
+                          <Tag color="blue">{tender.tender_number}</Tag>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <Text strong style={{ marginRight: 8 }}>
+                            {tender.title}
+                          </Text>
+                          <Tag color="orange">v{tender.version || 1}</Tag>
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {tender.client_name}
+                        </Text>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </div>
+            )}
+          </div>
+      </Card>
+    );
+  }
+
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {/* Заголовок и выбор тендера */}
-          <Row gutter={[16, 16]} align="middle">
-            <Col flex="auto">
-              <Title level={3} style={{ margin: 0 }}>
-                <DollarOutlined /> Коммерция
-              </Title>
-            </Col>
-            <Col>
-              <Space>
+    <Card
+      bordered={false}
+      style={{ height: '100%' }}
+      headStyle={{ borderBottom: 'none', paddingBottom: 0 }}
+      title={
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            type="primary"
+            onClick={() => {
+              setSelectedTenderId(undefined);
+              setSelectedTenderTitle(null);
+              setSelectedVersion(null);
+            }}
+            style={{
+              padding: '4px 15px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              width: 'fit-content',
+              backgroundColor: '#10b981',
+              borderColor: '#10b981'
+            }}
+          >
+            Назад к выбору
+          </Button>
+          <Title level={4} style={{ margin: 0 }}>
+            <DollarOutlined /> Коммерция
+          </Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <Space size="middle" wrap>
+              <Space size="small">
+                <Text type="secondary" style={{ fontSize: 16 }}>Тендер:</Text>
                 <Select
-                  style={{ width: 300 }}
+                  style={{ width: 350, fontSize: 16 }}
                   placeholder="Выберите тендер"
-                  value={selectedTenderId}
-                  onChange={setSelectedTenderId}
+                  value={selectedTenderTitle}
+                  onChange={handleTenderTitleChange}
                   loading={loading}
-                  options={tenders.map(t => ({
-                    label: `${t.tender_number} - ${t.title}`,
-                    value: t.id
-                  }))}
+                  options={getTenderTitles()}
+                  showSearch
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  allowClear
                 />
+              </Space>
+              <Space size="small">
+                <Text type="secondary" style={{ fontSize: 16 }}>Версия:</Text>
+                <Select
+                  style={{ width: 140 }}
+                  placeholder="Версия"
+                  value={selectedVersion}
+                  onChange={handleVersionChange}
+                  loading={loading}
+                  disabled={!selectedTenderTitle}
+                  options={selectedTenderTitle ? getVersionsForTitle(selectedTenderTitle) : []}
+                />
+              </Space>
+              <Space size="small">
+                <Text type="secondary" style={{ fontSize: 16 }}>Схема:</Text>
                 <Select
                   style={{ width: 250 }}
                   placeholder="Выберите тактику наценок"
@@ -568,158 +732,55 @@ export default function Commerce() {
                     value: t.id
                   }))}
                 />
-                {tacticChanged && (
-                  <Tooltip title="Применить новую тактику к тендеру">
-                    <Button
-                      type="primary"
-                      danger
-                      onClick={handleApplyTactic}
-                      loading={calculating}
-                    >
-                      Применить тактику
-                    </Button>
-                  </Tooltip>
-                )}
-                <Tooltip title="Пересчитать коммерческие стоимости">
+              </Space>
+            </Space>
+            <div>
+            <Space>
+              {tacticChanged && (
+                <Tooltip title="Применить новую тактику к тендеру">
                   <Button
                     type="primary"
-                    icon={<CalculatorOutlined />}
-                    onClick={handleRecalculate}
+                    danger
+                    onClick={handleApplyTactic}
                     loading={calculating}
-                    disabled={!selectedTenderId}
                   >
-                    Пересчитать
+                    Применить тактику
                   </Button>
                 </Tooltip>
-                <Tooltip title="Экспорт в Excel">
-                  <Button
-                    icon={<FileExcelOutlined />}
-                    onClick={handleExportToExcel}
-                    disabled={positions.length === 0}
-                  >
-                    Экспорт
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Обновить данные">
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={() => selectedTenderId && loadPositions(selectedTenderId)}
-                    loading={loading}
-                  />
-                </Tooltip>
-                {/* Кнопка инициализации только для dev режима */}
-                {process.env.NODE_ENV === 'development' && (
-                  <>
-                    <Tooltip title="Создать тестовую тактику наценок">
-                      <Button
-                        onClick={handleInitializeTestData}
-                        disabled={!selectedTenderId}
-                        style={{ background: '#ff4d4f', color: 'white' }}
-                      >
-                        Тест
-                      </Button>
-                    </Tooltip>
-                    <Tooltip title="Отладка расчета коммерческих стоимостей">
-                      <Button
-                        onClick={() => selectedTenderId && debugCommercialCalculation(selectedTenderId)}
-                        disabled={!selectedTenderId}
-                        style={{ background: '#faad14', color: 'white' }}
-                      >
-                        Debug
-                      </Button>
-                    </Tooltip>
-                    <Tooltip title="Проверка коэффициентов наценок">
-                      <Button
-                        onClick={() => selectedTenderId && verifyCoefficients(selectedTenderId)}
-                        disabled={!selectedTenderId}
-                        style={{ background: '#52c41a', color: 'white' }}
-                      >
-                        Коэфф.
-                      </Button>
-                    </Tooltip>
-                  </>
-                )}
-              </Space>
-            </Col>
-          </Row>
-
-          {/* Информация о тендере */}
-          {selectedTender && (
-            <Card size="small">
-              <Row gutter={[16, 8]}>
-                <Col span={6}>
-                  <Text type="secondary">Клиент:</Text> <Text strong>{selectedTender.client_name}</Text>
-                </Col>
-                <Col span={6}>
-                  <Text type="secondary">Номер тендера:</Text> <Text strong>{selectedTender.tender_number}</Text>
-                </Col>
-                <Col span={6}>
-                  <Text type="secondary">Версия:</Text> <Text strong>{selectedTender.version}</Text>
-                </Col>
-                <Col span={6}>
-                  <Text type="secondary">Тактика наценок:</Text>{' '}
-                  <Text strong>
-                    {markupTactics.find(t => t.id === selectedTacticId)?.name || 'Не выбрана'}
-                  </Text>
-                  {tacticChanged && (
-                    <Tag color="orange" style={{ marginLeft: 8 }}>Изменена</Tag>
-                  )}
-                </Col>
-              </Row>
-            </Card>
-          )}
-
-          {/* Статистика */}
-          {selectedTenderId && positions.length > 0 && (
-            <Row gutter={16}>
-              <Col span={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Базовая стоимость"
-                    value={totals.base}
-                    precision={2}
-                    suffix="₽"
-                    valueStyle={{ color: '#1677ff' }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Коммерческая стоимость"
-                    value={totals.commercial}
-                    precision={2}
-                    suffix="₽"
-                    valueStyle={{ color: '#52c41a' }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Разница"
-                    value={totals.difference}
-                    precision={2}
-                    suffix="₽"
-                    valueStyle={{ color: totals.difference >= 0 ? '#52c41a' : '#ff4d4f' }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Средняя наценка"
-                    value={totals.markupPercentage}
-                    precision={2}
-                    suffix="%"
-                    prefix={totals.markupPercentage > 0 ? '+' : ''}
-                    valueStyle={{ color: totals.markupPercentage >= 0 ? '#52c41a' : '#ff4d4f' }}
-                  />
-                </Card>
-              </Col>
-            </Row>
-          )}
-
+              )}
+              <Tooltip title="Пересчитать коммерческие стоимости">
+                <Button
+                  type="primary"
+                  icon={<CalculatorOutlined />}
+                  onClick={handleRecalculate}
+                  loading={calculating}
+                  disabled={!selectedTenderId}
+                >
+                  Пересчитать
+                </Button>
+              </Tooltip>
+              <Tooltip title="Экспорт в Excel">
+                <Button
+                  icon={<FileExcelOutlined />}
+                  onClick={handleExportToExcel}
+                  disabled={positions.length === 0}
+                >
+                  Экспорт
+                </Button>
+              </Tooltip>
+              <Tooltip title="Обновить данные">
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => selectedTenderId && loadPositions(selectedTenderId)}
+                  loading={loading}
+                />
+              </Tooltip>
+            </Space>
+            </div>
+          </div>
+        </Space>
+      }
+    >
           {/* Таблица позиций */}
           {selectedTenderId ? (
             <Spin spinning={loading || calculating}>
@@ -731,27 +792,24 @@ export default function Commerce() {
                 locale={{
                   emptyText: <Empty description="Нет позиций заказчика" />
                 }}
-                pagination={{
-                  pageSize: 20,
-                  showSizeChanger: true,
-                  showTotal: (total, range) => `${range[0]}-${range[1]} из ${total} позиций`,
-                }}
-                summary={(pageData) => {
-                  const pageBase = pageData.reduce((sum, pos) => sum + (pos.base_total || 0), 0);
-                  const pageCommercial = pageData.reduce((sum, pos) => sum + (pos.commercial_total || 0), 0);
+                pagination={false}
+                scroll={{ y: 'calc(100vh - 450px)' }}
+                summary={() => {
+                  const totalBase = positions.reduce((sum, pos) => sum + (pos.base_total || 0), 0);
+                  const totalCommercial = positions.reduce((sum, pos) => sum + (pos.commercial_total || 0), 0);
 
                   return (
                     <Table.Summary fixed>
                       <Table.Summary.Row>
                         <Table.Summary.Cell index={0} colSpan={3}>
-                          <Text strong>Итого на странице:</Text>
+                          <Text strong>Итого:</Text>
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={1} align="right">
-                          <Text strong>{formatCommercialCost(pageBase)}</Text>
+                          <Text strong>{formatCommercialCost(totalBase)}</Text>
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={2} align="right">
                           <Text strong style={{ color: '#52c41a' }}>
-                            {formatCommercialCost(pageCommercial)}
+                            {formatCommercialCost(totalCommercial)}
                           </Text>
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={3} colSpan={3} />
@@ -764,8 +822,6 @@ export default function Commerce() {
           ) : (
             <Empty description="Выберите тендер для просмотра коммерческих стоимостей" />
           )}
-        </Space>
-      </Card>
-    </div>
+    </Card>
   );
 }

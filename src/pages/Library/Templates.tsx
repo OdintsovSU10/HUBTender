@@ -1308,7 +1308,7 @@ const Templates: React.FC = () => {
   const uniqueDetailCategories = Array.from(new Set(templates.map(t => t.detail_category_name).filter(Boolean)));
 
   return (
-    <div>
+    <div style={{ margin: '-16px', padding: '24px' }}>
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
@@ -1317,7 +1317,7 @@ const Templates: React.FC = () => {
             key: 'list',
             label: 'Список шаблонов',
             children: (
-              <Card>
+              <div>
                 <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
                   <Row gutter={16}>
                     <Col span={8}>
@@ -1664,14 +1664,14 @@ const Templates: React.FC = () => {
                     </Text>
                   </div>
                 )}
-              </Card>
+              </div>
             ),
           },
           {
             key: 'create',
             label: 'Создание шаблона',
             children: (
-              <Card>
+              <div>
         <Form form={form} layout="vertical">
           <Row gutter={16}>
             <Col span={12}>
@@ -1817,21 +1817,23 @@ const Templates: React.FC = () => {
             style={{ marginBottom: 16 }}
           />
 
-          <Space>
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              onClick={handleSaveTemplate}
-              loading={loading}
-            >
-              Сохранить шаблон
-            </Button>
-            <Button icon={<CloseOutlined />} onClick={handleCancel}>
-              Отмена
-            </Button>
-          </Space>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Space>
+              <Button icon={<CloseOutlined />} onClick={handleCancel}>
+                Отмена
+              </Button>
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                onClick={handleSaveTemplate}
+                loading={loading}
+              >
+                Сохранить шаблон
+              </Button>
+            </Space>
+          </div>
         </Form>
-              </Card>
+              </div>
             ),
           },
         ]}

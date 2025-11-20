@@ -3368,7 +3368,6 @@ const MarkupConstructor: React.FC = () => {
                     <Title level={5}>Текущие параметры наценок ({markupParameters.length})</Title>
                     <List
                       size="small"
-                      bordered
                       dataSource={markupParameters}
                       locale={{ emptyText: 'Нет параметров. Нажмите "Добавить параметр" для создания нового.' }}
                       renderItem={(markup, index) => (
@@ -3376,6 +3375,8 @@ const MarkupConstructor: React.FC = () => {
                           style={{
                             padding: '8px 16px',
                             backgroundColor: editingParameterId === markup.id ? '#f0f5ff' : undefined,
+                            borderTop: index === 0 ? '1px solid #f0f0f0' : 'none',
+                            borderBottom: '1px solid #f0f0f0',
                           }}
                           actions={[
                             <Button

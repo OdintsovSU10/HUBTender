@@ -16,7 +16,7 @@ import * as XLSX from 'xlsx';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 const { confirm } = Modal;
-const { Text, Paragraph } = Typography;
+const { Text, Paragraph, Title } = Typography;
 
 // Типы данных
 interface CostCategory {
@@ -798,7 +798,7 @@ ORDER BY sort_order;`;
   ];
 
   return (
-    <div>
+    <div style={{ margin: '-16px', padding: '24px' }}>
       <style>{`
         .construction-cost-table .ant-table-row-expand-icon {
           display: inline-flex !important;
@@ -859,10 +859,21 @@ ORDER BY sort_order;`;
         .construction-cost-table .ant-table-row-expand-icon.ant-table-row-expand-icon-spaced {
           visibility: hidden !important;
         }
+
+        /* Уменьшаем высоту строк для более компактного вида */
+        .construction-cost-table .ant-table-tbody > tr > td {
+          padding: 6px 8px !important;
+        }
+
+        .construction-cost-table .ant-table-thead > tr > th {
+          padding: 8px 8px !important;
+        }
       `}</style>
-      <Card
-        title="Затраты на строительство"
-        extra={
+      <Title level={4} style={{ margin: '0 0 16px 0' }}>
+        Затраты на строительство
+      </Title>
+      <div>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
           <Space>
             <Upload
               accept=".xlsx,.xls"
@@ -925,21 +936,21 @@ ORDER BY sort_order;`;
               Удалить затраты
             </Button>
           </Space>
-        }
-      >
+        </div>
         <Table
           className="construction-cost-table"
           columns={columns}
           dataSource={data}
           loading={loading}
           pagination={false}
+          size="small"
           scroll={{ y: 'calc(100vh - 300px)' }}
           expandable={{
             defaultExpandAllRows: true,
           }}
           rowKey="key"
         />
-      </Card>
+      </div>
 
       {/* Модальное окно редактирования */}
       <Modal
