@@ -468,6 +468,141 @@ export async function applyTacticToPosition(
 }
 
 /**
+ * Настройки ценообразования для тендера
+ */
+interface PricingDistribution {
+  basic_material_base_target: 'material' | 'work';
+  basic_material_markup_target: 'material' | 'work';
+  auxiliary_material_base_target: 'material' | 'work';
+  auxiliary_material_markup_target: 'material' | 'work';
+  subcontract_basic_material_base_target?: 'material' | 'work';
+  subcontract_basic_material_markup_target?: 'material' | 'work';
+  subcontract_auxiliary_material_base_target?: 'material' | 'work';
+  subcontract_auxiliary_material_markup_target?: 'material' | 'work';
+  work_base_target: 'material' | 'work';
+  work_markup_target: 'material' | 'work';
+}
+
+/**
+ * Загружает настройки ценообразования для тендера
+ */
+async function loadPricingDistribution(tenderId: string): Promise<PricingDistribution | null> {
+  const { data, error } = await supabase
+    .from('tender_pricing_distribution')
+    .select('*')
+    .eq('tender_id', tenderId)
+    .single();
+
+  if (error || !data) {
+    console.warn('⚠️ Настройки ценообразования не найдены, используются defaults');
+    return null;
+  }
+
+  return data as PricingDistribution;
+}
+
+/**
+ * Определяет тип материала на основе boq_item_type
+ */
+function getMaterialType(boqItemType: string): 'basic' | 'auxiliary' | 'subcontract_basic' | 'subcontract_auxiliary' | 'work' | null {
+  // Определяем тип на основе названия типа элемента
+  if (boqItemType === 'мат') return 'basic';
+  if (boqItemType === 'мат-комп.') return 'auxiliary';
+  if (boqItemType === 'суб-мат') {
+    // Для субматериалов нужно различать основные и вспомогательные
+    // Пока возвращаем subcontract_basic по умолчанию
+    return 'subcontract_basic';
+  }
+  if (boqItemType === 'раб' || boqItemType === 'раб-комп.' || boqItemType === 'суб-раб') {
+    return 'work';
+  }
+  return null;
+}
+
+/**
+ * Применяет распределение ценообразования к коммерческой стоимости
+ * Разделяет commercialCost на базовую стоимость и наценку, затем распределяет их
+ */
+function applyPricingDistribution(
+  baseAmount: number,
+  commercialCost: number,
+  boqItemType: string,
+  distribution: PricingDistribution | null
+): { materialCost: number; workCost: number } {
+  // Если настроек нет, используем старую логику
+  if (!distribution) {
+    const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(boqItemType);
+    return {
+      materialCost: isMaterial ? commercialCost : 0,
+      workCost: isMaterial ? 0 : commercialCost
+    };
+  }
+
+  // Вычисляем базовую стоимость и наценку
+  const markup = commercialCost - baseAmount;
+
+  // Определяем тип материала/работы
+  const materialType = getMaterialType(boqItemType);
+  if (!materialType) {
+    console.warn(`⚠️ Неизвестный тип элемента: ${boqItemType}`);
+    return { materialCost: 0, workCost: commercialCost };
+  }
+
+  let materialCost = 0;
+  let workCost = 0;
+
+  // Применяем распределение для каждого типа
+  switch (materialType) {
+    case 'basic':
+      materialCost += distribution.basic_material_base_target === 'material' ? baseAmount : 0;
+      workCost += distribution.basic_material_base_target === 'work' ? baseAmount : 0;
+      materialCost += distribution.basic_material_markup_target === 'material' ? markup : 0;
+      workCost += distribution.basic_material_markup_target === 'work' ? markup : 0;
+      break;
+
+    case 'auxiliary':
+      materialCost += distribution.auxiliary_material_base_target === 'material' ? baseAmount : 0;
+      workCost += distribution.auxiliary_material_base_target === 'work' ? baseAmount : 0;
+      materialCost += distribution.auxiliary_material_markup_target === 'material' ? markup : 0;
+      workCost += distribution.auxiliary_material_markup_target === 'work' ? markup : 0;
+      break;
+
+    case 'subcontract_basic':
+      if (distribution.subcontract_basic_material_base_target && distribution.subcontract_basic_material_markup_target) {
+        materialCost += distribution.subcontract_basic_material_base_target === 'material' ? baseAmount : 0;
+        workCost += distribution.subcontract_basic_material_base_target === 'work' ? baseAmount : 0;
+        materialCost += distribution.subcontract_basic_material_markup_target === 'material' ? markup : 0;
+        workCost += distribution.subcontract_basic_material_markup_target === 'work' ? markup : 0;
+      } else {
+        // Fallback на старую логику для субматериалов
+        workCost = commercialCost;
+      }
+      break;
+
+    case 'subcontract_auxiliary':
+      if (distribution.subcontract_auxiliary_material_base_target && distribution.subcontract_auxiliary_material_markup_target) {
+        materialCost += distribution.subcontract_auxiliary_material_base_target === 'material' ? baseAmount : 0;
+        workCost += distribution.subcontract_auxiliary_material_base_target === 'work' ? baseAmount : 0;
+        materialCost += distribution.subcontract_auxiliary_material_markup_target === 'material' ? markup : 0;
+        workCost += distribution.subcontract_auxiliary_material_markup_target === 'work' ? markup : 0;
+      } else {
+        // Fallback на старую логику
+        workCost = commercialCost;
+      }
+      break;
+
+    case 'work':
+      materialCost += distribution.work_base_target === 'material' ? baseAmount : 0;
+      workCost += distribution.work_base_target === 'work' ? baseAmount : 0;
+      materialCost += distribution.work_markup_target === 'material' ? markup : 0;
+      workCost += distribution.work_markup_target === 'work' ? markup : 0;
+      break;
+  }
+
+  return { materialCost, workCost };
+}
+
+/**
  * Применяет тактику наценки ко всем элементам тендера
  * @param tenderId ID тендера
  * @param tacticId ID тактики наценок (если не указан, используется тактика из тендера)
@@ -478,6 +613,8 @@ export async function applyTacticToTender(
   tacticId?: string
 ): Promise<TacticApplicationResult> {
   try {
+    console.log('🚀 Начало пересчёта тендера:', tenderId);
+
     // Если тактика не указана, получаем ее из тендера
     if (!tacticId) {
       const { data: tender, error: tenderError } = await supabase
@@ -496,57 +633,138 @@ export async function applyTacticToTender(
       tacticId = tender.markup_tactic_id;
     }
 
-    // Загружаем все позиции тендера
-    const { data: positions, error: positionsError } = await supabase
-      .from('client_positions')
-      .select('id')
-      .eq('tender_id', tenderId);
+    // Загружаем тактику и параметры один раз для всего тендера
+    const { data: tactic, error: tacticError } = await supabase
+      .from('markup_tactics')
+      .select('*')
+      .eq('id', tacticId)
+      .single();
 
-    if (positionsError) {
+    if (tacticError || !tactic) {
       return {
         success: false,
-        errors: [`Ошибка загрузки позиций: ${positionsError.message}`]
+        errors: [`Тактика наценок не найдена: ${tacticId}`]
       };
     }
 
-    if (!positions || positions.length === 0) {
+    const markupParameters = await loadMarkupParameters(tenderId);
+    console.log('✅ Загружена тактика и параметры');
+
+    // Загружаем настройки ценообразования
+    const pricingDistribution = await loadPricingDistribution(tenderId);
+    console.log('💰 Настройки ценообразования:', pricingDistribution ? 'загружены' : 'используются defaults');
+
+    // Загружаем ВСЕ элементы BOQ тендера за один запрос
+    const { data: allBoqItems, error: itemsError } = await supabase
+      .from('boq_items')
+      .select('*')
+      .eq('tender_id', tenderId)
+      .order('sort_number');
+
+    if (itemsError || !allBoqItems) {
+      return {
+        success: false,
+        errors: [`Ошибка загрузки элементов тендера: ${itemsError?.message}`]
+      };
+    }
+
+    if (allBoqItems.length === 0) {
       return {
         success: true,
         updatedCount: 0,
-        errors: ['Нет позиций для обработки в тендере']
+        errors: ['Нет элементов для обработки в тендере']
       };
     }
 
-    // Применяем тактику к каждой позиции
-    let totalUpdated = 0;
-    const allErrors: string[] = [];
-    const allDetails: TacticApplicationResult['details'] = [];
+    console.log(`📦 Загружено ${allBoqItems.length} элементов BOQ`);
 
-    for (const position of positions) {
-      const result = await applyTacticToPosition(position.id!, tacticId);
+    // Обрабатываем все элементы и готовим batch updates
+    const updates: Array<{ id: string; data: any }> = [];
+    const errors: string[] = [];
 
-      if (result.updatedCount) {
-        totalUpdated += result.updatedCount;
-      }
+    for (const item of allBoqItems) {
+      try {
+        // Получаем последовательность для типа элемента
+        const sequence = tactic.sequences[item.boq_item_type];
+        if (!sequence || sequence.length === 0) {
+          errors.push(`Элемент ${item.id}: отсутствует последовательность для типа "${item.boq_item_type}"`);
+          continue;
+        }
 
-      if (result.errors) {
-        allErrors.push(...result.errors.map(e => `Позиция ${position.id}: ${e}`));
-      }
+        // Создаем контекст и выполняем расчет
+        const context: CalculationContext = {
+          baseAmount: item.total_amount || 0,
+          itemType: item.boq_item_type,
+          markupSequence: sequence,
+          markupParameters,
+          baseCost: tactic.base_costs?.[item.boq_item_type]
+        };
 
-      if (result.details) {
-        allDetails.push(...result.details);
+        const result = calculateMarkupResult(context);
+
+        // Применяем распределение ценообразования
+        const { materialCost, workCost } = applyPricingDistribution(
+          item.total_amount || 0,
+          result.commercialCost,
+          item.boq_item_type,
+          pricingDistribution
+        );
+
+        // Готовим данные для обновления
+        const updateData: any = {
+          commercial_markup: result.markupCoefficient,
+          total_commercial_material_cost: materialCost,
+          total_commercial_work_cost: workCost,
+          updated_at: new Date().toISOString()
+        };
+
+        updates.push({ id: item.id, data: updateData });
+
+      } catch (itemError) {
+        const errorMessage = itemError instanceof Error ? itemError.message : 'Неизвестная ошибка';
+        errors.push(`Элемент ${item.id}: ${errorMessage}`);
       }
     }
 
+    console.log(`⚡ Подготовлено ${updates.length} обновлений`);
+
+    // Выполняем batch updates параллельно (порциями по 50)
+    const BATCH_SIZE = 50;
+    let successCount = 0;
+
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE);
+
+      // Выполняем обновления в этом батче параллельно
+      const batchPromises = batch.map(({ id, data }) =>
+        supabase.from('boq_items').update(data).eq('id', id)
+      );
+
+      const results = await Promise.allSettled(batchPromises);
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled' && !result.value.error) {
+          successCount++;
+        } else {
+          const error = result.status === 'rejected' ? result.reason : result.value.error;
+          errors.push(`Элемент ${batch[idx].id}: ${error?.message || 'Ошибка обновления'}`);
+        }
+      });
+
+      console.log(`✅ Обработан батч ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(updates.length / BATCH_SIZE)}`);
+    }
+
+    console.log(`🎉 Обновлено ${successCount} элементов`);
+
     return {
-      success: totalUpdated > 0,
-      updatedCount: totalUpdated,
-      errors: allErrors.length > 0 ? allErrors : undefined,
-      details: allDetails
+      success: successCount > 0,
+      updatedCount: successCount,
+      errors: errors.length > 0 ? errors : undefined
     };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+    console.error('❌ Ошибка пересчёта:', errorMessage);
     return {
       success: false,
       errors: [`Ошибка применения тактики к тендеру: ${errorMessage}`]

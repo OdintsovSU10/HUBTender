@@ -48,6 +48,8 @@ interface PositionWithCommercialCost extends ClientPosition {
   base_total?: number;
   markup_percentage?: number;
   items_count?: number;
+  material_cost_total?: number;
+  work_cost_total?: number;
 }
 
 interface MarkupTactic {
@@ -192,6 +194,9 @@ export default function Commerce() {
     }
 
     try {
+      console.log('🔄 Загрузка позиций для тендера:', tenderId);
+      const startTime = Date.now();
+
       // Загружаем позиции заказчика
       const { data: clientPositions, error: posError } = await supabase
         .from('client_positions')
@@ -200,31 +205,51 @@ export default function Commerce() {
         .order('position_number');
 
       if (posError) throw posError;
+      console.log(`📋 Загружено позиций: ${clientPositions?.length || 0}`);
 
-      // Для каждой позиции загружаем коммерческие стоимости из boq_items
-      const positionsWithCosts = await Promise.all((clientPositions || []).map(async (position) => {
-        const { data: boqItems, error: itemsError } = await supabase
-          .from('boq_items')
-          .select('total_amount, total_commercial_material_cost, total_commercial_work_cost')
-          .eq('client_position_id', position.id);
+      // ОПТИМИЗАЦИЯ: Загружаем ВСЕ BOQ элементы для тендера ОДНИМ запросом
+      const { data: allBoqItems, error: itemsError } = await supabase
+        .from('boq_items')
+        .select('client_position_id, total_amount, total_commercial_material_cost, total_commercial_work_cost')
+        .eq('tender_id', tenderId);
 
-        if (itemsError) {
-          console.error('Ошибка загрузки элементов позиции:', itemsError);
-          return position;
+      if (itemsError) {
+        console.error('Ошибка загрузки элементов:', itemsError);
+        throw itemsError;
+      }
+
+      console.log(`📝 Загружено BOQ элементов: ${allBoqItems?.length || 0}`);
+
+      // Группируем элементы по позициям в памяти
+      const itemsByPosition = new Map<string, typeof allBoqItems>();
+      for (const item of allBoqItems || []) {
+        if (!itemsByPosition.has(item.client_position_id)) {
+          itemsByPosition.set(item.client_position_id, []);
         }
+        itemsByPosition.get(item.client_position_id)!.push(item);
+      }
+
+      // Обрабатываем позиции с уже загруженными данными
+      const positionsWithCosts = (clientPositions || []).map((position) => {
+        const boqItems = itemsByPosition.get(position.id) || [];
 
         // Суммируем стоимости
         let baseTotal = 0;
         let commercialTotal = 0;
+        let materialCostTotal = 0;
+        let workCostTotal = 0;
         let itemsCount = 0;
 
-        for (const item of boqItems || []) {
+        for (const item of boqItems) {
           const itemBase = item.total_amount || 0;
-          const itemCommercial = (item.total_commercial_material_cost || 0) +
-                                 (item.total_commercial_work_cost || 0);
+          const itemMaterial = item.total_commercial_material_cost || 0;
+          const itemWork = item.total_commercial_work_cost || 0;
+          const itemCommercial = itemMaterial + itemWork;
 
           baseTotal += itemBase;
           commercialTotal += itemCommercial;
+          materialCostTotal += itemMaterial;
+          workCostTotal += itemWork;
           itemsCount++;
         }
 
@@ -237,10 +262,15 @@ export default function Commerce() {
           ...position,
           base_total: baseTotal,
           commercial_total: commercialTotal,
-          markup_percentage: markupCoefficient, // Теперь это коэффициент, не процент
+          material_cost_total: materialCostTotal,
+          work_cost_total: workCostTotal,
+          markup_percentage: markupCoefficient,
           items_count: itemsCount
         } as PositionWithCommercialCost;
-      }));
+      });
+
+      const loadTime = Date.now() - startTime;
+      console.log(`✅ Данные загружены за ${loadTime}ms`);
 
       setPositions(positionsWithCosts);
     } catch (error) {
@@ -370,13 +400,15 @@ export default function Commerce() {
       'Название': pos.work_name,
       'Примечание клиента': pos.client_note || '',
       'Единица': pos.unit_code || '',
-      'Количество': pos.volume || 0,
+      'Количество (ГП)': pos.manual_volume || 0,
       'Кол-во элементов': pos.items_count || 0,
       'Базовая стоимость': pos.base_total || 0,
       'Коммерческая стоимость': pos.commercial_total || 0,
       'Коэффициент': pos.markup_percentage?.toFixed(4) || '1.0000',
-      'За единицу (база)': pos.volume && pos.volume > 0 ? (pos.base_total || 0) / pos.volume : 0,
-      'За единицу (коммерч.)': pos.volume && pos.volume > 0 ? (pos.commercial_total || 0) / pos.volume : 0,
+      'За единицу (база)': pos.manual_volume && pos.manual_volume > 0 ? (pos.base_total || 0) / pos.manual_volume : 0,
+      'За единицу (коммерч.)': pos.manual_volume && pos.manual_volume > 0 ? (pos.commercial_total || 0) / pos.manual_volume : 0,
+      'За единицу материалов': pos.manual_volume && pos.manual_volume > 0 ? (pos.material_cost_total || 0) / pos.manual_volume : 0,
+      'За единицу работ': pos.manual_volume && pos.manual_volume > 0 ? (pos.work_cost_total || 0) / pos.manual_volume : 0,
     }));
 
     // Добавляем итоговую строку
@@ -389,13 +421,15 @@ export default function Commerce() {
       'Название': 'ИТОГО',
       'Примечание клиента': '',
       'Единица': '',
-      'Количество': positions.reduce((sum, pos) => sum + (pos.volume || 0), 0),
+      'Количество (ГП)': positions.reduce((sum, pos) => sum + (pos.manual_volume || 0), 0),
       'Кол-во элементов': positions.reduce((sum, pos) => sum + (pos.items_count || 0), 0),
       'Базовая стоимость': totalBase,
       'Коммерческая стоимость': totalCommercial,
       'Наценка, %': avgMarkup.toFixed(2),
       'За единицу (база)': 0,
       'За единицу (коммерч.)': 0,
+      'За единицу материалов': 0,
+      'За единицу работ': 0,
     });
 
     // Создаем книгу Excel
@@ -495,7 +529,7 @@ export default function Commerce() {
       width: 100,
       render: (_, record) => (
         <div>
-          <div>{record.volume || 0} {record.unit_code || ''}</div>
+          <div>{record.manual_volume || 0} {record.unit_code || ''}</div>
           <div style={{ fontSize: '11px', color: '#999' }}>
             {record.items_count || 0} элем.
           </div>
@@ -508,11 +542,41 @@ export default function Commerce() {
       width: 150,
       align: 'right',
       render: (_, record) => {
-        if (!record.volume || record.volume === 0) return '-';
-        const perUnit = (record.commercial_total || 0) / record.volume;
+        if (!record.manual_volume || record.manual_volume === 0) return '-';
+        const perUnit = (record.commercial_total || 0) / record.manual_volume;
         return (
           <Text type="secondary">
             {formatCommercialCost(perUnit)}
+          </Text>
+        );
+      },
+    },
+    {
+      title: 'Цена за единицу материалов, Руб.',
+      key: 'per_unit_material',
+      width: 150,
+      align: 'right',
+      render: (_, record) => {
+        if (!record.manual_volume || record.manual_volume === 0) return '-';
+        const perUnitMaterial = (record.material_cost_total || 0) / record.manual_volume;
+        return (
+          <Text type="secondary" style={{ color: '#1890ff' }}>
+            {formatCommercialCost(perUnitMaterial)}
+          </Text>
+        );
+      },
+    },
+    {
+      title: 'Цена за единицу работ, Руб.',
+      key: 'per_unit_work',
+      width: 150,
+      align: 'right',
+      render: (_, record) => {
+        if (!record.manual_volume || record.manual_volume === 0) return '-';
+        const perUnitWork = (record.work_cost_total || 0) / record.manual_volume;
+        return (
+          <Text type="secondary" style={{ color: '#52c41a' }}>
+            {formatCommercialCost(perUnitWork)}
           </Text>
         );
       },
