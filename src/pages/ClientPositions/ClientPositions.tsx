@@ -469,13 +469,16 @@ const ClientPositions: React.FC = () => {
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-            <Tag color="success" style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>
+            <Text style={{ margin: 0, fontWeight: 600, fontSize: 15, color: currentTheme === 'dark' ? '#52c41a' : '#389e0d' }}>
               {Math.round(total).toLocaleString('ru-RU')}
-            </Tag>
+            </Text>
             {(counts.works > 0 || counts.materials > 0) && (
-              <Tag color="success" style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>
-                Р {counts.works} М {counts.materials}
-              </Tag>
+              <div style={{ display: 'flex', gap: 8, fontSize: 15, fontWeight: 600 }}>
+                <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>Р:</span>
+                <span style={{ color: '#ff9800' }}>{counts.works}</span>
+                <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>М:</span>
+                <span style={{ color: '#1890ff' }}>{counts.materials}</span>
+              </div>
             )}
           </div>
         );
@@ -568,67 +571,68 @@ const ClientPositions: React.FC = () => {
 
   return (
     <div style={{ padding: 0 }}>
-      {/* Верхняя шапка с названием тендера и кнопками */}
-      {selectedTender && (
-        <div style={{
-          background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
-          padding: '12px 32px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderRadius: '8px 8px 0 0',
-          margin: '16px 0 0 0',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <FileTextOutlined style={{ fontSize: 32, color: 'white' }} />
-            <div>
-              <Title level={3} style={{ margin: 0, color: 'white' }}>
-                {selectedTender.title}
-              </Title>
-              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
-                Заказчик: {selectedTender.client_name}
-              </Text>
+      {/* Блок с названием тендера, кнопками, фильтрами и информацией */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
+        borderRadius: '8px',
+        margin: '16px 0 0 0',
+      }}>
+        {/* Верхняя шапка с названием тендера и кнопками */}
+        {selectedTender && (
+          <div style={{
+            padding: '12px 32px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <FileTextOutlined style={{ fontSize: 32, color: 'white' }} />
+              <div>
+                <Title level={3} style={{ margin: 0, color: 'white' }}>
+                  {selectedTender.title}
+                </Title>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
+                  Заказчик: {selectedTender.client_name}
+                </Text>
+              </div>
             </div>
+            <Space>
+              <Button
+                type="primary"
+                style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
+                icon={<ArrowLeftOutlined />}
+                onClick={() => {
+                  setSelectedTender(null);
+                  setSelectedTenderId(null);
+                  setSelectedTenderTitle(null);
+                  setSelectedVersion(null);
+                  setClientPositions([]);
+                }}
+              >
+                Назад к выбору
+              </Button>
+              <Button
+                icon={<DashboardOutlined />}
+                onClick={() => navigate('/dashboard')}
+              >
+                К дашборду
+              </Button>
+            </Space>
           </div>
-          <Space>
-            <Button
-              type="primary"
-              style={{ backgroundColor: '#10b981', borderColor: '#10b981' }}
-              icon={<ArrowLeftOutlined />}
-              onClick={() => {
-                setSelectedTender(null);
-                setSelectedTenderId(null);
-                setSelectedTenderTitle(null);
-                setSelectedVersion(null);
-                setClientPositions([]);
-              }}
-            >
-              Назад к выбору
-            </Button>
-            <Button
-              icon={<DashboardOutlined />}
-              onClick={() => navigate('/dashboard')}
-            >
-              К дашборду
-            </Button>
-          </Space>
-        </div>
-      )}
+        )}
 
-      {/* Блок с фильтрами и информацией о тендере */}
-      <div>
-        <Card
-          bordered={false}
-          bodyStyle={{ padding: '12px 24px' }}
-          style={{
-            background: currentTheme === 'dark' ? '#1a1a1a' : '#f5f5f5',
-            borderRadius: selectedTender ? '0' : '8px',
-            marginBottom: 0,
-          }}
-        >
-          <Row gutter={[16, 8]}>
-            {/* Левая колонка: Фильтры */}
-            <Col span={7}>
+        {/* Блок с фильтрами и информацией о тендере */}
+        <div style={{
+          padding: '16px',
+        }}>
+        <Row gutter={16}>
+          {/* Левая карточка: Фильтры */}
+          <Col span={7}>
+            <Card
+              bordered={false}
+              bodyStyle={{ padding: '16px' }}
+              style={{ borderRadius: '8px' }}
+            >
               <Row gutter={8}>
                 <Col span={16}>
                   <Text strong style={{ color: currentTheme === 'dark' ? '#fff' : '#000', fontSize: 14 }}>Тендер:</Text>
@@ -656,10 +660,16 @@ const ClientPositions: React.FC = () => {
                   />
                 </Col>
               </Row>
-            </Col>
+            </Card>
+          </Col>
 
-            {/* Средняя колонка: Информация о тендере */}
-            <Col span={17} offset={0}>
+          {/* Правая карточка: Информация о тендере */}
+          <Col span={10} offset={7}>
+            <Card
+              bordered={false}
+              bodyStyle={{ padding: '16px' }}
+              style={{ borderRadius: '8px' }}
+            >
               {selectedTender ? (
                 <div style={{ textAlign: 'right' }}>
                   {/* Строка 1: Название и заказчик */}
@@ -751,36 +761,92 @@ const ClientPositions: React.FC = () => {
                   </Text>
                 </div>
               )}
-            </Col>
-          </Row>
-        </Card>
+            </Card>
+          </Col>
+        </Row>
+      </div>
 
-        {/* Строка с дедлайном */}
+        {/* Строка с дедлайном - шкала состояния */}
         {selectedTender && selectedTender.submission_deadline && (() => {
-          const isExpired = dayjs(selectedTender.submission_deadline).isBefore(dayjs());
+          const deadline = dayjs(selectedTender.submission_deadline);
+          const now = dayjs();
+          const isExpired = deadline.isBefore(now);
+
+          // Вычисляем прогресс времени (предполагаем стандартный период в 30 дней)
+          const totalDays = 30; // Можно настроить или использовать дату создания тендера
+          const daysRemaining = deadline.diff(now, 'day', true);
+          const progress = isExpired ? 100 : Math.max(0, Math.min(100, ((totalDays - daysRemaining) / totalDays) * 100));
+
+          // Интерполяция цвета для шкалы от бирюзового к красному
+          const getProgressColor = (progress: number): string => {
+            if (isExpired) return '#c62828'; // Насыщенный красный если истек
+
+            // Плавный переход от бирюзового (#14b8a6) к насыщенному красному (#c62828)
+            const normalizedProgress = progress / 100;
+            const r = Math.round(20 + (198 - 20) * normalizedProgress);
+            const g = Math.round(184 + (40 - 184) * normalizedProgress);
+            const b = Math.round(166 + (40 - 166) * normalizedProgress);
+            return `rgb(${r}, ${g}, ${b})`;
+          };
+
+          const percentage = Math.round(100 - progress);
+
           return (
             <div style={{
-              background: isExpired ? '#b91c1c' : 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
-              padding: '8px 32px',
+              position: 'relative',
               marginTop: 0,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 24,
-              color: 'white',
-              fontWeight: 600,
+              height: 40,
               borderRadius: '0 0 8px 8px',
+              overflow: 'hidden',
+              background: currentTheme === 'dark' ? '#0a5348' : '#ccfbf1',
             }}>
-              <Text style={{ color: 'white' }}>
-                {isExpired
-                  ? `Дедлайн истек ${dayjs().diff(dayjs(selectedTender.submission_deadline), 'day')} дней назад`
-                  : `До дедлайна осталось ${dayjs(selectedTender.submission_deadline).diff(dayjs(), 'day')} дней`
-                }
-              </Text>
-              <Text style={{ color: 'white' }}>
-                Дедлайн: {dayjs(selectedTender.submission_deadline).format('DD MMMM YYYY, HH:mm')}
-              </Text>
-              <Text style={{ color: 'white' }}>100%</Text>
+              {/* Шкала прогресса */}
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                height: '100%',
+                width: `${progress}%`,
+                background: getProgressColor(progress),
+                transition: 'all 0.5s ease',
+              }} />
+
+              {/* Текст поверх шкалы */}
+              <div style={{
+                position: 'relative',
+                height: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 24,
+                padding: '0 32px',
+                zIndex: 1,
+              }}>
+                <Text style={{
+                  color: 'white',
+                  fontWeight: 600,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                }}>
+                  {isExpired
+                    ? `Дедлайн истек ${now.diff(deadline, 'day')} дней назад`
+                    : `До дедлайна осталось ${Math.ceil(daysRemaining)} дней`
+                  }
+                </Text>
+                <Text style={{
+                  color: 'white',
+                  fontWeight: 600,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                }}>
+                  Дедлайн: {deadline.format('DD MMMM YYYY, HH:mm')}
+                </Text>
+                <Text style={{
+                  color: 'white',
+                  fontWeight: 600,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                }}>
+                  {isExpired ? '0%' : `${percentage}%`}
+                </Text>
+              </div>
             </div>
           );
         })()}
@@ -797,6 +863,19 @@ const ClientPositions: React.FC = () => {
             rowClassName={(record) =>
               scrollToPositionId === record.id ? 'highlight-row' : ''
             }
+            onRow={(record, index) => {
+              const isLeaf = isLeafPosition(index!);
+              return {
+                onClick: () => {
+                  if (isLeaf && selectedTender) {
+                    navigate(`/positions/${record.id}/items?tenderId=${selectedTender.id}&positionId=${record.id}`);
+                  }
+                },
+                style: {
+                  cursor: isLeaf ? 'pointer' : 'default',
+                },
+              };
+            }}
             pagination={false}
             scroll={{ x: 1200, y: 'calc(100vh - 400px)' }}
             size="small"
@@ -822,13 +901,16 @@ const ClientPositions: React.FC = () => {
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={4} align="center">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                        <Tag color="success" style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>
+                        <Text style={{ margin: 0, fontWeight: 600, fontSize: 15, color: currentTheme === 'dark' ? '#52c41a' : '#389e0d' }}>
                           {Math.round(totalSum).toLocaleString('ru-RU')}
-                        </Tag>
+                        </Text>
                         {(totalWorks > 0 || totalMaterials > 0) && (
-                          <Tag color="success" style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>
-                            Р {totalWorks} М {totalMaterials}
-                          </Tag>
+                          <div style={{ display: 'flex', gap: 8, fontSize: 15, fontWeight: 600 }}>
+                            <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>Р:</span>
+                            <span style={{ color: '#ff9800' }}>{totalWorks}</span>
+                            <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>М:</span>
+                            <span style={{ color: '#1890ff' }}>{totalMaterials}</span>
+                          </div>
                         )}
                       </div>
                     </Table.Summary.Cell>
