@@ -157,3 +157,4 @@ vite.config.ts.timestamp-*
 # MCP wrapper script (auto-generated)
 mcp-supabase.js
 .git-credentials
+src/pages/Admin/MarkupConstructor/backup/
