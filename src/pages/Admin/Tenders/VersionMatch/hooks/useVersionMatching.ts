@@ -51,26 +51,10 @@ export function useVersionMatching({
 }: UseVersionMatchingProps): UseVersionMatchingResult {
   const [state, dispatch] = useReducer(matchReducer, initialMatchState);
 
-  // Загрузить старые позиции при изменении тендера
-  useEffect(() => {
-    if (!sourceTender) {
-      dispatch({ type: 'RESET' });
-      return;
-    }
-
-    dispatch({ type: 'SET_SOURCE_TENDER', payload: sourceTender });
-    loadOldPositions(sourceTender.id);
-  }, [sourceTender]);
-
-  // Обновить новые позиции
-  useEffect(() => {
-    dispatch({ type: 'SET_NEW_POSITIONS', payload: newPositions });
-  }, [newPositions]);
-
   /**
    * Загрузить позиции старой версии из БД
    */
-  const loadOldPositions = async (tenderId: string) => {
+  const loadOldPositions = useCallback(async (tenderId: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
 
     try {
@@ -90,7 +74,23 @@ export function useVersionMatching({
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, []);
+
+  // Загрузить старые позиции при изменении тендера
+  useEffect(() => {
+    if (!sourceTender) {
+      dispatch({ type: 'RESET' });
+      return;
+    }
+
+    dispatch({ type: 'SET_SOURCE_TENDER', payload: sourceTender });
+    loadOldPositions(sourceTender.id);
+  }, [sourceTender, loadOldPositions]);
+
+  // Обновить новые позиции
+  useEffect(() => {
+    dispatch({ type: 'SET_NEW_POSITIONS', payload: newPositions });
+  }, [newPositions]);
 
   /**
    * Выполнить автоматическое сопоставление

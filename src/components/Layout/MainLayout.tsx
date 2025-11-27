@@ -144,12 +144,12 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
 
   // Функция форматирования чисел с разрядами
   const formatCalcDisplay = (value: string): string => {
-    // Разбиваем выражение на части (числа и операторы)
-    const parts = value.split(/([+\-*/()])/);
+    // Разбиваем выражение на части (числа и операторы, включая ^ и sqrt)
+    const parts = value.split(/([+\-*/()^]|sqrt)/);
 
     return parts.map(part => {
       // Пропускаем операторы и пустые строки
-      if (/^[+\-*/()]\s*$/.test(part) || part === '') return part;
+      if (/^[+\-*/()^]\s*$/.test(part) || part === '' || part === 'sqrt') return part;
 
       // Убираем существующие пробелы
       const clean = part.replace(/\s/g, '');
@@ -168,43 +168,33 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
 
   // Функции калькулятора
   const handleCalcClick = (value: string) => {
-    const input = calcInputRef.current?.input;
-    const cursorPos = input ? input.selectionStart : calcValue.length;
-
-    if (value === 'C') {
-      setCalcValue('0');
-    } else if (value === '=') {
+    if (value === '=') {
       try {
         // Убираем пробелы и заменяем запятые на точки для вычислений
-        const evalValue = calcValue.replace(/\s/g, '').replace(/,/g, '.');
+        let evalValue = calcValue.replace(/\s/g, '').replace(/,/g, '.');
+        // Заменяем ^ на ** для возведения в степень
+        evalValue = evalValue.replace(/\^/g, '**');
+        // Обрабатываем sqrt как функцию
+        evalValue = evalValue.replace(/sqrt\(([^)]+)\)/g, 'Math.sqrt($1)');
         const result = eval(evalValue);
         const resultStr = String(result).replace('.', ',');
         setCalcValue(resultStr);
       } catch {
         setCalcValue('Ошибка');
       }
-    } else if (value === '←') {
-      if (cursorPos > 0) {
-        const newValue = calcValue.slice(0, cursorPos - 1) + calcValue.slice(cursorPos);
-        setCalcValue(newValue || '0');
-        setTimeout(() => {
-          if (input) input.setSelectionRange(cursorPos - 1, cursorPos - 1);
-        }, 0);
-      }
-    } else {
-      const newValue = calcValue.slice(0, cursorPos) + value + calcValue.slice(cursorPos);
-      setCalcValue(calcValue === '0' && value !== ',' && value !== '.' ? value : newValue);
-      setTimeout(() => {
-        if (input) input.setSelectionRange(cursorPos + 1, cursorPos + 1);
-      }, 0);
     }
   };
 
   const handleCalcInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    // Разрешаем только цифры, операторы и запятую
-    if (/^[0-9+\-*/.(),\s]*$/.test(newValue) || newValue === '') {
-      setCalcValue(newValue || '0');
+    // Разрешаем цифры, операторы, запятую, ^, и буквы для sqrt
+    if (/^[0-9+\-*/.(),^sqrtа-яА-ЯёЁ\s]*$/.test(newValue) || newValue === '') {
+      // Если текущее значение "0" и пользователь вводит цифру, заменяем 0
+      if (calcValue === '0' && newValue.length > 1 && /^[0-9]/.test(newValue.charAt(newValue.length - 1))) {
+        setCalcValue(newValue.replace(/^0/, ''));
+      } else {
+        setCalcValue(newValue || '0');
+      }
     }
   };
 
@@ -214,18 +204,9 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       if (!calcOpen) return;
 
       const key = e.key;
-      if (/^[0-9+\-*/.()]$/.test(key)) {
-        e.preventDefault();
-        handleCalcClick(key);
-      } else if (key === ',' || key === '.') {
-        e.preventDefault();
-        handleCalcClick(',');
-      } else if (key === 'Enter') {
+      if (key === 'Enter') {
         e.preventDefault();
         handleCalcClick('=');
-      } else if (key === 'Backspace') {
-        e.preventDefault();
-        handleCalcClick('←');
       } else if (key === 'Escape') {
         e.preventDefault();
         setCalcValue('0');
@@ -464,33 +445,25 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <Popover
               content={
-                <div style={{ width: '250px' }}>
+                <div style={{ width: '300px' }}>
                   <Input
                     ref={calcInputRef}
                     value={formatCalcDisplay(calcValue)}
                     onChange={handleCalcInputChange}
+                    placeholder="Введите выражение..."
                     style={{
-                      marginBottom: '12px',
-                      fontSize: '20px',
+                      marginBottom: '8px',
+                      fontSize: '18px',
                       textAlign: 'right',
                       fontWeight: 'bold',
                     }}
+                    onPressEnter={() => handleCalcClick('=')}
                   />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                    {['7', '8', '9', '/'].map(btn => (
-                      <Button key={btn} onClick={() => handleCalcClick(btn)}>{btn}</Button>
-                    ))}
-                    {['4', '5', '6', '*'].map(btn => (
-                      <Button key={btn} onClick={() => handleCalcClick(btn)}>{btn}</Button>
-                    ))}
-                    {['1', '2', '3', '-'].map(btn => (
-                      <Button key={btn} onClick={() => handleCalcClick(btn)}>{btn}</Button>
-                    ))}
-                    {['0', ',', '=', '+'].map(btn => (
-                      <Button key={btn} onClick={() => handleCalcClick(btn)} type={btn === '=' ? 'primary' : 'default'}>{btn}</Button>
-                    ))}
-                    <Button onClick={() => handleCalcClick('C')} danger style={{ gridColumn: '1 / 3' }}>C</Button>
-                    <Button onClick={() => handleCalcClick('←')} style={{ gridColumn: '3 / 5' }}>←</Button>
+                  <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
+                    Операции: +, -, *, /, ^(степень), sqrt(x)
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>
+                    Enter — вычислить, Esc — очистить
                   </div>
                 </div>
               }

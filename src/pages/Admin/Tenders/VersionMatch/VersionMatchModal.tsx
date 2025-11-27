@@ -2,7 +2,7 @@
  * Модальное окно для сопоставления и переноса данных между версиями тендера
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Modal, Upload, Button, Space, Divider, Alert, Result, Typography } from 'antd';
 import {
   UploadOutlined,
@@ -49,6 +49,9 @@ export function VersionMatchModal({ open, onClose, tender }: VersionMatchModalPr
     reset: resetParser,
   } = useFileParser();
 
+  // Мемоизируем newPositions чтобы избежать создания нового массива на каждом рендере
+  const newPositions = useMemo(() => parsedData || [], [parsedData]);
+
   // Хук сопоставления версий
   const {
     state,
@@ -61,7 +64,7 @@ export function VersionMatchModal({ open, onClose, tender }: VersionMatchModalPr
     reset: resetMatching,
   } = useVersionMatching({
     sourceTender: tender,
-    newPositions: parsedData || [],
+    newPositions,
   });
 
   /**
@@ -225,7 +228,7 @@ export function VersionMatchModal({ open, onClose, tender }: VersionMatchModalPr
           </Space>
 
           {/* Сопоставление */}
-          {parsedData && parsedData.length > 0 && (
+          {newPositions.length > 0 && (
             <>
               <Divider />
 
@@ -251,7 +254,7 @@ export function VersionMatchModal({ open, onClose, tender }: VersionMatchModalPr
                   {/* Таблица сопоставления */}
                   <MatchingTable
                     matches={state.matches}
-                    newPositions={parsedData}
+                    newPositions={newPositions}
                     filter={state.filter}
                     onToggleTransfer={toggleTransfer}
                     onManualMatch={manualMatch}

@@ -804,6 +804,13 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       console.log('breakdownData.length:', breakdownData.length);
       console.log('breakdownData:', breakdownData);
 
+      // Группируем данные только по категориям (без видов и локализаций)
+      const categoryMap = new Map<string, number>();
+      breakdownData.forEach(item => {
+        const current = categoryMap.get(item.category_name) || 0;
+        categoryMap.set(item.category_name, current + item.total_amount);
+      });
+
       const colors = [
         'rgba(255, 77, 79, 0.6)',     // #ff4d4f
         'rgba(24, 144, 255, 0.6)',    // #1890ff
@@ -822,9 +829,9 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         'rgba(89, 126, 247, 0.6)',    // #597ef7
       ];
 
-      barItems = breakdownData.map((item, idx) => ({
-        label: `${item.category_name} → ${item.detail_name}`,
-        cost: item.total_amount,
+      barItems = Array.from(categoryMap.entries()).map(([categoryName, totalCost], idx) => ({
+        label: categoryName,
+        cost: totalCost,
         color: colors[idx % colors.length],
       })).sort((a, b) => b.cost - a.cost);
 
@@ -1379,6 +1386,9 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
     }
   };
 
+  // Extract current drill-down level for use in barOptions
+  const currentLevel = drillDownPath[drillDownPath.length - 1];
+
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1414,6 +1424,38 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       x: {
         ticks: {
           color: currentTheme === 'dark' ? '#ffffff' : '#000000',
+          font: {
+            size: currentLevel.type === 'indicator' && breakdownData.length > 0 ? 10 : 12
+          },
+          maxRotation: currentLevel.type === 'indicator' && breakdownData.length > 0 ? 0 : 0,
+          minRotation: 0,
+          autoSkip: false,
+          callback: function(value: any, index: number) {
+            // Для детализации категорий затрат разбиваем на две строки
+            if (currentLevel.type === 'indicator' && breakdownData.length > 0) {
+              const label = this.getLabelForValue(value);
+              // Разбиваем длинные строки на части по 20 символов
+              if (label.length > 20) {
+                const words = label.split(' ');
+                const lines: string[] = [];
+                let currentLine = '';
+
+                words.forEach(word => {
+                  if ((currentLine + ' ' + word).length > 20 && currentLine.length > 0) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                  } else {
+                    currentLine = currentLine ? currentLine + ' ' + word : word;
+                  }
+                });
+
+                if (currentLine) lines.push(currentLine);
+                return lines;
+              }
+              return label;
+            }
+            return this.getLabelForValue(value);
+          }
         },
         grid: {
           color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
@@ -1619,24 +1661,13 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
                 background: currentTheme === 'dark' ? '#1f1f1f' : '#ffffff',
               }}
             >
-              <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <Title level={5} style={{ margin: 0, marginBottom: 4 }}>
-                    Детализация по категориям затрат
-                  </Title>
-                  <Text type="secondary" style={{ fontSize: 13 }}>
-                    {selectedIndicatorName}
-                  </Text>
-                </div>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setSelectedIndicator(null);
-                    setBreakdownData([]);
-                  }}
-                >
-                  Закрыть
-                </Button>
+              <div style={{ marginBottom: 16 }}>
+                <Title level={5} style={{ margin: 0, marginBottom: 4 }}>
+                  Детализация по категориям затрат
+                </Title>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  {selectedIndicatorName}
+                </Text>
               </div>
 
               <Spin spinning={loadingBreakdown}>

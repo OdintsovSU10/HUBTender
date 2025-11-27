@@ -102,7 +102,7 @@ const FinancialIndicators: React.FC = () => {
 
   if (!selectedTenderId) {
     return (
-      <div style={{ margin: '-16px', padding: '24px' }}>
+      <div>
         <Card bordered={false} style={{ height: '100%' }}>
           <div style={{ textAlign: 'center', padding: '40px 20px' }}>
             <Title level={4} style={{ marginBottom: 24 }}>
@@ -178,7 +178,7 @@ const FinancialIndicators: React.FC = () => {
   }
 
   return (
-    <div style={{ margin: '-16px', padding: '24px' }}>
+    <div>
       <div style={{ marginBottom: 16 }}>
         <Button
           type="primary"
@@ -243,8 +243,8 @@ const FinancialIndicators: React.FC = () => {
                   <IndicatorsCharts
                     data={data}
                     spTotal={spTotal}
-                    customerTotal={customerTotal}
                     formatNumber={formatNumber}
+                    selectedTenderId={selectedTenderId}
                   />
                 ),
               },
