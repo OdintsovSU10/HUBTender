@@ -14,6 +14,28 @@ interface MaterialEditFormProps {
   onCancel: () => void;
 }
 
+// Компонент для заголовка поля с опциональной звездочкой
+const FieldLabel: React.FC<{ label: string; required?: boolean; align?: 'left' | 'center' }> = ({ label, required, align = 'center' }) => (
+  <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: align }}>
+    {required && <span style={{ color: 'red', marginRight: '4px' }}>*</span>}
+    {label}
+  </div>
+);
+
+// Функция для получения цвета border на основе типа материала
+const getBorderColor = (type: string) => {
+  switch (type) {
+    case 'мат':
+      return '#2196f3';
+    case 'суб-мат':
+      return '#9ccc65';
+    case 'мат-комп.':
+      return '#00897b';
+    default:
+      return '#d9d9d9';
+  }
+};
+
 const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
   record,
   materialNames,
@@ -97,7 +119,8 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     const qty = calculateQuantity();
     const rate = getCurrencyRate(formData.currency_type);
     const deliveryPrice = calculateDeliveryPrice();
-    return qty * (formData.unit_rate * rate + deliveryPrice);
+    const total = qty * (formData.unit_rate * rate + deliveryPrice);
+    return Math.round(total * 100) / 100;
   };
 
   // Обновление количества при изменении зависимых полей
@@ -121,6 +144,11 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     // Проверка на коэффициент расхода
     if (formData.consumption_coefficient < 1.0) {
       message.error('Значение коэффициента расхода не может быть менее 1,00');
+      return;
+    }
+
+    if (!formData.detail_cost_category_id) {
+      message.error('Выберите затрату на строительство');
       return;
     }
 
@@ -182,11 +210,11 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
   };
 
   return (
-    <div style={{ padding: '16px', border: '1px solid #d9d9d9', borderRadius: '4px' }}>
+    <div style={{ padding: '16px', border: `2px solid ${getBorderColor(formData.boq_item_type)}`, borderRadius: '4px' }}>
       {/* Строка 1: Тип | Вид | Наименование | Привязка */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Тип</div>
+          <FieldLabel label="Тип" />
           <Select
             value={formData.boq_item_type}
             onChange={(value) => setFormData({ ...formData, boq_item_type: value })}
@@ -201,7 +229,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         </div>
 
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Вид</div>
+          <FieldLabel label="Вид" />
           <Select
             value={formData.material_type}
             onChange={(value) => setFormData({ ...formData, material_type: value })}
@@ -215,7 +243,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         </div>
 
         <div style={{ flex: 2 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Наименование</div>
+          <FieldLabel label="Наименование" required />
           <AutoComplete
             value={materialSearchText}
             onChange={(value) => {
@@ -279,45 +307,47 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         {/* К перев - показываем только если выбрана привязка */}
         {formData.parent_work_item_id && (
           <div style={{ width: '80px' }}>
-            <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>К перев</div>
+            <FieldLabel label="К перев" />
             <InputNumber
               value={formData.conversion_coefficient}
               onChange={(value) => setFormData({ ...formData, conversion_coefficient: value || 1 })}
-              placeholder="1.00"
-              precision={3}
+              placeholder="1.00000"
+              precision={5}
               style={{ width: '100%' }}
               size="small"
+              parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
             />
           </div>
         )}
 
         <div style={{ width: '80px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>К расх</div>
+          <FieldLabel label="К расх" required />
           <InputNumber
             value={formData.consumption_coefficient}
             onChange={(value) => setFormData({ ...formData, consumption_coefficient: value || 1 })}
-            placeholder="1.00"
-            precision={3}
+            placeholder="1.00000"
+            precision={5}
             min={1.0}
             style={{ width: '100%' }}
             size="small"
+            parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
           />
         </div>
 
         <div style={{ width: '100px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Кол-во</div>
+          <FieldLabel label="Кол-во" />
           <InputNumber
             value={formData.quantity}
             disabled
-            placeholder="0.00"
-            precision={3}
+            placeholder="0.00000"
+            precision={5}
             style={{ width: '100%' }}
             size="small"
           />
         </div>
 
         <div style={{ width: '60px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Ед.изм.</div>
+          <FieldLabel label="Ед.изм." />
           <Input
             value={formData.unit_code || '-'}
             disabled
@@ -327,7 +357,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         </div>
 
         <div style={{ width: '100px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Цена за ед.</div>
+          <FieldLabel label="Цена за ед." />
           <InputNumber
             value={formData.unit_rate}
             onChange={(value) => setFormData({ ...formData, unit_rate: value || 0 })}
@@ -335,11 +365,13 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
             precision={2}
             style={{ width: '100%' }}
             size="small"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s/g, '').replace(/,/g, '.')}
           />
         </div>
 
         <div style={{ width: '80px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Валюта</div>
+          <FieldLabel label="Валюта" />
           <Select
             value={formData.currency_type}
             onChange={(value) => setFormData({ ...formData, currency_type: value })}
@@ -355,7 +387,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         </div>
 
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Доставка</div>
+          <FieldLabel label="Доставка" />
           <Select
             value={formData.delivery_price_type}
             onChange={(value) => {
@@ -379,7 +411,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         {/* Сумма доставки - показываем только если тип "суммой" */}
         {formData.delivery_price_type === 'суммой' && (
           <div style={{ width: '100px' }}>
-            <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Сум. дост.</div>
+            <FieldLabel label="Сум. дост." />
             <InputNumber
               value={formData.delivery_amount}
               onChange={(value) => setFormData({ ...formData, delivery_amount: value || 0 })}
@@ -387,12 +419,14 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
               precision={2}
               style={{ width: '100%' }}
               size="small"
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+              parser={(value) => value!.replace(/\s/g, '').replace(/,/g, '.')}
             />
           </div>
         )}
 
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Итого</div>
+          <FieldLabel label="Итого" />
           <InputNumber
             value={calculateTotal()}
             disabled
@@ -406,7 +440,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
 
         {/* Затрата на строительство (flex для заполнения остального пространства) */}
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Затрата на строительство</div>
+          <FieldLabel label="Затрата на строительство" required />
           <AutoComplete
             value={costSearchText}
             onChange={(value) => {
@@ -439,7 +473,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
       {/* Строка 3: Ссылка на КП | Примечание (50/50) */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>Ссылка на КП</div>
+          <FieldLabel label="Ссылка на КП" align="left" />
           <Input
             value={formData.quote_link}
             onChange={(e) => setFormData({ ...formData, quote_link: e.target.value })}
@@ -450,7 +484,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
           />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>Примечание</div>
+          <FieldLabel label="Примечание" align="left" />
           <Input
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}

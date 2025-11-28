@@ -282,44 +282,6 @@ export const PositionTable: React.FC<PositionTableProps> = ({
         pagination={false}
         scroll={{ x: 1200, y: 'calc(100vh - 400px)' }}
         size="small"
-        summary={() => {
-          const totalSum = clientPositions.reduce(
-            (sum, pos) => sum + (pos.total_material || 0) + (pos.total_works || 0),
-            0
-          );
-
-          let totalWorks = 0;
-          let totalMaterials = 0;
-          Object.values(positionCounts).forEach(count => {
-            totalWorks += count.works;
-            totalMaterials += count.materials;
-          });
-
-          return (
-            <Table.Summary fixed>
-              <Table.Summary.Row style={{ fontWeight: 'bold' }}>
-                <Table.Summary.Cell index={0} colSpan={4} align="right">
-                  Итого:
-                </Table.Summary.Cell>
-                <Table.Summary.Cell index={4} align="center">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                    <Text style={{ margin: 0, fontWeight: 600, fontSize: 15, color: currentTheme === 'dark' ? '#52c41a' : '#389e0d' }}>
-                      {Math.round(totalSum).toLocaleString('ru-RU')}
-                    </Text>
-                    {(totalWorks > 0 || totalMaterials > 0) && (
-                      <div style={{ display: 'flex', gap: 8, fontSize: 15, fontWeight: 600 }}>
-                        <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>Р:</span>
-                        <span style={{ color: '#ff9800' }}>{totalWorks}</span>
-                        <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>М:</span>
-                        <span style={{ color: '#1890ff' }}>{totalMaterials}</span>
-                      </div>
-                    )}
-                  </div>
-                </Table.Summary.Cell>
-              </Table.Summary.Row>
-            </Table.Summary>
-          );
-        }}
       />
     </Card>
   );

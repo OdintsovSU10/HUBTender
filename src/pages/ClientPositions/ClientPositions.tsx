@@ -45,6 +45,7 @@ const ClientPositions: React.FC = () => {
     loading,
     setLoading,
     positionCounts,
+    totalSum,
     fetchClientPositions,
   } = useClientPositions();
 
@@ -278,6 +279,7 @@ const ClientPositions: React.FC = () => {
           tenderTitles={getTenderTitles()}
           versions={selectedTenderTitle ? getVersionsForTitle(selectedTenderTitle) : []}
           currentTheme={currentTheme}
+          totalSum={totalSum}
           onTenderTitleChange={handleTenderTitleChange}
           onVersionChange={handleVersionChange}
           onBackToSelection={handleBackToSelection}

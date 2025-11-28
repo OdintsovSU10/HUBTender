@@ -123,6 +123,27 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
       },
     },
     {
+      title: <div style={{ textAlign: 'center' }}>Затрата на стр-во</div>,
+      key: 'cost_category',
+      width: 150,
+      align: 'center',
+      render: (_: any, record: BoqItemFull) => {
+        if (!record.detail_cost_category_full || record.detail_cost_category_full === '-') {
+          return '-';
+        }
+
+        // Извлекаем только первый уровень (категорию)
+        const parts = record.detail_cost_category_full.split(' / ');
+        const categoryName = parts[0] || '-';
+
+        return (
+          <Tooltip title={record.detail_cost_category_full}>
+            <span style={{ cursor: 'help' }}>{categoryName}</span>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: <div style={{ textAlign: 'center' }}>Наименование</div>,
       key: 'name',
       width: 200,
@@ -291,13 +312,6 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
       },
     },
     {
-      title: <div style={{ textAlign: 'center' }}>Затрата на стр-во</div>,
-      key: 'cost_category',
-      width: 150,
-      align: 'center',
-      render: (_: any, record: BoqItemFull) => record.detail_cost_category_full || '-',
-    },
-    {
       title: <div style={{ textAlign: 'center' }}>Ссылка на КП</div>,
       dataIndex: 'quote_link',
       key: 'quote_link',
@@ -352,23 +366,6 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
       pagination={false}
       scroll={{ y: 'calc(100vh - 500px)' }}
       size="small"
-      summary={() => {
-        const totalSum = items.reduce((sum, item) => sum + calculateTotal(item), 0);
-        return (
-          <Table.Summary fixed>
-            <Table.Summary.Row style={{ fontWeight: 'bold' }}>
-              <Table.Summary.Cell index={0} colSpan={7} />
-              <Table.Summary.Cell index={7} align="right">
-                Итого:
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={8} align="center">
-                {Math.round(totalSum).toLocaleString('ru-RU')}
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={9} colSpan={4} />
-            </Table.Summary.Row>
-          </Table.Summary>
-        );
-      }}
       expandable={{
         showExpandColumn: false,
         expandedRowKeys: expandedRowKeys,

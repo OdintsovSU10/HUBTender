@@ -12,6 +12,28 @@ interface WorkEditFormProps {
   onCancel: () => void;
 }
 
+// Компонент для заголовка поля с опциональной звездочкой
+const FieldLabel: React.FC<{ label: string; required?: boolean; align?: 'left' | 'center' }> = ({ label, required, align = 'center' }) => (
+  <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: align }}>
+    {required && <span style={{ color: 'red', marginRight: '4px' }}>*</span>}
+    {label}
+  </div>
+);
+
+// Функция для получения цвета border на основе типа работы
+const getBorderColor = (type: string) => {
+  switch (type) {
+    case 'раб':
+      return '#ff9800';
+    case 'суб-раб':
+      return '#9c27b0';
+    case 'раб-комп.':
+      return '#f44336';
+    default:
+      return '#d9d9d9';
+  }
+};
+
 const WorkEditForm: React.FC<WorkEditFormProps> = ({
   record,
   workNames,
@@ -53,7 +75,8 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
   // Вычисление суммы
   const calculateTotal = (): number => {
     const rate = getCurrencyRate(formData.currency_type);
-    return formData.quantity * formData.unit_rate * rate;
+    const total = formData.quantity * formData.unit_rate * rate;
+    return Math.round(total * 100) / 100;
   };
 
   // Обработчик сохранения
@@ -65,6 +88,11 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
 
     if (!formData.quantity || formData.quantity <= 0) {
       message.error('Введите количество');
+      return;
+    }
+
+    if (!formData.detail_cost_category_id) {
+      message.error('Выберите затрату на строительство');
       return;
     }
 
@@ -103,11 +131,11 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
   };
 
   return (
-    <div style={{ padding: '16px', border: '1px solid #d9d9d9', borderRadius: '4px' }}>
+    <div style={{ padding: '16px', border: `2px solid ${getBorderColor(formData.boq_item_type)}`, borderRadius: '4px' }}>
       {/* Строка 1: Тип | Наименование | Кол-во | Ед.изм | Валюта | Цена */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Тип</div>
+          <FieldLabel label="Тип" />
           <Select
             value={formData.boq_item_type}
             onChange={(value) => setFormData({ ...formData, boq_item_type: value })}
@@ -122,7 +150,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
         </div>
 
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Наименование</div>
+          <FieldLabel label="Наименование" required />
           <AutoComplete
             value={workSearchText}
             onChange={(value) => {
@@ -154,19 +182,20 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
         </div>
 
         <div style={{ width: '100px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Кол-во</div>
+          <FieldLabel label="Кол-во" required />
           <InputNumber
             value={formData.quantity}
             onChange={(value) => setFormData({ ...formData, quantity: value || 0 })}
-            placeholder="0.00"
-            precision={2}
+            placeholder="0.00000"
+            precision={5}
             style={{ width: '100%' }}
             size="small"
+            parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
           />
         </div>
 
         <div style={{ width: '60px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Ед.изм.</div>
+          <FieldLabel label="Ед.изм." />
           <Input
             value={formData.unit_code || '-'}
             disabled
@@ -176,7 +205,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
         </div>
 
         <div style={{ width: '80px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Валюта</div>
+          <FieldLabel label="Валюта" />
           <Select
             value={formData.currency_type}
             onChange={(value) => setFormData({ ...formData, currency_type: value })}
@@ -192,7 +221,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
         </div>
 
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Цена за ед.</div>
+          <FieldLabel label="Цена за ед." />
           <InputNumber
             value={formData.unit_rate}
             onChange={(value) => setFormData({ ...formData, unit_rate: value || 0 })}
@@ -200,11 +229,13 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
             precision={2}
             style={{ width: '100%' }}
             size="small"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s/g, '').replace(/,/g, '.')}
           />
         </div>
 
         <div style={{ width: '120px' }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px', textAlign: 'center' }}>Итого</div>
+          <FieldLabel label="Итого" />
           <InputNumber
             value={calculateTotal()}
             disabled
@@ -219,7 +250,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
 
       {/* Строка 2: Затрата на строительство (на всю ширину) */}
       <div style={{ marginBottom: '12px' }}>
-        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>Затрата на строительство</div>
+        <FieldLabel label="Затрата на строительство" required />
         <AutoComplete
           value={costSearchText}
           onChange={(value) => {
@@ -251,7 +282,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
       {/* Строка 3: Ссылка на КП | Примечание (50/50) */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>Ссылка на КП</div>
+          <FieldLabel label="Ссылка на КП" align="left" />
           <Input
             value={formData.quote_link}
             onChange={(e) => setFormData({ ...formData, quote_link: e.target.value })}
@@ -262,7 +293,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
           />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>Примечание</div>
+          <FieldLabel label="Примечание" align="left" />
           <Input
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}

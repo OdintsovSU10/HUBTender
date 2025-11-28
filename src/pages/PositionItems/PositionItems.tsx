@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Card, Button, Typography, Tag, Input, InputNumber, Select } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { useState, useMemo } from 'react';
+import { Card, Button, Typography, Tag, Input, InputNumber, Select, Modal, message } from 'antd';
+import { ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import WorkEditForm from './WorkEditForm';
 import MaterialEditForm from './MaterialEditForm';
@@ -8,6 +8,8 @@ import { useBoqItems } from './hooks/useBoqItems';
 import { useItemActions } from './hooks/useItemActions';
 import ItemsTable from './components/ItemsTable';
 import AddItemForm from './components/AddItemForm';
+import TemplateSelectModal from './components/TemplateSelectModal';
+import { supabase } from '../../lib/supabase';
 
 const { Text, Title } = Typography;
 
@@ -18,8 +20,8 @@ const PositionItems: React.FC = () => {
 
   const [workSearchText, setWorkSearchText] = useState<string>('');
   const [materialSearchText, setMaterialSearchText] = useState<string>('');
-  const [templateSearchText, setTemplateSearchText] = useState<string>('');
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
+  const [templateModalVisible, setTemplateModalVisible] = useState<boolean>(false);
 
   const {
     position,
@@ -63,6 +65,11 @@ const PositionItems: React.FC = () => {
     fetchItems,
   });
 
+  // Вычисление общей суммы
+  const totalSum = useMemo(() => {
+    return items.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+  }, [items]);
+
   const handleEditClick = (record: any) => {
     setExpandedRowKeys([record.id]);
   };
@@ -85,6 +92,33 @@ const PositionItems: React.FC = () => {
     if (positionId && position?.is_additional) {
       await handleSaveAdditionalWorkData(positionId, workName, unitCode, fetchPositionData);
     }
+  };
+
+  const handleClearAllItems = async () => {
+    Modal.confirm({
+      title: 'Очистить все элементы?',
+      content: 'Вы действительно хотите удалить все работы и материалы из этой позиции? Это действие необратимо.',
+      okText: 'Да, очистить',
+      cancelText: 'Отмена',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          // Удаляем все элементы позиции из БД
+          const { error } = await supabase
+            .from('boq_items')
+            .delete()
+            .eq('client_position_id', positionId);
+
+          if (error) throw error;
+
+          // Обновляем состояние
+          await fetchItems();
+          message.success('Все элементы успешно удалены');
+        } catch (error: any) {
+          message.error('Ошибка при удалении элементов: ' + error.message);
+        }
+      },
+    });
   };
 
   if (!position) {
@@ -154,9 +188,10 @@ const PositionItems: React.FC = () => {
                       value={gpVolume}
                       onChange={(value) => setGpVolume(value || 0)}
                       onBlur={onSaveGPData}
-                      precision={2}
+                      precision={5}
                       style={{ width: 120 }}
                       size="small"
+                      parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
                     />
                     <Text type="secondary" style={{ marginLeft: 16 }}>Ед. изм:</Text>
                     <Select
@@ -194,9 +229,10 @@ const PositionItems: React.FC = () => {
                       value={gpVolume}
                       onChange={(value) => setGpVolume(value || 0)}
                       onBlur={onSaveGPData}
-                      precision={2}
+                      precision={5}
                       style={{ width: 120 }}
                       size="small"
+                      parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
                     />
                     <Text type="secondary">{position.unit_code}</Text>
                   </div>
@@ -222,13 +258,10 @@ const PositionItems: React.FC = () => {
         <AddItemForm
           works={works}
           materials={materials}
-          templates={templates}
           workSearchText={workSearchText}
           materialSearchText={materialSearchText}
-          templateSearchText={templateSearchText}
           onWorkSearchChange={setWorkSearchText}
           onMaterialSearchChange={setMaterialSearchText}
-          onTemplateSearchChange={setTemplateSearchText}
           onAddWork={(workNameId) => {
             handleAddWork(workNameId);
             setWorkSearchText('');
@@ -237,14 +270,30 @@ const PositionItems: React.FC = () => {
             handleAddMaterial(materialNameId);
             setMaterialSearchText('');
           }}
-          onAddTemplate={(templateId) => {
-            handleAddTemplate(templateId, () => {});
-            setTemplateSearchText('');
-          }}
+          onOpenTemplateModal={() => setTemplateModalVisible(true)}
         />
       </Card>
 
-      <Card title="Элементы позиции">
+      <Card
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Элементы позиции</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 'bold' }}>
+                Итого: <span style={{ color: '#10b981' }}>{Math.round(totalSum).toLocaleString('ru-RU')} ₽</span>
+              </div>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleClearAllItems}
+                disabled={items.length === 0}
+              >
+                Очистить все
+              </Button>
+            </div>
+          </div>
+        }
+      >
         <ItemsTable
           items={items}
           loading={loading}
@@ -290,6 +339,17 @@ const PositionItems: React.FC = () => {
           }}
         />
       </Card>
+
+      {/* Модалка выбора шаблона */}
+      <TemplateSelectModal
+        visible={templateModalVisible}
+        templates={templates}
+        onCancel={() => setTemplateModalVisible(false)}
+        onSelect={(templateId) => {
+          handleAddTemplate(templateId, () => {});
+          setTemplateModalVisible(false);
+        }}
+      />
     </div>
   );
 };

@@ -25,6 +25,7 @@ interface PositionToolbarProps {
   tenderTitles: TenderOption[];
   versions: { value: number; label: string }[];
   currentTheme: string;
+  totalSum: number;
   onTenderTitleChange: (title: string) => void;
   onVersionChange: (version: number) => void;
   onBackToSelection: () => void;
@@ -37,6 +38,7 @@ export const PositionToolbar: React.FC<PositionToolbarProps> = ({
   tenderTitles,
   versions,
   currentTheme,
+  totalSum,
   onTenderTitleChange,
   onVersionChange,
   onBackToSelection,
@@ -84,13 +86,14 @@ export const PositionToolbar: React.FC<PositionToolbarProps> = ({
       )}
 
       {/* Блок с фильтрами и информацией о тендере */}
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: '16px', display: 'flex', gap: '8px' }}>
+        {/* Левый и средний блоки объединены */}
         <Card
           bordered={false}
           bodyStyle={{ padding: '16px' }}
-          style={{ borderRadius: '8px' }}
+          style={{ borderRadius: '8px', flex: 1 }}
         >
-          <Row gutter={16}>
+          <Row gutter={8}>
             {/* Левый блок: Фильтры */}
             <Col span={9}>
               <Row gutter={8}>
@@ -122,8 +125,8 @@ export const PositionToolbar: React.FC<PositionToolbarProps> = ({
               </Row>
             </Col>
 
-            {/* Правый блок: Информация о тендере */}
-            <Col span={10} offset={5}>
+            {/* Средний блок: Информация о тендере */}
+            <Col span={15}>
               {selectedTender ? (
                 <div style={{ textAlign: 'right' }}>
                   {/* Строка 1: Название и заказчик */}
@@ -217,6 +220,33 @@ export const PositionToolbar: React.FC<PositionToolbarProps> = ({
               )}
             </Col>
           </Row>
+        </Card>
+
+        {/* Правый блок: Общая стоимость */}
+        <Card
+          bordered={false}
+          bodyStyle={{ padding: '16px', display: 'flex', minHeight: '120px' }}
+          style={{ borderRadius: '8px', width: '180px', flexShrink: 0 }}
+        >
+          {selectedTender ? (
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+              }}
+            >
+              <div style={{ fontSize: 14, color: currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)', lineHeight: '28px' }}>
+                Общая стоимость
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: currentTheme === 'dark' ? '#52c41a' : '#389e0d', letterSpacing: '0.5px', lineHeight: '28px' }}>
+                {Math.round(totalSum).toLocaleString('ru-RU')}
+              </div>
+            </div>
+          ) : null}
         </Card>
       </div>
     </>

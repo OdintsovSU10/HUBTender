@@ -13,6 +13,7 @@ interface Template {
   id: string;
   name: string;
   detail_cost_category_id: string | null;
+  detail_cost_category_full?: string | null;
 }
 
 export const useBoqItems = (positionId: string | undefined) => {
@@ -249,13 +250,39 @@ export const useBoqItems = (positionId: string | undefined) => {
 
   const fetchTemplates = async () => {
     try {
-      const { data, error } = await supabase
+      // Загружаем шаблоны с категориями затрат
+      const { data: templatesData, error: templatesError } = await supabase
         .from('templates')
-        .select('id, name, detail_cost_category_id')
+        .select(`
+          id,
+          name,
+          detail_cost_category_id,
+          detail_cost_categories(name, location, cost_categories(name))
+        `)
         .order('name', { ascending: true });
 
-      if (error) throw error;
-      setTemplates(data || []);
+      if (templatesError) throw templatesError;
+
+      // Преобразуем данные, добавляя detail_cost_category_full
+      const templatesWithCategories = (templatesData || []).map((template: any) => {
+        let detailCostCategoryFull = null;
+
+        if (template.detail_cost_categories) {
+          const categoryName = template.detail_cost_categories.cost_categories?.name || '';
+          const detailName = template.detail_cost_categories.name || '';
+          const location = template.detail_cost_categories.location || '';
+          detailCostCategoryFull = `${categoryName} / ${detailName} / ${location}`;
+        }
+
+        return {
+          id: template.id,
+          name: template.name,
+          detail_cost_category_id: template.detail_cost_category_id,
+          detail_cost_category_full: detailCostCategoryFull,
+        };
+      });
+
+      setTemplates(templatesWithCategories);
     } catch (error: any) {
       message.error('Ошибка загрузки шаблонов: ' + error.message);
     }

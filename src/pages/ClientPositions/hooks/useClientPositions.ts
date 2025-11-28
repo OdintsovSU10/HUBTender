@@ -8,6 +8,7 @@ export const useClientPositions = () => {
   const [clientPositions, setClientPositions] = useState<ClientPosition[]>([]);
   const [loading, setLoading] = useState(false);
   const [positionCounts, setPositionCounts] = useState<Record<string, { works: number; materials: number }>>({});
+  const [totalSum, setTotalSum] = useState<number>(0);
 
   // Загрузка тендеров
   useEffect(() => {
@@ -44,6 +45,9 @@ export const useClientPositions = () => {
       // Загружаем счетчики работ и материалов для каждой позиции
       if (data && data.length > 0) {
         await fetchPositionCounts(data.map(p => p.id));
+        await fetchTotalSum(data.map(p => p.id));
+      } else {
+        setTotalSum(0);
       }
     } catch (error: any) {
       message.error('Ошибка загрузки позиций: ' + error.message);
@@ -83,6 +87,25 @@ export const useClientPositions = () => {
     }
   };
 
+  // Загрузка общей суммы по всем элементам позиций
+  const fetchTotalSum = async (positionIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('boq_items')
+        .select('total_amount')
+        .in('client_position_id', positionIds);
+
+      if (error) throw error;
+
+      // Суммируем все total_amount
+      const sum = (data || []).reduce((acc, item) => acc + (item.total_amount || 0), 0);
+      setTotalSum(sum);
+    } catch (error: any) {
+      console.error('Ошибка загрузки общей суммы:', error);
+      setTotalSum(0);
+    }
+  };
+
   return {
     tenders,
     selectedTender,
@@ -92,6 +115,7 @@ export const useClientPositions = () => {
     loading,
     setLoading,
     positionCounts,
+    totalSum,
     fetchClientPositions,
   };
 };
