@@ -211,19 +211,20 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                 </Tooltip>
               )}
             </div>
-            {isLeaf && (
+            {/* Показываем сумму и счетчики для любой позиции, у которой есть работы/материалы, независимо от того, листовая она или нет */}
+            {(counts.works > 0 || counts.materials > 0) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                <Text style={{ margin: 0, fontWeight: 600, fontSize: 15, color: currentTheme === 'dark' ? '#52c41a' : '#389e0d' }}>
-                  {Math.round(total).toLocaleString('ru-RU')}
-                </Text>
-                {(counts.works > 0 || counts.materials > 0) && (
-                  <div style={{ display: 'flex', gap: 8, fontSize: 15, fontWeight: 600 }}>
-                    <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>Р:</span>
-                    <span style={{ color: '#ff9800' }}>{counts.works}</span>
-                    <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>М:</span>
-                    <span style={{ color: '#1890ff' }}>{counts.materials}</span>
-                  </div>
+                {total > 0 && (
+                  <Text style={{ margin: 0, fontWeight: 600, fontSize: 15, color: currentTheme === 'dark' ? '#52c41a' : '#389e0d' }}>
+                    {Math.round(total).toLocaleString('ru-RU')}
+                  </Text>
                 )}
+                <div style={{ display: 'flex', gap: 8, fontSize: 15, fontWeight: 600 }}>
+                  <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>Р:</span>
+                  <span style={{ color: '#ff9800' }}>{counts.works}</span>
+                  <span style={{ color: currentTheme === 'dark' ? '#fff' : '#000' }}>М:</span>
+                  <span style={{ color: '#1890ff' }}>{counts.materials}</span>
+                </div>
               </div>
             )}
           </div>

@@ -184,14 +184,27 @@ const ClientPositions: React.FC = () => {
   };
 
   // Определение конечной строки (листового узла)
+  // ДОП работы НЕ влияют на статус родительской позиции
   const isLeafPosition = (index: number): boolean => {
     if (index === clientPositions.length - 1) {
       return true;
     }
 
-    const currentLevel = clientPositions[index].hierarchy_level || 0;
-    const nextLevel = clientPositions[index + 1]?.hierarchy_level || 0;
+    const currentPosition = clientPositions[index];
+    const currentLevel = currentPosition.hierarchy_level || 0;
 
+    // Ищем следующую НЕдополнительную позицию для проверки
+    let nextIndex = index + 1;
+    while (nextIndex < clientPositions.length && clientPositions[nextIndex].is_additional) {
+      nextIndex++;
+    }
+
+    // Если не нашли обычную позицию (все следующие - ДОП работы), то текущая - листовая
+    if (nextIndex >= clientPositions.length) {
+      return true;
+    }
+
+    const nextLevel = clientPositions[nextIndex].hierarchy_level || 0;
     return currentLevel >= nextLevel;
   };
 

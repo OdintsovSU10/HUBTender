@@ -12,6 +12,19 @@ TenderHUB by SU_10 is a construction tender management portal for Bill of Quanti
 **Branding**: Complete design system documented in BRANDING.md
 **Logo Preview**: http://localhost:3000/logo-preview.html
 
+## Environment Setup
+
+**Required**: Create `.env.local` file with Supabase credentials:
+```bash
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+VITE_APP_NAME=TenderHub
+VITE_APP_VERSION=1.0.0
+NODE_ENV=development
+```
+
+See `.env.local` template in repository for full configuration.
+
 ## Development Commands
 
 ```bash
@@ -93,6 +106,7 @@ MIGRATION WORKFLOW:
 - `markup_tactics` - Markup strategies and rules
 - `tender_markup_percentage` - Tender-specific markup percentages
 - `subcontract_growth_exclusions` - Exclusions from subcontract growth markup (separate for works and materials)
+- `notifications` - User notifications system (managed via scripts)
 - ENUM: `boq_item_type` ('мат', 'суб-мат', 'мат-комп.', 'раб', 'суб-раб', 'раб-комп.')
 
 ## 🤖 AI Context for Database Schema
