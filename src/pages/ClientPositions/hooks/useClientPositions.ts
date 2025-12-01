@@ -9,6 +9,7 @@ export const useClientPositions = () => {
   const [loading, setLoading] = useState(false);
   const [positionCounts, setPositionCounts] = useState<Record<string, { works: number; materials: number }>>({});
   const [totalSum, setTotalSum] = useState<number>(0);
+  const [leafPositionIndices, setLeafPositionIndices] = useState<Set<number>>(new Set());
 
   // Загрузка тендеров
   useEffect(() => {
@@ -29,6 +30,38 @@ export const useClientPositions = () => {
     }
   };
 
+  // Вычисление листовых позиций (конечных узлов иерархии)
+  const computeLeafPositions = (positions: ClientPosition[]): Set<number> => {
+    const leafIndices = new Set<number>();
+
+    positions.forEach((position, index) => {
+      if (index === positions.length - 1) {
+        leafIndices.add(index);
+        return;
+      }
+
+      const currentLevel = position.hierarchy_level || 0;
+      let nextIndex = index + 1;
+
+      // Пропускаем ДОП работы при определении листового узла
+      while (nextIndex < positions.length && positions[nextIndex].is_additional) {
+        nextIndex++;
+      }
+
+      if (nextIndex >= positions.length) {
+        leafIndices.add(index);
+        return;
+      }
+
+      const nextLevel = positions[nextIndex].hierarchy_level || 0;
+      if (currentLevel >= nextLevel) {
+        leafIndices.add(index);
+      }
+    });
+
+    return leafIndices;
+  };
+
   // Загрузка позиций заказчика
   const fetchClientPositions = async (tenderId: string) => {
     setLoading(true);
@@ -42,67 +75,51 @@ export const useClientPositions = () => {
       if (error) throw error;
       setClientPositions(data || []);
 
-      // Загружаем счетчики работ и материалов для каждой позиции
+      // Вычисляем листовые позиции для оптимизации рендеринга
+      const leafIndices = computeLeafPositions(data || []);
+      setLeafPositionIndices(leafIndices);
+
+      // Загружаем счетчики работ/материалов и общую сумму одним запросом
       if (data && data.length > 0) {
-        await fetchPositionCounts(data.map(p => p.id));
-        await fetchTotalSum(data.map(p => p.id));
+        const positionIds = data.map(p => p.id);
+
+        const { data: boqData, error: boqError } = await supabase
+          .from('boq_items')
+          .select('client_position_id, boq_item_type, total_amount')
+          .in('client_position_id', positionIds);
+
+        if (boqError) throw boqError;
+
+        // Обрабатываем данные в памяти
+        const counts: Record<string, { works: number; materials: number }> = {};
+        let sum = 0;
+
+        (boqData || []).forEach((item) => {
+          // Подсчет работ и материалов
+          if (!counts[item.client_position_id]) {
+            counts[item.client_position_id] = { works: 0, materials: 0 };
+          }
+
+          if (['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type)) {
+            counts[item.client_position_id].works += 1;
+          } else if (['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)) {
+            counts[item.client_position_id].materials += 1;
+          }
+
+          // Суммирование
+          sum += item.total_amount || 0;
+        });
+
+        setPositionCounts(counts);
+        setTotalSum(sum);
       } else {
+        setPositionCounts({});
         setTotalSum(0);
       }
     } catch (error: any) {
       message.error('Ошибка загрузки позиций: ' + error.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Загрузка количества работ и материалов для позиций
-  const fetchPositionCounts = async (positionIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from('boq_items')
-        .select('client_position_id, boq_item_type')
-        .in('client_position_id', positionIds);
-
-      if (error) throw error;
-
-      // Подсчитываем количество работ и материалов для каждой позиции
-      const counts: Record<string, { works: number; materials: number }> = {};
-
-      (data || []).forEach((item) => {
-        if (!counts[item.client_position_id]) {
-          counts[item.client_position_id] = { works: 0, materials: 0 };
-        }
-
-        if (['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type)) {
-          counts[item.client_position_id].works += 1;
-        } else if (['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)) {
-          counts[item.client_position_id].materials += 1;
-        }
-      });
-
-      setPositionCounts(counts);
-    } catch (error: any) {
-      console.error('Ошибка загрузки счетчиков:', error);
-    }
-  };
-
-  // Загрузка общей суммы по всем элементам позиций
-  const fetchTotalSum = async (positionIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from('boq_items')
-        .select('total_amount')
-        .in('client_position_id', positionIds);
-
-      if (error) throw error;
-
-      // Суммируем все total_amount
-      const sum = (data || []).reduce((acc, item) => acc + (item.total_amount || 0), 0);
-      setTotalSum(sum);
-    } catch (error: any) {
-      console.error('Ошибка загрузки общей суммы:', error);
-      setTotalSum(0);
     }
   };
 
@@ -116,6 +133,7 @@ export const useClientPositions = () => {
     setLoading,
     positionCounts,
     totalSum,
+    leafPositionIndices,
     fetchClientPositions,
   };
 };

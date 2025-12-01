@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Table, Typography, Tag, Tooltip, Space, Button, AutoComplete } from 'antd';
+import React, { useMemo } from 'react';
+import { Card, Table, Typography, Tag, Tooltip, Space, Button } from 'antd';
 import { PlusOutlined, CopyOutlined, CheckOutlined, DownloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { ClientPosition, Tender } from '../../../lib/supabase';
@@ -10,44 +10,34 @@ interface PositionTableProps {
   clientPositions: ClientPosition[];
   selectedTender: Tender | null;
   loading: boolean;
-  scrollToPositionId: string | null;
   copiedPositionId: string | null;
   positionCounts: Record<string, { works: number; materials: number }>;
-  searchValue: string;
-  searchOptions: Array<{ key: string; value: string; label: string }>;
   currentTheme: string;
+  leafPositionIndices: Set<number>;
   onRowClick: (record: ClientPosition, index: number) => void;
   onOpenAdditionalModal: (parentId: string, event: React.MouseEvent) => void;
   onCopyPosition: (positionId: string, event: React.MouseEvent) => void;
   onPastePosition: (positionId: string, event: React.MouseEvent) => void;
   onDeleteAdditionalPosition: (positionId: string, positionName: string, event: React.MouseEvent) => void;
-  onSearchChange: (value: string) => void;
-  onSearchSelect: (value: string, option: any) => void;
   onExportToExcel: () => void;
-  isLeafPosition: (index: number) => boolean;
 }
 
 export const PositionTable: React.FC<PositionTableProps> = ({
   clientPositions,
   selectedTender,
   loading,
-  scrollToPositionId,
   copiedPositionId,
   positionCounts,
-  searchValue,
-  searchOptions,
   currentTheme,
+  leafPositionIndices,
   onRowClick,
   onOpenAdditionalModal,
   onCopyPosition,
   onPastePosition,
   onDeleteAdditionalPosition,
-  onSearchChange,
-  onSearchSelect,
   onExportToExcel,
-  isLeafPosition,
 }) => {
-  const columns: ColumnsType<ClientPosition> = [
+  const columns: ColumnsType<ClientPosition> = useMemo(() => [
     {
       title: <div style={{ textAlign: 'center' }}>№</div>,
       dataIndex: 'position_number',
@@ -62,7 +52,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
       width: 400,
       fixed: 'left',
       render: (_, record, index) => {
-        const isLeaf = isLeafPosition(index);
+        const isLeaf = leafPositionIndices.has(index);
         const sectionColor = isLeaf ? '#52c41a' : '#ff7875';
         const isAdditional = record.is_additional;
         const paddingLeft = isAdditional ? 20 : 0;
@@ -137,7 +127,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
       key: 'gp_data',
       width: 300,
       render: (_, record, index) => {
-        const isLeaf = isLeafPosition(index);
+        const isLeaf = leafPositionIndices.has(index);
 
         return (
           <div style={{ fontSize: 12 }}>
@@ -169,7 +159,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
       render: (_, record, index) => {
         const total = (record.total_material || 0) + (record.total_works || 0);
         const counts = positionCounts[record.id] || { works: 0, materials: 0 };
-        const isLeaf = isLeafPosition(index);
+        const isLeaf = leafPositionIndices.has(index);
         const isAdditional = record.is_additional;
 
         return (
@@ -245,33 +235,29 @@ export const PositionTable: React.FC<PositionTableProps> = ({
         );
       },
     },
-  ];
+  ], [
+    positionCounts,
+    leafPositionIndices,
+    copiedPositionId,
+    currentTheme,
+    onOpenAdditionalModal,
+    onDeleteAdditionalPosition,
+    onCopyPosition,
+    onPastePosition,
+  ]);
 
   return (
     <Card
       bordered={false}
       title="Позиции заказчика"
       extra={
-        <Space>
-          <AutoComplete
-            value={searchValue}
-            onChange={onSearchChange}
-            onSelect={onSearchSelect}
-            style={{ width: 300 }}
-            placeholder="Поиск позиции (минимум 2 символа)..."
-            options={searchOptions}
-            filterOption={false}
-            allowClear
-            notFoundContent={searchValue && searchValue.length >= 2 ? 'Позиции не найдены' : null}
-          />
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={onExportToExcel}
-            disabled={!selectedTender || loading}
-          >
-            Экспорт в Excel
-          </Button>
-        </Space>
+        <Button
+          icon={<DownloadOutlined />}
+          onClick={onExportToExcel}
+          disabled={!selectedTender || loading}
+        >
+          Экспорт в Excel
+        </Button>
       }
       style={{ marginTop: 24 }}
     >
@@ -281,12 +267,11 @@ export const PositionTable: React.FC<PositionTableProps> = ({
         rowKey="id"
         loading={loading}
         rowClassName={(record) => {
-          if (scrollToPositionId === record.id) return 'highlight-row';
           if (copiedPositionId === record.id) return 'copied-row';
           return '';
         }}
         onRow={(record, index) => {
-          const isLeaf = isLeafPosition(index!);
+          const isLeaf = leafPositionIndices.has(index!);
           return {
             onClick: () => onRowClick(record, index!),
             style: {
@@ -295,7 +280,8 @@ export const PositionTable: React.FC<PositionTableProps> = ({
           };
         }}
         pagination={false}
-        scroll={{ x: 1200, y: 'calc(100vh - 400px)' }}
+        scroll={{ x: 1200, y: 600 }}
+        virtual
         size="small"
       />
     </Card>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useClientPositions } from './hooks/useClientPositions';
@@ -29,11 +29,8 @@ const ClientPositions: React.FC = () => {
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
   const [selectedTenderTitle, setSelectedTenderTitle] = useState<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
-  const [scrollToPositionId, setScrollToPositionId] = useState<string | null>(null);
   const [additionalModalOpen, setAdditionalModalOpen] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
-  const [searchValue, setSearchValue] = useState<string>('');
-  const [searchOptions, setSearchOptions] = useState<Array<{ key: string; value: string; label: string }>>([]);
 
   // Hooks
   const {
@@ -46,6 +43,7 @@ const ClientPositions: React.FC = () => {
     setLoading,
     positionCounts,
     totalSum,
+    leafPositionIndices,
     fetchClientPositions,
   } = useClientPositions();
 
@@ -57,87 +55,9 @@ const ClientPositions: React.FC = () => {
     handleDeleteAdditionalPosition,
   } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
 
-  // Восстановление состояния из URL при возврате
-  useEffect(() => {
-    if (tenders.length > 0) {
-      const tenderId = searchParams.get('tenderId');
-      const positionId = searchParams.get('positionId');
-
-      if (tenderId) {
-        const tender = tenders.find(t => t.id === tenderId);
-        if (tender) {
-          setSelectedTender(tender);
-          setSelectedTenderId(tender.id);
-          setSelectedTenderTitle(tender.title);
-          setSelectedVersion(tender.version || 1);
-          fetchClientPositions(tender.id);
-
-          if (positionId) {
-            setScrollToPositionId(positionId);
-          }
-        }
-      }
-    }
-  }, [tenders, searchParams]);
-
-  // Debounce для поиска позиций
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchValue && searchValue.length >= 2) {
-        const searchLower = searchValue.toLowerCase();
-        const filtered = [];
-
-        for (let i = 0; i < clientPositions.length && filtered.length < 50; i++) {
-          const p = clientPositions[i];
-          if (p.work_name.toLowerCase().includes(searchLower)) {
-            filtered.push({
-              key: p.id,
-              value: `${p.position_number} - ${p.work_name}`,
-              label: `${p.position_number} - ${p.work_name}`,
-            });
-          }
-        }
-        setSearchOptions(filtered);
-      } else {
-        setSearchOptions([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchValue, clientPositions]);
-
-  // Прокрутка к позиции после загрузки данных
-  useEffect(() => {
-    if (scrollToPositionId && clientPositions.length > 0 && !loading) {
-      setTimeout(() => {
-        let element = document.querySelector(`[data-row-key="${scrollToPositionId}"]`) as HTMLElement;
-
-        if (!element) {
-          const allRows = document.querySelectorAll('.ant-table-row');
-          element = Array.from(allRows).find(
-            (row) => (row as HTMLElement).getAttribute('data-row-key') === scrollToPositionId
-          ) as HTMLElement;
-        }
-
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-          setTimeout(() => {
-            setScrollToPositionId(null);
-            setSearchParams({});
-          }, 2000);
-        } else {
-          setTimeout(() => {
-            setScrollToPositionId(null);
-            setSearchParams({});
-          }, 1000);
-        }
-      }, 500);
-    }
-  }, [scrollToPositionId, clientPositions, loading]);
 
   // Получение уникальных наименований тендеров
-  const getTenderTitles = (): TenderOption[] => {
+  const tenderTitles = useMemo((): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
 
     tenders.forEach(tender => {
@@ -151,18 +71,20 @@ const ClientPositions: React.FC = () => {
     });
 
     return Array.from(uniqueTitles.values());
-  };
+  }, [tenders]);
 
   // Получение версий для выбранного наименования тендера
-  const getVersionsForTitle = (title: string): { value: number; label: string }[] => {
+  const versions = useMemo((): { value: number; label: string }[] => {
+    if (!selectedTenderTitle) return [];
+
     return tenders
-      .filter(tender => tender.title === title)
+      .filter(tender => tender.title === selectedTenderTitle)
       .map(tender => ({
         value: tender.version || 1,
         label: `Версия ${tender.version || 1}`,
       }))
       .sort((a, b) => b.value - a.value);
-  };
+  }, [tenders, selectedTenderTitle]);
 
   // Обработка выбора наименования тендера
   const handleTenderTitleChange = (title: string) => {
@@ -184,37 +106,12 @@ const ClientPositions: React.FC = () => {
     }
   };
 
-  // Определение конечной строки (листового узла)
-  // ДОП работы НЕ влияют на статус родительской позиции
-  const isLeafPosition = (index: number): boolean => {
-    if (index === clientPositions.length - 1) {
-      return true;
-    }
-
-    const currentPosition = clientPositions[index];
-    const currentLevel = currentPosition.hierarchy_level || 0;
-
-    // Ищем следующую НЕдополнительную позицию для проверки
-    let nextIndex = index + 1;
-    while (nextIndex < clientPositions.length && clientPositions[nextIndex].is_additional) {
-      nextIndex++;
-    }
-
-    // Если не нашли обычную позицию (все следующие - ДОП работы), то текущая - листовая
-    if (nextIndex >= clientPositions.length) {
-      return true;
-    }
-
-    const nextLevel = clientPositions[nextIndex].hierarchy_level || 0;
-    return currentLevel >= nextLevel;
-  };
-
   // Обработчики модального окна
-  const handleOpenAdditionalModal = (parentId: string, event: React.MouseEvent) => {
+  const handleOpenAdditionalModal = useCallback((parentId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     setSelectedParentId(parentId);
     setAdditionalModalOpen(true);
-  };
+  }, []);
 
   const handleAdditionalSuccess = () => {
     setAdditionalModalOpen(false);
@@ -225,26 +122,15 @@ const ClientPositions: React.FC = () => {
   };
 
   // Обработчик клика по строке
-  const handleRowClick = (record: any, index: number) => {
-    const isLeaf = isLeafPosition(index);
+  const handleRowClick = useCallback((record: any, index: number) => {
+    const isLeaf = leafPositionIndices.has(index);
     if (isLeaf && selectedTender) {
       // Открываем в новой вкладке
       const url = `/positions/${record.id}/items?tenderId=${selectedTender.id}&positionId=${record.id}`;
       window.open(url, '_blank');
     }
-  };
+  }, [leafPositionIndices, selectedTender]);
 
-  // Обработчик поиска
-  const handleSearchSelect = (_value: string, option: any) => {
-    const positionId = option.key;
-    setScrollToPositionId(positionId);
-    setSearchValue('');
-    setSearchOptions([]);
-
-    setTimeout(() => {
-      setScrollToPositionId(null);
-    }, 3000);
-  };
 
   // Обработчик возврата к выбору
   const handleBackToSelection = () => {
@@ -271,8 +157,8 @@ const ClientPositions: React.FC = () => {
         tenders={tenders}
         selectedTenderTitle={selectedTenderTitle}
         selectedVersion={selectedVersion}
-        tenderTitles={getTenderTitles()}
-        versions={selectedTenderTitle ? getVersionsForTitle(selectedTenderTitle) : []}
+        tenderTitles={tenderTitles}
+        versions={versions}
         onTenderTitleChange={handleTenderTitleChange}
         onVersionChange={handleVersionChange}
         onTenderCardClick={handleTenderCardClick}
@@ -292,8 +178,8 @@ const ClientPositions: React.FC = () => {
           selectedTender={selectedTender}
           selectedTenderTitle={selectedTenderTitle}
           selectedVersion={selectedVersion}
-          tenderTitles={getTenderTitles()}
-          versions={selectedTenderTitle ? getVersionsForTitle(selectedTenderTitle) : []}
+          tenderTitles={tenderTitles}
+          versions={versions}
           currentTheme={currentTheme}
           totalSum={totalSum}
           onTenderTitleChange={handleTenderTitleChange}
@@ -310,12 +196,10 @@ const ClientPositions: React.FC = () => {
           clientPositions={clientPositions}
           selectedTender={selectedTender}
           loading={loading}
-          scrollToPositionId={scrollToPositionId}
           copiedPositionId={copiedPositionId}
           positionCounts={positionCounts}
-          searchValue={searchValue}
-          searchOptions={searchOptions}
           currentTheme={currentTheme}
+          leafPositionIndices={leafPositionIndices}
           onRowClick={handleRowClick}
           onOpenAdditionalModal={handleOpenAdditionalModal}
           onCopyPosition={handleCopyPosition}
@@ -323,10 +207,7 @@ const ClientPositions: React.FC = () => {
           onDeleteAdditionalPosition={(positionId, positionName, event) =>
             handleDeleteAdditionalPosition(positionId, positionName, selectedTenderId, event)
           }
-          onSearchChange={setSearchValue}
-          onSearchSelect={handleSearchSelect}
           onExportToExcel={() => handleExportToExcel(selectedTender)}
-          isLeafPosition={isLeafPosition}
         />
       )}
 
