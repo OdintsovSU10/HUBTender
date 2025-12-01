@@ -1,8 +1,7 @@
 import React from 'react';
 import { Card, Table, Typography, Tag, Tooltip, Space, Button, AutoComplete } from 'antd';
-import { PlusOutlined, CopyOutlined, CheckOutlined, DownloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, CopyOutlined, CheckOutlined, DownloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { Link as RouterLink } from 'react-router-dom';
 import type { ClientPosition, Tender } from '../../../lib/supabase';
 
 const { Text } = Typography;
@@ -21,6 +20,7 @@ interface PositionTableProps {
   onOpenAdditionalModal: (parentId: string, event: React.MouseEvent) => void;
   onCopyPosition: (positionId: string, event: React.MouseEvent) => void;
   onPastePosition: (positionId: string, event: React.MouseEvent) => void;
+  onDeleteAdditionalPosition: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onSearchChange: (value: string) => void;
   onSearchSelect: (value: string, option: any) => void;
   onExportToExcel: () => void;
@@ -41,6 +41,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onOpenAdditionalModal,
   onCopyPosition,
   onPastePosition,
+  onDeleteAdditionalPosition,
   onSearchChange,
   onSearchSelect,
   onExportToExcel,
@@ -68,11 +69,8 @@ export const PositionTable: React.FC<PositionTableProps> = ({
 
         if (isLeaf && selectedTender) {
           return (
-            <RouterLink
-              to={`/positions/${record.id}/items?tenderId=${selectedTender.id}&positionId=${record.id}`}
+            <div
               style={{
-                textDecoration: 'none',
-                color: 'inherit',
                 display: 'block',
                 paddingLeft: `${paddingLeft}px`,
               }}
@@ -86,8 +84,8 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                   </Text>
                 )
               )}
-              <Text>{record.work_name}</Text>
-            </RouterLink>
+              <Text style={{ textDecoration: 'underline' }}>{record.work_name}</Text>
+            </div>
           );
         }
 
@@ -185,6 +183,22 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                     onClick={(e) => onOpenAdditionalModal(record.id, e)}
                   >
                     <PlusOutlined />
+                  </Tag>
+                </Tooltip>
+              )}
+              {isAdditional && (
+                <Tooltip title="Удалить ДОП работу">
+                  <Tag
+                    style={{
+                      cursor: 'pointer',
+                      margin: 0,
+                      backgroundColor: currentTheme === 'dark' ? '#2d1818' : '#ffe6e6',
+                      borderColor: currentTheme === 'dark' ? '#5a3030' : '#ffb3b3',
+                      color: currentTheme === 'dark' ? '#d49999' : '#a65050',
+                    }}
+                    onClick={(e) => onDeleteAdditionalPosition(record.id, record.work_name, e)}
+                  >
+                    <DeleteOutlined />
                   </Tag>
                 </Tooltip>
               )}

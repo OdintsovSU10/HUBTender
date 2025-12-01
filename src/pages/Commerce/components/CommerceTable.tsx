@@ -41,16 +41,14 @@ export default function CommerceTable({
       width: 350,
       render: (_, record, index) => {
         const isLeaf = isLeafPosition(record, index);
-        const sectionColor = isLeaf ? '#52c41a' : '#ff7875';
+        const itemNoColor = isLeaf ? '#52c41a' : '#ff7875';
+        const paddingLeft = record.is_additional ? 20 : 0;
 
         return (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
+              paddingLeft,
               cursor: isLeaf ? 'pointer' : 'default',
-              whiteSpace: 'normal',
-              wordBreak: 'break-word'
             }}
             onClick={() => {
               if (isLeaf && selectedTenderId) {
@@ -58,12 +56,25 @@ export default function CommerceTable({
               }
             }}
           >
-            {record.item_no && (
-              <Text strong style={{ color: sectionColor, marginRight: 8, flexShrink: 0 }}>
-                {record.item_no}
-              </Text>
-            )}
-            <Text style={{ textDecoration: isLeaf ? 'underline' : 'none' }}>{record.work_name}</Text>
+            <div style={{ fontWeight: 500 }}>
+              {record.is_additional ? (
+                <Tag color="orange" style={{ marginRight: 8 }}>
+                  ДОП
+                </Tag>
+              ) : record.section_number ? (
+                <Tag color="blue" style={{ marginRight: 8 }}>
+                  {record.section_number}
+                </Tag>
+              ) : null}
+              {record.item_no && (
+                <span style={{ marginRight: 8, color: itemNoColor, fontWeight: 600 }}>
+                  {record.item_no}
+                </span>
+              )}
+              <span style={{ textDecoration: isLeaf ? 'underline' : 'none' }}>
+                {record.work_name}
+              </span>
+            </div>
           </div>
         );
       },

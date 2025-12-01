@@ -120,40 +120,40 @@ function collectExportRows(
       standaloneMaterials.forEach(mat => {
         rows.push(createBoqItemRow(mat, position));
       });
+    }
 
-      // ДОП работы для этой позиции
-      const childAdditional = additionalPositions.filter(
-        ap => ap.parent_position_id === position.id
-      );
+    // ДОП работы для этой позиции (обрабатываем для ВСЕХ позиций, не только листовых)
+    const childAdditional = additionalPositions.filter(
+      ap => ap.parent_position_id === position.id
+    );
 
-      for (const dopWork of childAdditional) {
-        // Добавить строку ДОП работы
-        rows.push(createPositionRow(dopWork, true));
+    for (const dopWork of childAdditional) {
+      // Добавить строку ДОП работы
+      rows.push(createPositionRow(dopWork, true));
 
-        // BOQ items для ДОП работы
-        const dopBoqItems = boqItemsByPosition.get(dopWork.id) || [];
+      // BOQ items для ДОП работы
+      const dopBoqItems = boqItemsByPosition.get(dopWork.id) || [];
 
-        const dopWorks = dopBoqItems.filter(item => isWorkType(item.boq_item_type));
-        const dopMaterials = dopBoqItems.filter(item => isMaterialType(item.boq_item_type));
+      const dopWorks = dopBoqItems.filter(item => isWorkType(item.boq_item_type));
+      const dopMaterials = dopBoqItems.filter(item => isMaterialType(item.boq_item_type));
 
-        for (const work of dopWorks) {
-          rows.push(createBoqItemRow(work, dopWork));
+      for (const work of dopWorks) {
+        rows.push(createBoqItemRow(work, dopWork));
 
-          const linkedMaterials = dopMaterials.filter(
-            m => m.parent_work_item_id === work.id
-          );
-          linkedMaterials.forEach(mat => {
-            rows.push(createBoqItemRow(mat, dopWork));
-          });
-        }
-
-        const standaloneMaterials = dopMaterials.filter(
-          m => !m.parent_work_item_id || m.parent_work_item_id === null
+        const linkedMaterials = dopMaterials.filter(
+          m => m.parent_work_item_id === work.id
         );
-        standaloneMaterials.forEach(mat => {
+        linkedMaterials.forEach(mat => {
           rows.push(createBoqItemRow(mat, dopWork));
         });
       }
+
+      const standaloneMaterials = dopMaterials.filter(
+        m => !m.parent_work_item_id || m.parent_work_item_id === null
+      );
+      standaloneMaterials.forEach(mat => {
+        rows.push(createBoqItemRow(mat, dopWork));
+      });
     }
   }
 
@@ -323,7 +323,7 @@ export async function exportPositionsToExcel(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Позиции заказчика');
 
     // Сформировать имя файла
-    const fileName = `${tenderTitle} (Версия ${tenderVersion}).xlsx`;
+    const fileName = `Форма КП_${tenderTitle} (v${tenderVersion}).xlsx`;
 
     // Экспортировать файл
     XLSX.writeFile(workbook, fileName);

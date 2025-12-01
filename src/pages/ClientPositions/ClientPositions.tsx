@@ -54,7 +54,8 @@ const ClientPositions: React.FC = () => {
     handleCopyPosition,
     handlePastePosition,
     handleExportToExcel,
-  } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions);
+    handleDeleteAdditionalPosition,
+  } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
 
   // Восстановление состояния из URL при возврате
   useEffect(() => {
@@ -227,7 +228,9 @@ const ClientPositions: React.FC = () => {
   const handleRowClick = (record: any, index: number) => {
     const isLeaf = isLeafPosition(index);
     if (isLeaf && selectedTender) {
-      navigate(`/positions/${record.id}/items?tenderId=${selectedTender.id}&positionId=${record.id}`);
+      // Открываем в новой вкладке
+      const url = `/positions/${record.id}/items?tenderId=${selectedTender.id}&positionId=${record.id}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -317,6 +320,9 @@ const ClientPositions: React.FC = () => {
           onOpenAdditionalModal={handleOpenAdditionalModal}
           onCopyPosition={handleCopyPosition}
           onPastePosition={(positionId, event) => handlePastePosition(positionId, event, selectedTenderId)}
+          onDeleteAdditionalPosition={(positionId, positionName, event) =>
+            handleDeleteAdditionalPosition(positionId, positionName, selectedTenderId, event)
+          }
           onSearchChange={setSearchValue}
           onSearchSelect={handleSearchSelect}
           onExportToExcel={() => handleExportToExcel(selectedTender)}

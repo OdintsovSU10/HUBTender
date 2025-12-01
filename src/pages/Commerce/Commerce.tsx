@@ -2,14 +2,12 @@
  * Страница "Коммерция" - отображение коммерческих стоимостей позиций заказчика
  */
 
-import { useNavigate } from 'react-router-dom';
 import { Card, Spin, Empty } from 'antd';
 import { useCommerceData, useCommerceActions, usePricingConsistency } from './hooks';
 import { TenderSelector, CommerceTable, CommerceHeader } from './components';
 import { exportCommerceToExcel } from './utils/exportToExcel';
 
 export default function Commerce() {
-  const navigate = useNavigate();
 
   const {
     loading,
@@ -86,7 +84,8 @@ export default function Commerce() {
   // Обработка навигации к позиции
   const handleNavigateToPosition = (positionId: string) => {
     if (selectedTenderId) {
-      navigate(`/positions/${positionId}/items?tenderId=${selectedTenderId}&positionId=${positionId}`);
+      const url = `/positions/${positionId}/items?tenderId=${selectedTenderId}&positionId=${positionId}`;
+      window.open(url, '_blank');
     }
   };
 

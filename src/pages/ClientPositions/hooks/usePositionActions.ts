@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { message } from 'antd';
+import { message, Modal } from 'antd';
 import { supabase, type ClientPosition } from '../../../lib/supabase';
 import { copyBoqItems } from '../../../utils/copyBoqItems';
 import { exportPositionsToExcel } from '../../../utils/excel';
@@ -8,7 +8,8 @@ export const usePositionActions = (
   _clientPositions: ClientPosition[],
   setClientPositions: React.Dispatch<React.SetStateAction<ClientPosition[]>>,
   setLoading: (loading: boolean) => void,
-  fetchClientPositions: (tenderId: string) => Promise<void>
+  fetchClientPositions: (tenderId: string) => Promise<void>,
+  currentTheme: string
 ) => {
   const [copiedPositionId, setCopiedPositionId] = useState<string | null>(null);
 
@@ -111,11 +112,63 @@ export const usePositionActions = (
     }
   };
 
+  // Удаление ДОП работы
+  const handleDeleteAdditionalPosition = async (
+    positionId: string,
+    positionName: string,
+    selectedTenderId: string | null,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation();
+
+    Modal.confirm({
+      title: 'Удалить ДОП работу?',
+      content: `Вы действительно хотите удалить ДОП работу "${positionName}"? Все связанные работы и материалы также будут удалены. Это действие необратимо.`,
+      okText: 'Да, удалить',
+      cancelText: 'Отмена',
+      okButtonProps: { danger: true },
+      rootClassName: currentTheme === 'dark' ? 'dark-modal' : '',
+      onOk: async () => {
+        setLoading(true);
+        try {
+          // Сначала удаляем все boq_items для этой позиции
+          const { error: boqError } = await supabase
+            .from('boq_items')
+            .delete()
+            .eq('client_position_id', positionId);
+
+          if (boqError) throw boqError;
+
+          // Затем удаляем саму позицию
+          const { error: posError } = await supabase
+            .from('client_positions')
+            .delete()
+            .eq('id', positionId);
+
+          if (posError) throw posError;
+
+          message.success('ДОП работа успешно удалена');
+
+          // Обновляем список позиций
+          if (selectedTenderId) {
+            await fetchClientPositions(selectedTenderId);
+          }
+        } catch (error: any) {
+          console.error('Ошибка удаления ДОП работы:', error);
+          message.error('Ошибка удаления: ' + error.message);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
+
   return {
     copiedPositionId,
     handleUpdatePosition,
     handleCopyPosition,
     handlePastePosition,
     handleExportToExcel,
+    handleDeleteAdditionalPosition,
   };
 };
