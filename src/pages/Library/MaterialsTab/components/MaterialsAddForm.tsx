@@ -129,7 +129,13 @@ export const MaterialsAddForm: React.FC<MaterialsAddFormProps> = ({
                 }
               ]}
             >
-              <InputNumber min={1.0} step={0.01} precision={4} style={{ width: '100%' }} />
+              <InputNumber
+                min={1.0}
+                step={0.01}
+                precision={4}
+                style={{ width: '100%' }}
+                parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
+              />
             </Form.Item>
           </Col>
           <Col span={2}>
@@ -138,7 +144,13 @@ export const MaterialsAddForm: React.FC<MaterialsAddFormProps> = ({
               name="unit_rate"
               rules={[{ required: true, message: 'Обязательное поле' }]}
             >
-              <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} />
+              <InputNumber
+                min={0}
+                step={0.01}
+                precision={2}
+                style={{ width: '100%' }}
+                parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
+              />
             </Form.Item>
           </Col>
           <Col span={2}>
@@ -186,6 +198,7 @@ export const MaterialsAddForm: React.FC<MaterialsAddFormProps> = ({
                 precision={2}
                 style={{ width: '100%' }}
                 disabled={addDeliveryType !== 'суммой'}
+                parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
               />
             </Form.Item>
           </Col>

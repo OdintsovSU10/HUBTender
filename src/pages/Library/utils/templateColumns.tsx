@@ -176,6 +176,7 @@ export const createTemplateColumns = (
               precision={4}
               style={{ width: '100%' }}
               disabled={!record.parent_work_item_id}
+              parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
             />
           );
         } else {

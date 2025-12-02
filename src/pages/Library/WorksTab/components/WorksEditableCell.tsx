@@ -124,6 +124,7 @@ export const WorksEditableCell: React.FC<WorksEditableCellProps> = ({
             step={0.01}
             precision={2}
             style={{ width: '100%' }}
+            parser={(value) => parseFloat(value!.replace(/,/g, '.'))}
           />
         </Form.Item>
       );
