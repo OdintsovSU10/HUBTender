@@ -654,7 +654,12 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
                           <Text type="secondary" style={{ fontSize: 12 }}>{user?.email}</Text>
                         </div>
                         <div>
-                          <Tag color="blue" style={{ margin: 0 }}>{user?.role}</Tag>
+                          <Tag
+                            color={user?.role_color || 'default'}
+                            style={{ margin: 0 }}
+                          >
+                            {user?.role}
+                          </Tag>
                         </div>
                       </div>
                     ),
@@ -677,7 +682,9 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <span>{user?.full_name || 'Пользователь'}</span>
-                <Avatar style={{ backgroundColor: '#10b981' }}>
+                <Avatar style={{
+                  backgroundColor: user?.role_color ? `var(--ant-${user.role_color}-6, #10b981)` : '#10b981'
+                }}>
                   {user?.full_name?.charAt(0).toUpperCase() || 'П'}
                 </Avatar>
               </div>

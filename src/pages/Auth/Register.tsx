@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message, Typography, Select } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, TeamOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, Typography } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { DEFAULT_ROLE_PAGES, type UserRole } from '../../lib/supabase/types';
+import { DEFAULT_ROLE_PAGES } from '../../lib/supabase/types';
 import { HeaderIcon } from '../../components/Icons/HeaderIcon';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 
 interface RegisterFormValues {
   full_name: string;
   email: string;
   password: string;
   confirm_password: string;
-  role: UserRole;
 }
 
 const Register: React.FC = () => {
@@ -48,14 +46,23 @@ const Register: React.FC = () => {
         return;
       }
 
-      // 2. Создаем запись в public.users со статусом pending
+      // 2. Получаем allowed_pages для роли инженера
+      const { data: engineerRole } = await supabase
+        .from('roles')
+        .select('allowed_pages')
+        .eq('code', 'engineer')
+        .single();
+
+      // 3. Создаем запись в public.users со статусом pending
       // Используем функцию register_user для обхода RLS
+      // Роль по умолчанию 'engineer' (Инженер), будет изменена администратором при одобрении
       const { error: userInsertError } = await supabase.rpc('register_user', {
         p_user_id: authData.user.id,
         p_full_name: values.full_name,
         p_email: values.email,
-        p_role: values.role,
-        p_allowed_pages: DEFAULT_ROLE_PAGES[values.role],
+        p_role_code: 'engineer',
+        p_allowed_pages: engineerRole?.allowed_pages || [],
+        p_password: values.password, // Сохраняем пароль в открытом виде для reference
       });
 
       if (userInsertError) {
@@ -73,20 +80,20 @@ const Register: React.FC = () => {
         return;
       }
 
-      // 3. Получаем всех администраторов и руководителей для отправки уведомлений
+      // 3. Получаем всех администраторов, руководителей и разработчиков для отправки уведомлений
       const { data: admins } = await supabase
         .from('users')
         .select('id')
-        .in('role', ['Администратор', 'Руководитель'])
+        .in('role', ['Администратор', 'Руководитель', 'Разработчик'])
         .eq('access_status', 'approved');
 
-      // 4. Создаем уведомления для администраторов и руководителей
+      // 4. Создаем уведомления для администраторов, руководителей и разработчиков
       if (admins && admins.length > 0) {
         const notifications = admins.map((admin) => ({
           user_id: admin.id,
           type: 'pending' as const,
           title: 'Новый запрос на регистрацию',
-          message: `${values.full_name} (${values.email}) запросил роль "${values.role}"`,
+          message: `${values.full_name} (${values.email}) запросил доступ к системе`,
           related_entity_type: 'registration_request',
           related_entity_id: authData.user.id,
           is_read: false,
@@ -198,24 +205,6 @@ const Register: React.FC = () => {
               size="large"
               autoComplete="email"
             />
-          </Form.Item>
-
-          <Form.Item
-            name="role"
-            label="Роль"
-            rules={[{ required: true, message: 'Выберите роль' }]}
-          >
-            <Select
-              placeholder="Выберите вашу роль"
-              size="large"
-              suffixIcon={<TeamOutlined />}
-            >
-              <Option value="Инженер">Инженер</Option>
-              <Option value="Старший группы">Старший группы</Option>
-              <Option value="Руководитель">Руководитель</Option>
-              <Option value="Администратор">Администратор</Option>
-              <Option value="Разработчик">Разработчик</Option>
-            </Select>
           </Form.Item>
 
           <Form.Item

@@ -12,6 +12,14 @@ TenderHUB by SU_10 is a construction tender management portal for Bill of Quanti
 **Branding**: Complete design system documented in BRANDING.md
 **Logo Preview**: http://localhost:3000/logo-preview.html
 
+## КРАТКОСТЬ
+- Делай MVP
+- Отвечай максимально сжато. Без пояснений и предисловий.
+- Если запрашивают код — выводи только рабочие фрагменты кода в блоках, без текста.
+- Изменения выдавай как *минимальный diff/patch* или как *конкретные вставки*.
+- Не перечисляй, «что было сделано», если прямо не попросили.
+- Если нужен текст — не более 5 пунктов, каждый ≤ 12 слов.
+
 ## Development Commands
 
 ```bash

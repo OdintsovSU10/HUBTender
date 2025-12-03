@@ -702,19 +702,25 @@ export interface UserInsert {
   id: string; // UUID from auth.users
   full_name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // Русское название роли (для отображения)
+  role_code: string; // Связь с roles.code (administrator, developer, director, engineer, senior_group, general_director)
   access_status?: AccessStatus;
-  allowed_pages?: string[];
+  allowed_pages?: string[]; // Массив путей страниц. Пустой массив = полный доступ. Синхронизируется из roles.allowed_pages
   approved_by?: string | null;
   approved_at?: string | null;
+  password?: string | null; // ВНИМАНИЕ: хранится в открытом виде (только для справки администраторов)
+  access_enabled?: boolean; // Флаг доступа: true - может войти, false - доступ закрыт
 }
 
 export interface User extends UserInsert {
+  role_code: string;
   access_status: AccessStatus;
   allowed_pages: string[];
   registration_date: string;
   created_at: string;
   updated_at: string;
+  password: string | null;
+  access_enabled: boolean;
 }
 
 // Упрощенный тип пользователя для AuthContext
@@ -723,8 +729,11 @@ export interface AuthUser {
   email: string;
   full_name: string;
   role: UserRole;
+  role_code?: string;
+  role_color?: string;
   access_status: AccessStatus;
   allowed_pages: string[];
+  access_enabled: boolean;
 }
 
 // =============================================
@@ -873,6 +882,15 @@ export const hasPageAccess = (user: AuthUser, pagePath: string): boolean => {
   // Пустой массив allowed_pages = полный доступ
   if (user.allowed_pages.length === 0) {
     return true;
+  }
+
+  // Специальная логика: если есть доступ к /positions, автоматически разрешен доступ к /positions/:positionId/items
+  // Эти страницы являются одним целым - просмотр позиций и их элементов (работ и материалов)
+  if (pagePath.match(/^\/positions\/[^/]+\/items$/)) {
+    // Проверяем, есть ли доступ к родительской странице /positions
+    if (user.allowed_pages.includes('/positions')) {
+      return true;
+    }
   }
 
   // Проверяем, соответствует ли текущий путь хотя бы одному разрешенному

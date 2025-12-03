@@ -30,7 +30,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          *,
+          roles:role_code (
+            name,
+            color
+          )
+        `)
         .eq('id', authUser.id)
         .single();
 
@@ -49,9 +55,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: data.id,
         email: data.email,
         full_name: data.full_name,
-        role: data.role,
+        role: (data as any).roles?.name || 'Пользователь',
+        role_code: data.role_code,
+        role_color: (data as any).roles?.color,
         access_status: data.access_status,
         allowed_pages: Array.isArray(data.allowed_pages) ? data.allowed_pages : [],
+        access_enabled: data.access_enabled ?? true,
       };
 
       return userData;
