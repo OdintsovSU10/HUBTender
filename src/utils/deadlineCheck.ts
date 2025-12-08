@@ -1,5 +1,4 @@
-import { AuthUser } from '../contexts/AuthContext';
-import type { TenderDeadlineExtension, DeadlineCheckResult } from '../lib/supabase/types';
+import type { AuthUser, TenderDeadlineExtension, DeadlineCheckResult } from '../lib/supabase/types';
 
 // Роли с полным доступом независимо от дедлайна
 const ROLES_WITH_FULL_ACCESS = ['administrator', 'director', 'developer', 'veduschiy_inzhener'];

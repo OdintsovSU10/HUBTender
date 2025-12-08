@@ -17,6 +17,42 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Retry utility with exponential backoff
+ * Retries network errors up to maxRetries times with exponentially increasing delays
+ */
+const retryWithBackoff = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T | null> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
+      const isLastAttempt = attempt === maxRetries;
+      const isNetworkError =
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('Network request failed') ||
+        err.message?.includes('timeout') ||
+        err.code === 'PGRST301'; // PostgREST timeout
+
+      if (!isNetworkError || isLastAttempt) {
+        throw error; // Critical error or exhausted retries
+      }
+
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.warn(
+        `🔄 Retry attempt ${attempt}/${maxRetries} after ${delay}ms`,
+        { error: err.message }
+      );
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  return null;
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,67 +61,145 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Загрузка данных пользователя из таблицы public.users
+   * С retry механизмом для обработки временных сетевых ошибок
    */
-  const loadUserData = async (authUser: SupabaseUser): Promise<AuthUser | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select(`
-          *,
-          roles:role_code (
-            name,
-            color
-          )
-        `)
-        .eq('id', authUser.id)
-        .single();
+  const loadUserData = async (
+    authUser: SupabaseUser,
+    isRetry: boolean = false
+  ): Promise<AuthUser | null> => {
+    const startTime = Date.now();
 
-      if (error) {
-        console.error('Ошибка загрузки данных пользователя:', error);
+    try {
+      const result = await retryWithBackoff(async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select(`
+            *,
+            roles:role_code (
+              name,
+              color
+            )
+          `)
+          .eq('id', authUser.id)
+          .single();
+
+        if (error) throw error;
+        if (!data) throw new Error('USER_NOT_FOUND');
+
+        return data;
+      });
+
+      if (!result) {
+        console.error('❌ loadUserData: все попытки retry исчерпаны', {
+          userId: authUser.id,
+          duration: Date.now() - startTime,
+        });
         return null;
       }
 
-      if (!data) {
-        console.error('Пользователь не найден в таблице users');
-        return null;
+      // Check access_enabled BEFORE checking access_status
+      if (!result.access_enabled) {
+        console.warn('⚠️ Пользователь заблокирован (access_enabled=false)', {
+          userId: result.id,
+          email: result.email,
+        });
+        return null; // Critical: user disabled
+      }
+
+      if (result.access_status !== 'approved') {
+        console.warn('⚠️ Пользователь не одобрен', {
+          userId: result.id,
+          status: result.access_status,
+        });
+        return null; // Critical: not approved
       }
 
       // Формируем объект AuthUser
-      const userData: AuthUser = {
-        id: data.id,
-        email: data.email,
-        full_name: data.full_name,
-        role: (data as any).roles?.name || 'Пользователь',
-        role_code: data.role_code,
-        role_color: (data as any).roles?.color,
-        access_status: data.access_status,
-        allowed_pages: Array.isArray(data.allowed_pages) ? data.allowed_pages : [],
-        access_enabled: data.access_enabled ?? true,
+      const resultWithRoles = result as typeof result & {
+        roles?: { name: string; color: string };
       };
 
+      const userData: AuthUser = {
+        id: result.id,
+        email: result.email,
+        full_name: result.full_name,
+        role: resultWithRoles.roles?.name || 'Пользователь',
+        role_code: result.role_code,
+        role_color: resultWithRoles.roles?.color,
+        access_status: result.access_status,
+        allowed_pages: Array.isArray(result.allowed_pages) ? result.allowed_pages : [],
+        access_enabled: result.access_enabled ?? true,
+      };
+
+      console.log('✅ loadUserData success', {
+        userId: userData.id,
+        role: userData.role_code,
+        duration: Date.now() - startTime,
+        isRetry,
+      });
+
       return userData;
-    } catch (err) {
-      console.error('Неожиданная ошибка при загрузке пользователя:', err);
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
+      const duration = Date.now() - startTime;
+
+      // Classify error
+      const isCritical =
+        err.message === 'USER_NOT_FOUND' || err.code === 'PGRST116'; // Row not found
+
+      console.error(
+        isCritical
+          ? '❌ CRITICAL: Пользователь не найден'
+          : '⚠️ Временная ошибка loadUserData',
+        {
+          userId: authUser.id,
+          error: err.message,
+          code: err.code,
+          duration,
+          isCritical,
+        }
+      );
+
       return null;
     }
   };
 
   /**
    * Обновление данных текущего пользователя
+   * Не выходит при временных ошибках, сохраняет текущего user
    */
   const refreshUser = async () => {
+    console.log('🔄 refreshUser called', { currentUserId: user?.id });
+
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: { user: authUser }, error } = await supabase.auth.getUser();
+
+      if (error) throw error;
 
       if (authUser) {
         const userData = await loadUserData(authUser);
-        setUser(userData);
+
+        if (userData) {
+          setUser(userData);
+          console.log('✅ refreshUser: user updated');
+        } else {
+          console.warn('⚠️ refreshUser: failed to load user data, keeping current', {
+            authUserId: authUser.id,
+            currentUserId: user?.id,
+          });
+          // Don't logout, keep current user
+        }
       } else {
+        console.warn('⚠️ refreshUser: no auth user');
         setUser(null);
       }
-    } catch (error) {
-      console.error('Ошибка обновления пользователя:', error);
-      setUser(null);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('❌ refreshUser error', {
+        error: err.message,
+        currentUserId: user?.id,
+      });
+      // Don't logout on refresh errors - keep current user
     }
   };
 
@@ -180,7 +294,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }, 1500);
           }
         } else if (event === 'SIGNED_OUT') {
-          console.log('🔴 Handling SIGNED_OUT');
+          console.log('🔴 SIGNED_OUT event', {
+            currentUserId: user?.id,
+            hadSession: !!session,
+            timestamp: new Date().toISOString(),
+          });
 
           // Отменяем таймер SIGNED_IN если он был запущен
           if (signedInTimeout) {
@@ -188,48 +306,136 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             signedInTimeout = null;
           }
 
+          // Check if we still have a valid session (might be a false SIGNED_OUT)
+          // This can happen when refresh token fails with 500 error
+          if (user) {
+            console.warn('⚠️ SIGNED_OUT received but user exists, verifying session...');
+
+            try {
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+              if (currentSession?.user) {
+                console.log('✅ Session still valid, ignoring SIGNED_OUT', {
+                  userId: currentSession.user.id,
+                });
+                // Keep current user, don't logout
+                return;
+              }
+            } catch (error) {
+              console.error('❌ Error verifying session during SIGNED_OUT', error);
+            }
+          }
+
+          // Proceed with logout if no valid session found
+          console.log('🔴 Proceeding with logout');
           setUser(null);
           setLoading(false);
           initialSessionHandled.current = false;
           isProcessingEvent.current = false;
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          console.log('🔄 Handling TOKEN_REFRESHED');
-          const userData = await loadUserData(session.user);
-          setUser(userData);
+          console.log('🔄 TOKEN_REFRESHED event', {
+            userId: session.user.id,
+            timestamp: new Date().toISOString(),
+          });
+
+          try {
+            const userData = await loadUserData(session.user, true);
+
+            if (userData) {
+              setUser(userData);
+              console.log('✅ User data refreshed after token renewal');
+            } else {
+              // CRITICAL: Don't logout on temporary errors during token refresh
+              console.warn('⚠️ Failed to refresh user data, keeping current user', {
+                currentUserId: user?.id,
+                sessionUserId: session.user.id,
+              });
+
+              // Only logout if user IDs mismatch (security issue)
+              if (user && user.id !== session.user.id) {
+                console.error('❌ SECURITY: User ID mismatch, forcing logout');
+                setUser(null);
+              }
+              // Otherwise keep current user
+            }
+          } catch (error) {
+            console.error('❌ Error in TOKEN_REFRESHED handler', error);
+            // Keep current user on error
+          }
         } else if (event === 'USER_UPDATED' && session?.user) {
-          console.log('🔄 Handling USER_UPDATED');
-          const userData = await loadUserData(session.user);
-          setUser(userData);
+          console.log('🔄 USER_UPDATED event', {
+            userId: session.user.id,
+            timestamp: new Date().toISOString(),
+          });
+
+          try {
+            const userData = await loadUserData(session.user);
+
+            if (userData) {
+              setUser(userData);
+              console.log('✅ User data updated');
+            } else {
+              console.warn('⚠️ Failed to update user data, keeping current user', {
+                currentUserId: user?.id,
+                sessionUserId: session.user.id,
+              });
+              // Keep current user on error
+            }
+          } catch (error) {
+            console.error('❌ Error in USER_UPDATED handler', error);
+            // Keep current user on error
+          }
         }
       }
     );
 
     // Фоллбэк: если через 2 секунды события не пришло, проверяем сессию вручную
     const fallbackTimeout = setTimeout(async () => {
+      console.log('⏱️ Fallback timeout triggered (2s after mount)');
+
+      if (user || !loading) {
+        console.log('✅ User already loaded or loading complete, skipping fallback');
+        return;
+      }
+
       if (!initialSessionHandled.current && isSubscribed) {
-        console.warn('Auth event did not fire, checking session manually');
+        console.warn('⚠️ Auth event did not fire, checking session manually');
         try {
           // Добавляем таймаут для getSession
           const sessionPromise = supabase.auth.getSession();
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('getSession timeout')), 5000);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('getSession timeout after 5s')), 5000);
           });
 
-          const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-          const { data: { session } } = result;
+          const result = await Promise.race([sessionPromise, timeoutPromise]);
 
-          if (session?.user) {
-            const userData = await loadUserData(session.user);
-            setUser(userData);
+          if ('data' in result && result.data?.session?.user) {
+            console.log('✅ Fallback: session found', {
+              userId: result.data.session.user.id,
+            });
+
+            const userData = await loadUserData(result.data.session.user);
+
+            if (userData) {
+              setUser(userData);
+            } else {
+              console.warn('⚠️ Fallback: failed to load user data');
+              setUser(null);
+            }
           } else {
+            console.log('ℹ️ Fallback: no session');
             setUser(null);
           }
+        } catch (error: unknown) {
+          const err = error as Error;
+          console.error('❌ Fallback timeout error', {
+            error: err.message,
+            stack: err.stack,
+          });
+          setUser(null);
+        } finally {
           setLoading(false);
           initialSessionHandled.current = true;
-        } catch (error) {
-          console.error('Error in manual session check:', error);
-          setUser(null);
-          setLoading(false);
         }
       }
     }, 2000);
