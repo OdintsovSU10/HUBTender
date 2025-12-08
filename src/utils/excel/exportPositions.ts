@@ -86,11 +86,23 @@ function collectExportRows(
 
   // Обработать обычные позиции
   for (const position of normalPositions) {
-    // Проверить является ли позиция конечной
-    const isLeaf = position.hierarchy_level !== undefined && position.hierarchy_level >= 3;
+    // Проверить является ли позиция конечной (листовой)
+    // Позиция листовая если у неё НЕТ дочерних позиций
+    const hasChildren = normalPositions.some(p => p.parent_position_id === position.id) ||
+                        additionalPositions.some(p => p.parent_position_id === position.id);
+    const isLeaf = !hasChildren;
 
-    // Добавить строку позиции
-    rows.push(createPositionRow(position, isLeaf));
+    // Рассчитать реальную сумму из BOQ items ТОЛЬКО для листовых позиций
+    let actualTotal = null;
+    if (isLeaf) {
+      const boqItems = boqItemsByPosition.get(position.id) || [];
+      actualTotal = boqItems.length > 0
+        ? boqItems.reduce((sum, item) => sum + (item.total_amount || 0), 0)
+        : null;
+    }
+
+    // Добавить строку позиции (для нелистовых actualTotal=null → используются поля position)
+    rows.push(createPositionRow(position, isLeaf, actualTotal));
 
     // Если конечная позиция, добавить её BOQ items
     if (isLeaf) {
@@ -128,11 +140,14 @@ function collectExportRows(
     );
 
     for (const dopWork of childAdditional) {
-      // Добавить строку ДОП работы
-      rows.push(createPositionRow(dopWork, true));
-
-      // BOQ items для ДОП работы
+      // Рассчитать реальную сумму из BOQ items для ДОП работы
       const dopBoqItems = boqItemsByPosition.get(dopWork.id) || [];
+      const dopActualTotal = dopBoqItems.length > 0
+        ? dopBoqItems.reduce((sum, item) => sum + (item.total_amount || 0), 0)
+        : null;
+
+      // Добавить строку ДОП работы с реальной суммой
+      rows.push(createPositionRow(dopWork, true, dopActualTotal));
 
       const dopWorks = dopBoqItems.filter(item => isWorkType(item.boq_item_type));
       const dopMaterials = dopBoqItems.filter(item => isMaterialType(item.boq_item_type));
@@ -323,7 +338,7 @@ export async function exportPositionsToExcel(
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Позиции заказчика');
 
     // Сформировать имя файла
-    const fileName = `Форма КП_${tenderTitle} (v${tenderVersion}).xlsx`;
+    const fileName = `Расчет ПЗ_${tenderTitle}_Версия ${tenderVersion}.xlsx`;
 
     // Экспортировать файл
     XLSX.writeFile(workbook, fileName);

@@ -40,8 +40,16 @@ export function formatNumber(value: number | null, decimalPlaces: number = 2): s
 /**
  * Создает строку экспорта из позиции заказчика
  */
-export function createPositionRow(position: ClientPosition, isLeaf: boolean): ExportRow {
-  const totalAmount = (position.total_material || 0) + (position.total_works || 0);
+export function createPositionRow(
+  position: ClientPosition,
+  isLeaf: boolean,
+  actualTotalAmount: number | null = null
+): ExportRow {
+  // Для листовых позиций: использовать только actualTotalAmount (null если нет BOQ items)
+  // Для нелистовых позиций: использовать агрегированные поля position
+  const totalAmount = isLeaf
+    ? actualTotalAmount
+    : (position.total_material || 0) + (position.total_works || 0);
 
   return {
     itemNo: position.item_no || position.position_number,
@@ -59,7 +67,7 @@ export function createPositionRow(position: ClientPosition, isLeaf: boolean): Ex
     deliveryType: '',
     deliveryCost: null,
     unitPrice: null,
-    totalAmount: totalAmount || null,
+    totalAmount: totalAmount,
     quoteLink: '',
     clientNote: position.client_note || '',
     gpNote: position.manual_note || '',
