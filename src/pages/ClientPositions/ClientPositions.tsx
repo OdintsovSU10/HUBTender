@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useClientPositions } from './hooks/useClientPositions';
 import { usePositionActions } from './hooks/usePositionActions';
+import { useDeadlineCheck } from '../../hooks/useDeadlineCheck';
 import { TenderSelectionScreen } from './components/TenderSelectionScreen';
 import { PositionToolbar } from './components/PositionToolbar';
 import { DeadlineBar } from './components/DeadlineBar';
@@ -59,6 +60,9 @@ const ClientPositions: React.FC = () => {
     handleDeleteAdditionalPosition,
   } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
 
+  // Проверка дедлайна для блокировки редактирования
+  const { canEdit: canEditByDeadline, loading: deadlineLoading } =
+    useDeadlineCheck(selectedTender?.id);
 
   // Получение уникальных наименований тендеров
   const tenderTitles = useMemo((): TenderOption[] => {
@@ -205,6 +209,7 @@ const ClientPositions: React.FC = () => {
           positionCounts={positionCounts}
           currentTheme={currentTheme}
           leafPositionIndices={leafPositionIndices}
+          readOnly={!canEditByDeadline || deadlineLoading}
           onRowClick={handleRowClick}
           onOpenAdditionalModal={handleOpenAdditionalModal}
           onCopyPosition={handleCopyPosition}

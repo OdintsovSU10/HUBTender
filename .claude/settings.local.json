@@ -65,7 +65,8 @@
       "Bash(taskkill //F //PID 87804)",
       "Bash(taskkill //F //PID 51728)",
       "Bash(git remote add:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

@@ -18,6 +18,7 @@ interface ItemsTableProps {
   onDelete: (id: string) => void;
   getCurrencyRate: (currency: CurrencyType) => number;
   expandedRowRender: (record: BoqItemFull) => React.ReactNode;
+  readOnly?: boolean;
 }
 
 const ItemsTable: React.FC<ItemsTableProps> = ({
@@ -29,6 +30,7 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
   onDelete,
   getCurrencyRate,
   expandedRowRender,
+  readOnly,
 }) => {
   const getRowClassName = (record: BoqItemFull): string => {
     const itemType = record.boq_item_type;
@@ -340,7 +342,7 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
               size="small"
               icon={<EditOutlined />}
               onClick={() => onEditClick(record)}
-              disabled={expandedRowKeys.length > 0 && !expandedRowKeys.includes(record.id)}
+              disabled={readOnly || (expandedRowKeys.length > 0 && !expandedRowKeys.includes(record.id))}
             />
             <Popconfirm
               title="Удалить элемент?"
@@ -348,7 +350,7 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
               okText="Да"
               cancelText="Нет"
             >
-              <Button type="text" danger size="small" icon={<DeleteOutlined />} />
+              <Button type="text" danger size="small" icon={<DeleteOutlined />} disabled={readOnly} />
             </Popconfirm>
           </Space>
         );

@@ -1,5 +1,5 @@
 -- Database Schema SQL Export
--- Generated: 2025-12-03T17:47:27.983471
+-- Generated: 2025-12-08T12:13:55.807676
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -952,6 +952,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     access_enabled boolean DEFAULT true,
     role_code text NOT NULL,
     allowed_pages jsonb DEFAULT '[]'::jsonb,
+    tender_deadline_extensions jsonb DEFAULT '[]'::jsonb,
     CONSTRAINT users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id),
     CONSTRAINT users_email_key UNIQUE (email),
     CONSTRAINT users_pkey PRIMARY KEY (id),
@@ -1013,76 +1014,6 @@ CREATE TABLE IF NOT EXISTS realtime.messages (
     CONSTRAINT messages_pkey PRIMARY KEY (inserted_at)
 );
 
--- Table: realtime.messages_2025_11_30
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_11_30 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_11_30_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_11_30_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_01
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_01 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_01_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_01_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_02
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_02 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_02_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_02_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_03
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_03 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_03_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_03_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_04
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_04 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_04_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_04_pkey PRIMARY KEY (inserted_at)
-);
-
 -- Table: realtime.messages_2025_12_05
 CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_05 (
     topic text NOT NULL,
@@ -1109,6 +1040,76 @@ CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_06 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     CONSTRAINT messages_2025_12_06_pkey PRIMARY KEY (id),
     CONSTRAINT messages_2025_12_06_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_07
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_07 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_07_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_07_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_08
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_08 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_08_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_08_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_09
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_09 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_09_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_09_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_10
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_10 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_10_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_10_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_11
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_11 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_11_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_11_pkey PRIMARY KEY (inserted_at)
 );
 
 -- Table: realtime.schema_migrations
@@ -4771,6 +4772,9 @@ CREATE INDEX idx_users_access_status ON public.users USING btree (access_status)
 CREATE INDEX idx_users_approved_by ON public.users USING btree (approved_by);
 
 -- Index on public.users
+CREATE INDEX idx_users_deadline_extensions ON public.users USING gin (tender_deadline_extensions);
+
+-- Index on public.users
 CREATE INDEX idx_users_email ON public.users USING btree (email);
 
 -- Index on public.users
@@ -4806,26 +4810,26 @@ CREATE INDEX idx_works_library_work_name_id ON public.works_library USING btree 
 -- Index on realtime.messages
 CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
--- Index on realtime.messages_2025_11_30
-CREATE INDEX messages_2025_11_30_inserted_at_topic_idx ON realtime.messages_2025_11_30 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_01
-CREATE INDEX messages_2025_12_01_inserted_at_topic_idx ON realtime.messages_2025_12_01 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_02
-CREATE INDEX messages_2025_12_02_inserted_at_topic_idx ON realtime.messages_2025_12_02 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_03
-CREATE INDEX messages_2025_12_03_inserted_at_topic_idx ON realtime.messages_2025_12_03 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_04
-CREATE INDEX messages_2025_12_04_inserted_at_topic_idx ON realtime.messages_2025_12_04 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
 -- Index on realtime.messages_2025_12_05
 CREATE INDEX messages_2025_12_05_inserted_at_topic_idx ON realtime.messages_2025_12_05 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
 -- Index on realtime.messages_2025_12_06
 CREATE INDEX messages_2025_12_06_inserted_at_topic_idx ON realtime.messages_2025_12_06 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_07
+CREATE INDEX messages_2025_12_07_inserted_at_topic_idx ON realtime.messages_2025_12_07 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_08
+CREATE INDEX messages_2025_12_08_inserted_at_topic_idx ON realtime.messages_2025_12_08 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_09
+CREATE INDEX messages_2025_12_09_inserted_at_topic_idx ON realtime.messages_2025_12_09 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_10
+CREATE INDEX messages_2025_12_10_inserted_at_topic_idx ON realtime.messages_2025_12_10 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_11
+CREATE INDEX messages_2025_12_11_inserted_at_topic_idx ON realtime.messages_2025_12_11 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
 -- Index on realtime.subscription
 CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btree (entity);
@@ -4983,6 +4987,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_27 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_28 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_29 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_30 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_31 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_32 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_33 TO postgres;
@@ -4998,6 +5003,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_44 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_45 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_46 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_47 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_48 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_49 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_5 TO postgres;
@@ -5031,6 +5037,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_27 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_28 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_29 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_30 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_31 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_32 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_33 TO postgres;
@@ -5046,6 +5053,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_44 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_45 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_46 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_47 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_48 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_49 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_5 TO postgres;
@@ -5112,6 +5120,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_27 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_28 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_29 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_30 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_31 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_32 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_33 TO supabase_admin;
@@ -5127,6 +5136,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_44 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_45 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_46 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_47 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_48 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_49 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_5 TO supabase_admin;
@@ -5160,6 +5170,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_27 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_28 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_29 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_30 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_31 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_32 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_33 TO supabase_admin;
@@ -5175,6 +5186,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_44 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_45 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_46 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_47 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_48 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_49 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_5 TO supabase_admin;
@@ -5234,6 +5246,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_27 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_28 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_29 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_30 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_31 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_32 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_33 TO supabase_etl_admin;
@@ -5249,6 +5262,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_44 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_45 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_46 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_47 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_48 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_49 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_5 TO supabase_etl_admin;
@@ -5282,6 +5296,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_27 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_28 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_29 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_30 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_31 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_32 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_33 TO supabase_etl_admin;
@@ -5297,6 +5312,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_44 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_45 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_46 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_47 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_48 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_49 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_5 TO supabase_etl_admin;
@@ -5348,6 +5364,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_27 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_28 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_29 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_30 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_31 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_32 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_33 TO supabase_read_only_user;
@@ -5363,6 +5380,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_44 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_45 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_46 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_47 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_48 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_49 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_5 TO supabase_read_only_user;
@@ -5396,6 +5414,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_27 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_28 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_29 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_30 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_31 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_32 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_33 TO supabase_read_only_user;
@@ -5411,6 +5430,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_44 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_45 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_46 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_47 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_48 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_49 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_5 TO supabase_read_only_user;

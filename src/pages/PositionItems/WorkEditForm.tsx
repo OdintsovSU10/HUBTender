@@ -10,6 +10,7 @@ interface WorkEditFormProps {
   currencyRates: { usd: number; eur: number; cny: number };
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
+  readOnly?: boolean;
 }
 
 // Компонент для заголовка поля с опциональной звездочкой
@@ -41,6 +42,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
   currencyRates,
   onSave,
   onCancel,
+  readOnly,
 }) => {
   const [formData, setFormData] = useState<any>({
     boq_item_type: record.boq_item_type,
@@ -131,7 +133,8 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
   };
 
   return (
-    <div style={{ padding: '16px', border: `2px solid ${getBorderColor(formData.boq_item_type)}`, borderRadius: '4px' }}>
+    <fieldset disabled={readOnly} style={{ border: 'none', margin: 0, padding: 0 }}>
+      <div style={{ padding: '16px', border: `2px solid ${getBorderColor(formData.boq_item_type)}`, borderRadius: '4px' }}>
       {/* Строка 1: Тип | Наименование | Кол-во | Ед.изм | Валюта | Цена */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
         <div style={{ width: '120px' }}>
@@ -321,6 +324,7 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
         </Button>
       </div>
     </div>
+    </fieldset>
   );
 };
 

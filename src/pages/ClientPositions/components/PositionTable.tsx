@@ -25,6 +25,7 @@ interface PositionTableProps {
   positionCounts: Record<string, { works: number; materials: number }>;
   currentTheme: string;
   leafPositionIndices: Set<number>;
+  readOnly?: boolean;
   onRowClick: (record: ClientPosition, index: number) => void;
   onOpenAdditionalModal: (parentId: string, event: React.MouseEvent) => void;
   onCopyPosition: (positionId: string, event: React.MouseEvent) => void;
@@ -45,6 +46,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   positionCounts,
   currentTheme,
   leafPositionIndices,
+  readOnly,
   onRowClick,
   onOpenAdditionalModal,
   onCopyPosition,
@@ -226,7 +228,12 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                 <Tooltip title="Вставить работы и материалы" {...tooltipColor}>
                   <Tag
                     color="success"
-                    style={{ cursor: 'pointer', margin: 0 }}
+                    style={{
+                      cursor: readOnly ? 'not-allowed' : 'pointer',
+                      margin: 0,
+                      opacity: readOnly ? 0.5 : 1,
+                      pointerEvents: readOnly ? 'none' : 'auto'
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       onPastePosition(record.id, e);
@@ -242,7 +249,12 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                 <Tooltip title="Вставить примечание ГП" {...tooltipColor}>
                   <Tag
                     color="lime"
-                    style={{ cursor: 'pointer', margin: 0 }}
+                    style={{
+                      cursor: readOnly ? 'not-allowed' : 'pointer',
+                      margin: 0,
+                      opacity: readOnly ? 0.5 : 1,
+                      pointerEvents: readOnly ? 'none' : 'auto'
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       onPasteNote(record.id, e);
@@ -348,7 +360,12 @@ export const PositionTable: React.FC<PositionTableProps> = ({
               <Tooltip title="Действия" {...tooltipColor}>
                 <Tag
                   color="default"
-                  style={{ cursor: 'pointer', margin: 0 }}
+                  style={{
+                    cursor: readOnly ? 'not-allowed' : 'pointer',
+                    margin: 0,
+                    opacity: readOnly ? 0.5 : 1,
+                    pointerEvents: readOnly ? 'none' : 'auto'
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setExpandedPositionId(isExpanded ? null : record.id);
@@ -369,6 +386,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
     copiedNotePositionId,
     currentTheme,
     expandedPositionId,
+    readOnly,
     onOpenAdditionalModal,
     onDeleteAdditionalPosition,
     onCopyPosition,

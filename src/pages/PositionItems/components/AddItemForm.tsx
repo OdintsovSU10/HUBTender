@@ -13,6 +13,7 @@ interface AddItemFormProps {
   onAddWork: (workNameId: string) => void;
   onAddMaterial: (materialNameId: string) => void;
   onOpenTemplateModal: () => void;
+  disabled?: boolean;
 }
 
 const AddItemForm: React.FC<AddItemFormProps> = ({
@@ -25,6 +26,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({
   onAddWork,
   onAddMaterial,
   onOpenTemplateModal,
+  disabled,
 }) => {
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -33,6 +35,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({
         <AutoComplete
           style={{ flex: 1 }}
           placeholder="Выберите или начните вводить работу..."
+          disabled={disabled}
           options={works
             .filter(w => {
               if (!workSearchText) return true;
@@ -55,7 +58,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({
           type="primary"
           icon={<PlusOutlined />}
           style={{ background: '#10b981' }}
-          disabled={!workSearchText || works.filter(w =>
+          disabled={disabled || !workSearchText || works.filter(w =>
             w.work_name.toLowerCase().includes(workSearchText.toLowerCase())
           ).length === 0}
           onClick={() => {
@@ -75,6 +78,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({
         <AutoComplete
           style={{ flex: 1 }}
           placeholder="Выберите или начните вводить материал..."
+          disabled={disabled}
           options={materials
             .filter(m => {
               if (!materialSearchText) return true;
@@ -97,7 +101,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({
           type="primary"
           icon={<PlusOutlined />}
           style={{ background: '#10b981' }}
-          disabled={!materialSearchText || materials.filter(m =>
+          disabled={disabled || !materialSearchText || materials.filter(m =>
             m.material_name.toLowerCase().includes(materialSearchText.toLowerCase())
           ).length === 0}
           onClick={() => {
@@ -118,6 +122,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({
           type="primary"
           icon={<FileAddOutlined />}
           onClick={onOpenTemplateModal}
+          disabled={disabled}
           style={{ background: '#10b981', width: '100%' }}
         >
           Вставить шаблон

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tabs, Table, Button, Space, Tag, Modal, Form, Checkbox, Select, message, Popconfirm, Typography, Alert, Input, Radio, Tooltip } from 'antd';
+import { Card, Tabs, Table, Button, Space, Tag, Modal, Form, Checkbox, Select, message, Popconfirm, Typography, Alert, Input, Radio, Tooltip, AutoComplete } from 'antd';
 import { CheckOutlined, CloseOutlined, EditOutlined, UserOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { supabase } from '../../lib/supabase';
@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { canManageUsers, ALL_PAGES, PAGE_LABELS, PAGES_STRUCTURE, type AccessStatus } from '../../lib/supabase/types';
 import dayjs from 'dayjs';
+import TenderAccessTab from './components/TenderAccessTab';
 
 const { TabPane } = Tabs;
 const { Text } = Typography;
@@ -73,8 +74,27 @@ const Users: React.FC = () => {
   const [roleForm] = Form.useForm();
   const [createRoleForm] = Form.useForm();
 
+  // Состояние для поиска тендеров
+  const [tenderSearchText, setTenderSearchText] = useState('');
+  const [tendersList, setTendersList] = useState<{ id: string; tender_number: string; title: string; version: number }[]>([]);
+
   // Проверка доступа
   const hasAccess = currentUser && canManageUsers(currentUser.role);
+
+  // Загрузка списка тендеров для поиска
+  const loadTendersList = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenders')
+        .select('id, tender_number, title, version')
+        .order('submission_deadline', { ascending: false });
+
+      if (error) throw error;
+      setTendersList(data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки списка тендеров:', error);
+    }
+  };
 
   // Загрузка запросов на регистрацию
   const loadPendingRequests = async () => {
@@ -980,6 +1000,8 @@ const Users: React.FC = () => {
         loadUsers();
       } else if (activeTab === 'roles') {
         loadRoles();
+      } else if (activeTab === 'tender-access') {
+        loadTendersList();
       }
     }
   }, [activeTab, hasAccess]);
@@ -1018,7 +1040,28 @@ const Users: React.FC = () => {
           </div>
         }
       >
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          tabBarExtraContent={
+            activeTab === 'tender-access' ? (
+              <AutoComplete
+                style={{ width: 300 }}
+                options={tendersList.map(t => ({
+                  value: t.title,
+                  label: `№${t.tender_number} v${t.version} - ${t.title}`
+                }))}
+                value={tenderSearchText}
+                onChange={setTenderSearchText}
+                placeholder="Поиск по наименованию тендера"
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                allowClear
+              />
+            ) : null
+          }
+        >
           <TabPane
             tab={
               <span>
@@ -1069,6 +1112,10 @@ const Users: React.FC = () => {
               pagination={false}
               scroll={{ x: 900 }}
             />
+          </TabPane>
+
+          <TabPane tab="Доступ к тендерам" key="tender-access">
+            <TenderAccessTab searchText={tenderSearchText} />
           </TabPane>
         </Tabs>
       </Card>

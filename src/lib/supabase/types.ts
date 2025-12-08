@@ -720,6 +720,7 @@ export interface User extends UserInsert {
   updated_at: string;
   password: string | null;
   access_enabled: boolean;
+  tender_deadline_extensions?: TenderDeadlineExtension[];
 }
 
 // Упрощенный тип пользователя для AuthContext
@@ -733,6 +734,22 @@ export interface AuthUser {
   access_status: AccessStatus;
   allowed_pages: string[];
   access_enabled: boolean;
+}
+
+// =============================================
+// Типы для системы управления дедлайнами
+// =============================================
+
+export interface TenderDeadlineExtension {
+  tender_id: string;
+  extended_deadline: string; // ISO 8601 timestamp
+}
+
+export interface DeadlineCheckResult {
+  isExpired: boolean;      // Истек ли дедлайн
+  canEdit: boolean;        // Может ли редактировать
+  deadline: Date | null;   // Эффективный дедлайн
+  isExtended: boolean;     // Продлен ли вручную
 }
 
 // =============================================

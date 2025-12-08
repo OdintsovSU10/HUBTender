@@ -10,6 +10,7 @@ import ItemsTable from './components/ItemsTable';
 import AddItemForm from './components/AddItemForm';
 import TemplateSelectModal from './components/TemplateSelectModal';
 import { supabase } from '../../lib/supabase';
+import { useDeadlineCheck } from '../../hooks/useDeadlineCheck';
 
 const { Text, Title } = Typography;
 
@@ -46,6 +47,10 @@ const PositionItems: React.FC = () => {
     fetchPositionData,
     fetchItems,
   } = useBoqItems(positionId);
+
+  // Проверка дедлайна для блокировки редактирования
+  const { canEdit: canEditByDeadline, loading: deadlineLoading } =
+    useDeadlineCheck(position?.tender_id);
 
   const {
     handleAddWork,
@@ -152,6 +157,7 @@ const PositionItems: React.FC = () => {
                       value={workName}
                       onChange={(e) => setWorkName(e.target.value)}
                       onBlur={onSaveAdditionalWorkData}
+                      disabled={!canEditByDeadline || deadlineLoading}
                       style={{ width: 300 }}
                       size="small"
                       placeholder="Наименование работы"
@@ -161,6 +167,7 @@ const PositionItems: React.FC = () => {
                       value={gpNote}
                       onChange={(e) => setGpNote(e.target.value)}
                       onBlur={onSaveGPData}
+                      disabled={!canEditByDeadline || deadlineLoading}
                       style={{ width: 300 }}
                       size="small"
                       placeholder="Примечание"
@@ -172,6 +179,7 @@ const PositionItems: React.FC = () => {
                       value={gpVolume}
                       onChange={(value) => setGpVolume(value || 0)}
                       onBlur={onSaveGPData}
+                      disabled={!canEditByDeadline || deadlineLoading}
                       precision={5}
                       style={{ width: 120 }}
                       size="small"
@@ -184,6 +192,7 @@ const PositionItems: React.FC = () => {
                         setUnitCode(value);
                         setTimeout(() => onSaveAdditionalWorkData(), 100);
                       }}
+                      disabled={!canEditByDeadline || deadlineLoading}
                       style={{ width: 100 }}
                       size="small"
                       showSearch
@@ -212,6 +221,7 @@ const PositionItems: React.FC = () => {
                       value={gpVolume}
                       onChange={(value) => setGpVolume(value || 0)}
                       onBlur={onSaveGPData}
+                      disabled={!canEditByDeadline || deadlineLoading}
                       precision={5}
                       style={{ width: 120 }}
                       size="small"
@@ -226,6 +236,7 @@ const PositionItems: React.FC = () => {
                     value={gpNote}
                     onChange={(e) => setGpNote(e.target.value)}
                     onBlur={onSaveGPData}
+                    disabled={!canEditByDeadline || deadlineLoading}
                     style={{ width: 400 }}
                     size="small"
                     placeholder="Примечание"
@@ -254,6 +265,7 @@ const PositionItems: React.FC = () => {
             setMaterialSearchText('');
           }}
           onOpenTemplateModal={() => setTemplateModalVisible(true)}
+          disabled={!canEditByDeadline || deadlineLoading}
         />
       </Card>
 
@@ -269,7 +281,7 @@ const PositionItems: React.FC = () => {
                 danger
                 icon={<DeleteOutlined />}
                 onClick={handleClearAllItems}
-                disabled={items.length === 0}
+                disabled={items.length === 0 || !canEditByDeadline || deadlineLoading}
               >
                 Очистить все
               </Button>
@@ -285,6 +297,7 @@ const PositionItems: React.FC = () => {
           onEditClick={handleEditClick}
           onDelete={handleDelete}
           getCurrencyRate={getCurrencyRate}
+          readOnly={!canEditByDeadline || deadlineLoading}
           expandedRowRender={(record) => {
             const isWork = ['раб', 'суб-раб', 'раб-комп.'].includes(record.boq_item_type);
 
@@ -297,6 +310,7 @@ const PositionItems: React.FC = () => {
                   currencyRates={currencyRates}
                   onSave={onFormSave}
                   onCancel={onFormCancel}
+                  readOnly={!canEditByDeadline || deadlineLoading}
                 />
               );
             } else {
@@ -316,6 +330,7 @@ const PositionItems: React.FC = () => {
                   gpVolume={gpVolume}
                   onSave={onFormSave}
                   onCancel={onFormCancel}
+                  readOnly={!canEditByDeadline || deadlineLoading}
                 />
               );
             }

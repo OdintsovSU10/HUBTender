@@ -12,6 +12,7 @@ interface MaterialEditFormProps {
   gpVolume: number; // Количество ГП из позиции заказчика
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
+  readOnly?: boolean;
 }
 
 // Компонент для заголовка поля с опциональной звездочкой
@@ -45,6 +46,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
   gpVolume,
   onSave,
   onCancel,
+  readOnly,
 }) => {
   const [formData, setFormData] = useState<any>({
     boq_item_type: record.boq_item_type,
@@ -210,7 +212,8 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
   };
 
   return (
-    <div style={{ padding: '16px', border: `2px solid ${getBorderColor(formData.boq_item_type)}`, borderRadius: '4px' }}>
+    <fieldset disabled={readOnly} style={{ border: 'none', margin: 0, padding: 0 }}>
+      <div style={{ padding: '16px', border: `2px solid ${getBorderColor(formData.boq_item_type)}`, borderRadius: '4px' }}>
       {/* Строка 1: Тип | Вид | Наименование | Привязка */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
         <div style={{ width: '120px' }}>
@@ -512,6 +515,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         </Button>
       </div>
     </div>
+    </fieldset>
   );
 };
 
