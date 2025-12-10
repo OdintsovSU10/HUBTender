@@ -759,6 +759,7 @@ export interface DeadlineCheckResult {
 // Все страницы портала (для Transfer component и проверки доступа)
 export const ALL_PAGES = [
   '/dashboard',
+  '/tasks',
   '/admin/nomenclatures',
   '/admin/tenders',
   '/admin/construction_cost',
@@ -787,6 +788,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
   'Разработчик': [], // Полный доступ (для отладки и разработки)
   'Старший группы': [
     '/dashboard',
+    '/tasks',
     '/positions',
     '/positions/:positionId/items',
     '/commerce',
@@ -801,6 +803,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
   ],
   'Инженер': [
     '/dashboard',
+    '/tasks',
     '/positions',
     '/positions/:positionId/items',
     '/library',
@@ -813,6 +816,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
 // Названия страниц (соответствуют левому боковому меню)
 export const PAGE_LABELS: Record<string, string> = {
   '/dashboard': 'Дашборд',
+  '/tasks': 'Список задач',
   '/positions': 'Позиции заказчика',
   '/commerce/proposal': 'Форма КП',
   '/commerce/redistribution': 'Перераспределение',
@@ -837,7 +841,7 @@ export const PAGE_LABELS: Record<string, string> = {
 export const PAGES_STRUCTURE = [
   {
     title: null, // Без группы
-    pages: ['/dashboard', '/positions'],
+    pages: ['/dashboard', '/tasks', '/positions'],
   },
   {
     title: 'Коммерция',

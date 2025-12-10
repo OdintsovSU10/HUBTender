@@ -1,5 +1,5 @@
 -- Database Schema SQL Export
--- Generated: 2025-12-08T12:13:55.807676
+-- Generated: 2025-12-10T11:58:40.139724
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -936,6 +936,25 @@ CREATE TABLE IF NOT EXISTS public.units (
     CONSTRAINT units_pkey PRIMARY KEY (code)
 );
 
+-- Table: public.user_tasks
+-- Description: Задачи пользователей по тендерам
+CREATE TABLE IF NOT EXISTS public.user_tasks (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL,
+    tender_id uuid NOT NULL,
+    description text NOT NULL,
+    task_status USER-DEFINED DEFAULT 'running'::task_status,
+    completed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT user_tasks_pkey PRIMARY KEY (id),
+    CONSTRAINT user_tasks_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None),
+    CONSTRAINT user_tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES None.None(None)
+);
+COMMENT ON TABLE public.user_tasks IS 'Задачи пользователей по тендерам';
+COMMENT ON COLUMN public.user_tasks.task_status IS 'Статус задачи: running (в работе), paused (остановлена),
+  completed (завершена)';
+
 -- Table: public.users
 -- Description: Auth: Stores user login data within a secure schema.
 CREATE TABLE IF NOT EXISTS public.users (
@@ -953,6 +972,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     role_code text NOT NULL,
     allowed_pages jsonb DEFAULT '[]'::jsonb,
     tender_deadline_extensions jsonb DEFAULT '[]'::jsonb,
+    current_work_mode USER-DEFINED DEFAULT 'office'::work_mode,
+    current_work_status USER-DEFINED DEFAULT 'working'::work_status,
     CONSTRAINT users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id),
     CONSTRAINT users_email_key UNIQUE (email),
     CONSTRAINT users_pkey PRIMARY KEY (id),
@@ -1012,34 +1033,6 @@ CREATE TABLE IF NOT EXISTS realtime.messages (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     CONSTRAINT messages_pkey PRIMARY KEY (id),
     CONSTRAINT messages_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_05
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_05 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_05_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_05_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_06
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_06 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_06_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_06_pkey PRIMARY KEY (inserted_at)
 );
 
 -- Table: realtime.messages_2025_12_07
@@ -1110,6 +1103,34 @@ CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_11 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     CONSTRAINT messages_2025_12_11_pkey PRIMARY KEY (id),
     CONSTRAINT messages_2025_12_11_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_12
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_12 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_12_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_12_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_13
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_13 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_13_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_13_pkey PRIMARY KEY (inserted_at)
 );
 
 -- Table: realtime.schema_migrations
@@ -1326,7 +1347,13 @@ CREATE TYPE public.housing_class_type AS ENUM ('комфорт', 'бизнес',
 
 CREATE TYPE public.material_type AS ENUM ('основн.', 'вспомогат.');
 
+CREATE TYPE public.task_status AS ENUM ('running', 'paused', 'completed');
+
 CREATE TYPE public.user_role_type AS ENUM ('Руководитель', 'Администратор', 'Разработчик', 'Старший группы', 'Инженер');
+
+CREATE TYPE public.work_mode AS ENUM ('office', 'remote');
+
+CREATE TYPE public.work_status AS ENUM ('working', 'not_working');
 
 CREATE TYPE realtime.action AS ENUM ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'ERROR');
 
@@ -4352,6 +4379,9 @@ CREATE TRIGGER update_tenders_updated_at BEFORE UPDATE ON public.tenders FOR EAC
 -- Trigger: update_units_updated_at on public.units
 CREATE TRIGGER update_units_updated_at BEFORE UPDATE ON public.units FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
 
+-- Trigger: set_user_tasks_updated_at on public.user_tasks
+CREATE TRIGGER set_user_tasks_updated_at BEFORE UPDATE ON public.user_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+
 -- Trigger: update_users_updated_at on public.users
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
 
@@ -4765,6 +4795,15 @@ CREATE INDEX idx_units_is_active ON public.units USING btree (is_active);
 -- Index on public.units
 CREATE INDEX idx_units_sort_order ON public.units USING btree (sort_order);
 
+-- Index on public.user_tasks
+CREATE INDEX idx_user_tasks_status ON public.user_tasks USING btree (task_status);
+
+-- Index on public.user_tasks
+CREATE INDEX idx_user_tasks_tender_id ON public.user_tasks USING btree (tender_id);
+
+-- Index on public.user_tasks
+CREATE INDEX idx_user_tasks_user_id ON public.user_tasks USING btree (user_id);
+
 -- Index on public.users
 CREATE INDEX idx_users_access_status ON public.users USING btree (access_status);
 
@@ -4810,12 +4849,6 @@ CREATE INDEX idx_works_library_work_name_id ON public.works_library USING btree 
 -- Index on realtime.messages
 CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
--- Index on realtime.messages_2025_12_05
-CREATE INDEX messages_2025_12_05_inserted_at_topic_idx ON realtime.messages_2025_12_05 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_06
-CREATE INDEX messages_2025_12_06_inserted_at_topic_idx ON realtime.messages_2025_12_06 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
 -- Index on realtime.messages_2025_12_07
 CREATE INDEX messages_2025_12_07_inserted_at_topic_idx ON realtime.messages_2025_12_07 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
@@ -4830,6 +4863,12 @@ CREATE INDEX messages_2025_12_10_inserted_at_topic_idx ON realtime.messages_2025
 
 -- Index on realtime.messages_2025_12_11
 CREATE INDEX messages_2025_12_11_inserted_at_topic_idx ON realtime.messages_2025_12_11 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_12
+CREATE INDEX messages_2025_12_12_inserted_at_topic_idx ON realtime.messages_2025_12_12 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_13
+CREATE INDEX messages_2025_12_13_inserted_at_topic_idx ON realtime.messages_2025_12_13 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
 -- Index on realtime.subscription
 CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btree (entity);

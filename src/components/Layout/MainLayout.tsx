@@ -21,6 +21,7 @@ import {
   BankOutlined,
   PercentageOutlined,
   CheckCircleOutlined,
+  CheckSquareOutlined,
   InfoCircleOutlined,
   WarningOutlined,
   ClockCircleOutlined,
@@ -243,6 +244,11 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       key: '/dashboard',
       icon: <DashboardOutlined />,
       label: 'Дашборд',
+    },
+    {
+      key: '/tasks',
+      icon: <CheckSquareOutlined />,
+      label: 'Список задач',
     },
     {
       key: '/positions',

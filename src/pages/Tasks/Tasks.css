@@ -1,0 +1,75 @@
+/* Растягивание таблиц на полную ширину */
+.tasks-page {
+  width: 100%;
+  max-width: 100%;
+}
+
+.tasks-page .ant-table {
+  width: 100% !important;
+}
+
+.tasks-page .ant-table-container {
+  width: 100% !important;
+}
+
+/* Зеленая подсветка для задач в работе */
+.ant-table-tbody > tr.task-row-running > td {
+  background-color: #f6ffed !important;
+}
+
+.ant-table-tbody > tr.task-row-running:hover > td {
+  background-color: #d9f7be !important;
+}
+
+/* Желтая подсветка для остановленных задач */
+.ant-table-tbody > tr.task-row-paused > td {
+  background-color: #fffbe6 !important;
+}
+
+.ant-table-tbody > tr.task-row-paused:hover > td {
+  background-color: #fff1b8 !important;
+}
+
+/* Бледно-красная подсветка для завершенных задач */
+.ant-table-tbody > tr.task-row-completed > td {
+  background-color: #fff1f0 !important;
+}
+
+.ant-table-tbody > tr.task-row-completed:hover > td {
+  background-color: #ffccc7 !important;
+}
+
+/* Dark theme */
+.dark .ant-table-tbody > tr.task-row-running > td {
+  background-color: rgba(0, 128, 0, 0.2) !important;
+}
+
+.dark .ant-table-tbody > tr.task-row-running:hover > td {
+  background-color: rgba(0, 128, 0, 0.15) !important;
+}
+
+.dark .ant-table-tbody > tr.task-row-paused > td {
+  background-color: rgba(255, 193, 7, 0.2) !important;
+}
+
+.dark .ant-table-tbody > tr.task-row-paused:hover > td {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+}
+
+.dark .ant-table-tbody > tr.task-row-completed > td {
+  background-color: rgba(255, 0, 0, 0.2) !important;
+}
+
+.dark .ant-table-tbody > tr.task-row-completed:hover > td {
+  background-color: rgba(255, 0, 0, 0.15) !important;
+}
+
+/* Базовый темный фон для таблиц на темной теме */
+.dark .ant-table-tbody > tr > td {
+  background-color: #1f1f1f !important;
+  border-color: #303030 !important;
+}
+
+.dark .ant-table-tbody > tr:hover > td {
+  background-color: #141414 !important;
+}
