@@ -77,17 +77,19 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   const workOptions = works
     .filter((w) => w.work_name.toLowerCase().includes(workSearchText.toLowerCase()))
     .map((w) => ({
-      value: `${w.work_name} (${w.unit})`,
+      key: w.id,
+      value: w.work_name,
       id: w.id,
-      label: `${w.work_name} (${w.unit})`,
+      label: w.work_name,
     }));
 
   const materialOptions = materials
     .filter((m) => m.material_name.toLowerCase().includes(materialSearchText.toLowerCase()))
     .map((m) => ({
-      value: `${m.material_name} (${m.unit})`,
+      key: m.id,
+      value: m.material_name,
       id: m.id,
-      label: `${m.material_name} (${m.unit})`,
+      label: m.material_name,
     }));
 
   return (
