@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, Table, Select, Tabs, Tag, Input, message, Button, Typography, Space, Row, Col } from 'antd';
-import { SearchOutlined, FileExcelOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { SearchOutlined, FileExcelOutlined, ArrowLeftOutlined, LinkOutlined } from '@ant-design/icons';
 import { supabase } from '../../lib/supabase';
 import type { UnitType, BoqItemType } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
@@ -24,12 +24,16 @@ interface Tender {
 interface BoqItemData {
   id: string;
   boq_item_type: BoqItemType;
+  material_type?: 'основн.' | 'вспомогат.';
   name: string;
   total_quantity: number;
   unit_code: UnitType;
   price_per_unit: number;
   total_amount: number;
   usage_count: number; // количество позиций где используется
+  quote_link?: string; // Ссылка на КП
+  work_name_id?: string; // ID работы для UPDATE
+  material_name_id?: string; // ID материала для UPDATE
 }
 
 const Bsm: React.FC = () => {
@@ -113,11 +117,13 @@ const Bsm: React.FC = () => {
         .select(`
           id,
           boq_item_type,
+          material_type,
           quantity,
           unit_code,
           total_amount,
           work_name_id,
           material_name_id,
+          quote_link,
           work_names (
             name
           ),
@@ -142,16 +148,21 @@ const Bsm: React.FC = () => {
           existing.total_quantity += item.quantity || 0;
           existing.total_amount += item.total_amount || 0;
           existing.usage_count += 1;
+          // Не перезаписывать quote_link если уже есть
         } else {
           grouped.set(key, {
             id: key,
             boq_item_type: item.boq_item_type,
+            material_type: item.material_type,
             name: name,
             total_quantity: item.quantity || 0,
             unit_code: item.unit_code,
             price_per_unit: item.total_amount && item.quantity ? (item.total_amount / item.quantity) : 0,
             total_amount: item.total_amount || 0,
-            usage_count: 1
+            usage_count: 1,
+            quote_link: item.quote_link || '',
+            work_name_id: item.work_name_id,
+            material_name_id: item.material_name_id,
           });
         }
       });
@@ -183,6 +194,137 @@ const Bsm: React.FC = () => {
     }
   }, [selectedTenderId]);
 
+  // Handle inline quote link update
+  const handleUpdateQuoteLink = async (record: BoqItemData, newQuoteLink: string) => {
+    try {
+      // Определить что обновлять: material или work
+      const updateField = record.material_name_id ? 'material_name_id' : 'work_name_id';
+      const updateValue = record.material_name_id || record.work_name_id;
+
+      if (!updateValue) {
+        message.error('Невозможно обновить ссылку: отсутствует ID материала/работы');
+        return;
+      }
+
+      // UPDATE всех boq_items с тем же материалом/работой в текущем тендере
+      const { error } = await supabase
+        .from('boq_items')
+        .update({ quote_link: newQuoteLink || null })
+        .eq('tender_id', selectedTenderId!)
+        .eq(updateField, updateValue);
+
+      if (error) throw error;
+
+      // Обновить локальное состояние
+      setAllItems(prevItems =>
+        prevItems.map(item =>
+          item.id === record.id
+            ? { ...item, quote_link: newQuoteLink }
+            : item
+        )
+      );
+
+      message.success('Ссылка на КП обновлена');
+    } catch (error) {
+      console.error('Error updating quote link:', error);
+      message.error('Ошибка обновления ссылки на КП');
+    }
+  };
+
+  // Handle automatic quote links application
+  const handleApplyQuoteLinks = async () => {
+    if (!selectedTenderId) {
+      message.error('Не выбран тендер');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Шаг 1: Получить все строки БСМ с ссылками
+      const itemsWithLinks = allItems.filter(item => item.quote_link && item.quote_link.trim() !== '');
+
+      if (itemsWithLinks.length === 0) {
+        message.warning('Нет ссылок для простановки. Сначала заполните ссылки на КП в таблице.');
+        return;
+      }
+
+      // Шаг 2: Получить все boq_items текущего тендера
+      const { data: boqItems, error: fetchError } = await supabase
+        .from('boq_items')
+        .select(`
+          id,
+          boq_item_type,
+          material_type,
+          work_name_id,
+          material_name_id,
+          unit_code,
+          quantity,
+          total_amount,
+          work_names (
+            name
+          ),
+          material_names (
+            name
+          )
+        `)
+        .eq('tender_id', selectedTenderId);
+
+      if (fetchError) throw fetchError;
+
+      // Шаг 3: Для каждой строки с ссылкой найти совпадения и обновить
+      let updatedCount = 0;
+
+      for (const sourceItem of itemsWithLinks) {
+        const matchingItems = boqItems?.filter((targetItem: any) => {
+          // Совпадение по виду строки
+          if (targetItem.boq_item_type !== sourceItem.boq_item_type) return false;
+
+          // Совпадение по типу материала (только для материалов)
+          const isMaterial = ['мат', 'суб-мат', 'мат-комп.'].includes(sourceItem.boq_item_type);
+          if (isMaterial && targetItem.material_type !== sourceItem.material_type) return false;
+
+          // Совпадение по наименованию
+          const targetName = targetItem.work_names?.name || targetItem.material_names?.name;
+          if (targetName !== sourceItem.name) return false;
+
+          // Совпадение по единице измерения
+          if (targetItem.unit_code !== sourceItem.unit_code) return false;
+
+          return true;
+        }) || [];
+
+        // UPDATE всех совпадающих записей
+        if (matchingItems.length > 0) {
+          const itemIds = matchingItems.map(item => item.id);
+
+          const { error: updateError, count } = await supabase
+            .from('boq_items')
+            .update({ quote_link: sourceItem.quote_link })
+            .in('id', itemIds)
+            .select();
+
+          if (updateError) {
+            console.error('Error updating batch:', updateError);
+          } else {
+            updatedCount += matchingItems.length;
+          }
+        }
+      }
+
+      message.success(`Успешно проставлено ссылок в ${updatedCount} ${updatedCount === 1 ? 'запись' : updatedCount < 5 ? 'записи' : 'записей'}`);
+
+      // Перезагрузить данные БСМ
+      await fetchBoqItems(selectedTenderId);
+
+    } catch (error) {
+      console.error('Error applying quote links:', error);
+      message.error('Ошибка простановки ссылок');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Unit colors mapping
   const getUnitColor = (unit: UnitType): string => {
     const colors: Record<UnitType, string> = {
@@ -199,17 +341,42 @@ const Bsm: React.FC = () => {
     return colors[unit] || 'default';
   };
 
-  // Item type colors
-  const getItemTypeColor = (type: BoqItemType): string => {
-    const colors: Record<BoqItemType, string> = {
-      'мат': 'orange',
-      'суб-мат': 'purple',
-      'мат-комп.': 'red',
-      'раб': 'orange',
-      'суб-раб': 'purple',
-      'раб-комп.': 'red'
-    };
-    return colors[type] || 'default';
+  // Item type colors (из ItemsTable.tsx)
+  const getItemTypeStyle = (type: BoqItemType): { backgroundColor: string; color: string } => {
+    const isWork = ['раб', 'суб-раб', 'раб-комп.'].includes(type);
+
+    if (isWork) {
+      switch (type) {
+        case 'раб':
+          return { backgroundColor: 'rgba(239, 108, 0, 0.12)', color: '#f57c00' };
+        case 'суб-раб':
+          return { backgroundColor: 'rgba(106, 27, 154, 0.12)', color: '#7b1fa2' };
+        case 'раб-комп.':
+          return { backgroundColor: 'rgba(198, 40, 40, 0.12)', color: '#d32f2f' };
+      }
+    } else {
+      switch (type) {
+        case 'мат':
+          return { backgroundColor: 'rgba(21, 101, 192, 0.12)', color: '#1976d2' };
+        case 'суб-мат':
+          return { backgroundColor: 'rgba(104, 159, 56, 0.12)', color: '#7cb342' };
+        case 'мат-комп.':
+          return { backgroundColor: 'rgba(0, 105, 92, 0.12)', color: '#00897b' };
+      }
+    }
+
+    return { backgroundColor: 'rgba(0, 0, 0, 0.06)', color: '#000' };
+  };
+
+  // Material type colors (из ItemsTable.tsx)
+  const getMaterialTypeStyle = (type?: 'основн.' | 'вспомогат.'): { backgroundColor: string; color: string } => {
+    if (!type) return { backgroundColor: 'transparent', color: 'inherit' };
+
+    if (type === 'основн.') {
+      return { backgroundColor: 'rgba(255, 152, 0, 0.12)', color: '#fb8c00' };
+    } else {
+      return { backgroundColor: 'rgba(21, 101, 192, 0.12)', color: '#1976d2' };
+    }
   };
 
   const isMaterial = (type: BoqItemType) =>
@@ -236,20 +403,53 @@ const Bsm: React.FC = () => {
 
   const columns = [
     {
-      title: 'Тип',
+      title: 'Вид строки',
       dataIndex: 'boq_item_type',
       key: 'boq_item_type',
-      width: 100,
+      width: 110,
       align: 'center' as const,
-      render: (type: BoqItemType) => (
-        <Tag color={getItemTypeColor(type)}>{type}</Tag>
-      ),
+      render: (type: BoqItemType) => {
+        const style = getItemTypeStyle(type);
+        return (
+          <Tag style={{ backgroundColor: style.backgroundColor, color: style.color, border: 'none', margin: 0 }}>
+            {type}
+          </Tag>
+        );
+      },
+      sorter: (a: BoqItemData, b: BoqItemData) => a.boq_item_type.localeCompare(b.boq_item_type),
+    },
+    {
+      title: 'Тип материала',
+      dataIndex: 'material_type',
+      key: 'material_type',
+      width: 120,
+      align: 'center' as const,
+      render: (type?: 'основн.' | 'вспомогат.') => {
+        if (!type) return <span>—</span>;
+        const style = getMaterialTypeStyle(type);
+        return (
+          <Tag style={{ backgroundColor: style.backgroundColor, color: style.color, border: 'none', margin: 0, fontSize: 11 }}>
+            {type}
+          </Tag>
+        );
+      },
+      sorter: (a: BoqItemData, b: BoqItemData) => {
+        const aType = a.material_type || '';
+        const bType = b.material_type || '';
+        return aType.localeCompare(bType);
+      },
     },
     {
       title: 'Наименование',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string) => <span>{name}</span>,
+      width: 300,
+      render: (name: string) => (
+        <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}>
+          {name}
+        </div>
+      ),
+      sorter: (a: BoqItemData, b: BoqItemData) => a.name.localeCompare(b.name),
     },
     {
       title: 'Количество',
@@ -278,7 +478,7 @@ const Bsm: React.FC = () => {
       width: 150,
       align: 'center' as const,
       render: (price: number) => (
-        <div style={{ textAlign: 'right' }}>{price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+        <div style={{ textAlign: 'center' }}>{price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
       ),
       sorter: (a: BoqItemData, b: BoqItemData) => a.price_per_unit - b.price_per_unit,
     },
@@ -289,7 +489,7 @@ const Bsm: React.FC = () => {
       width: 180,
       align: 'center' as const,
       render: (amount: number) => (
-        <div style={{ textAlign: 'right' }}>{amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+        <div style={{ textAlign: 'center' }}>{Math.round(amount).toLocaleString('ru-RU')}</div>
       ),
       sorter: (a: BoqItemData, b: BoqItemData) => a.total_amount - b.total_amount,
     },
@@ -303,6 +503,29 @@ const Bsm: React.FC = () => {
         <div style={{ textAlign: 'center' }}>{count}</div>
       ),
       sorter: (a: BoqItemData, b: BoqItemData) => a.usage_count - b.usage_count,
+    },
+    {
+      title: 'Ссылка на КП',
+      dataIndex: 'quote_link',
+      key: 'quote_link',
+      width: 325,
+      align: 'center' as const,
+      render: (_: string, record: BoqItemData) => (
+        <Input
+          placeholder="Введите ссылку"
+          defaultValue={record.quote_link || ''}
+          onBlur={(e) => handleUpdateQuoteLink(record, e.target.value)}
+          onPressEnter={(e) => {
+            e.currentTarget.blur();
+          }}
+          style={{ width: '100%' }}
+        />
+      ),
+      sorter: (a: BoqItemData, b: BoqItemData) => {
+        const aLink = a.quote_link || '';
+        const bLink = b.quote_link || '';
+        return aLink.localeCompare(bLink);
+      },
     },
   ];
 
@@ -502,6 +725,14 @@ const Bsm: React.FC = () => {
             style={{ marginBottom: 16 }}
             tabBarExtraContent={
               <Space>
+                <Button
+                  icon={<LinkOutlined />}
+                  onClick={handleApplyQuoteLinks}
+                  disabled={!selectedTenderId}
+                  type="default"
+                >
+                  Проставить ссылки
+                </Button>
                 <Button
                   icon={<FileExcelOutlined />}
                   onClick={handleExportToExcel}

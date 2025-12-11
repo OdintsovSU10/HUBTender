@@ -63,9 +63,6 @@ const Users: React.FC = () => {
   // Состояние для хранения выбранных role_code для каждого запроса на регистрацию
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
 
-  // Состояние для отображения паролей (user_id -> boolean)
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
-
   // Состояние для вкладки "Роли"
   const [roles, setRoles] = useState<RoleRecord[]>([]);
   const [isRoleModalVisible, setIsRoleModalVisible] = useState(false);
@@ -342,14 +339,6 @@ const Users: React.FC = () => {
       console.error('Неожиданная ошибка:', err);
       message.error('Произошла ошибка при изменении доступа');
     }
-  };
-
-  // Переключение видимости пароля
-  const togglePasswordVisibility = (userId: string) => {
-    setVisiblePasswords((prev) => ({
-      ...prev,
-      [userId]: !prev[userId],
-    }));
   };
 
   // Открытие модального окна редактирования
@@ -734,7 +723,7 @@ const Users: React.FC = () => {
       title: 'ФИО',
       dataIndex: 'full_name',
       key: 'full_name',
-      width: 180,
+      width: 310,
       align: 'center',
       render: (text: string) => <div style={{ textAlign: 'left' }}>{text}</div>,
     },
@@ -754,35 +743,6 @@ const Users: React.FC = () => {
       key: 'email',
       width: 200,
       align: 'center',
-    },
-    {
-      title: 'Пароль',
-      dataIndex: 'password',
-      key: 'password',
-      width: 130,
-      align: 'center',
-      render: (password: string | null, record: UserRecord) => {
-        if (!password) {
-          return <Text type="secondary">Не установлен</Text>;
-        }
-
-        const isVisible = visiblePasswords[record.id];
-
-        return (
-          <Space>
-            <Text
-              copyable={isVisible}
-              style={{
-                cursor: 'pointer',
-                userSelect: isVisible ? 'text' : 'none',
-              }}
-              onClick={() => togglePasswordVisibility(record.id)}
-            >
-              {isVisible ? password : '••••••••'}
-            </Text>
-          </Space>
-        );
-      },
     },
     {
       title: 'Дата регистрации',
