@@ -20,6 +20,7 @@ export interface CostRow {
   cost_per_unit: number;
   order_num?: number;
   is_category?: boolean;
+  is_location?: boolean;  // Промежуточный уровень группировки по локализации
   children?: CostRow[];
 }
 
@@ -224,7 +225,12 @@ export const useCostData = () => {
         }
       });
 
+      // Группируем детальные категории по категориям и локализациям
       const categoryMap = new Map<string, CostRow>();
+      const categoryLocations = new Map<string, Set<string>>(); // Для подсчета локализаций
+
+      // Первый проход: собираем детальные строки и определяем структуру
+      const detailRowsByCategory = new Map<string, CostRow[]>();
 
       (categories || []).forEach((cat: any) => {
         const volume = volumeMap.get(cat.id) || 0;
@@ -233,13 +239,14 @@ export const useCostData = () => {
         const costPerUnit = volume > 0 ? totalCost / volume : 0;
 
         const categoryName = cat.cost_categories?.name || '';
+        const location = cat.location || '';
 
         const detailRow: CostRow = {
           key: cat.id,
           detail_cost_category_id: cat.id,
           cost_category_name: categoryName,
           detail_category_name: cat.name,
-          location_name: cat.location || '',
+          location_name: location,
           volume,
           unit: cat.unit,
           materials_cost: costs.materials,
@@ -253,39 +260,183 @@ export const useCostData = () => {
           order_num: cat.order_num,
         };
 
-        if (!categoryMap.has(categoryName)) {
-          categoryMap.set(categoryName, {
-            key: `category-${categoryName}`,
-            cost_category_name: categoryName,
-            detail_category_name: '',
-            location_name: '',
-            volume: 0,
-            unit: '',
-            materials_cost: 0,
-            works_cost: 0,
-            sub_materials_cost: 0,
-            sub_works_cost: 0,
-            materials_comp_cost: 0,
-            works_comp_cost: 0,
-            total_cost: 0,
-            cost_per_unit: 0,
-            is_category: true,
-            children: [],
-            order_num: cat.order_num,
+        // Собираем строки по категориям
+        if (!detailRowsByCategory.has(categoryName)) {
+          detailRowsByCategory.set(categoryName, []);
+        }
+        detailRowsByCategory.get(categoryName)!.push(detailRow);
+
+        // Собираем уникальные локализации для каждой категории
+        if (!categoryLocations.has(categoryName)) {
+          categoryLocations.set(categoryName, new Set());
+        }
+        if (location) {
+          categoryLocations.get(categoryName)!.add(location);
+        }
+      });
+
+      // Кастомный порядок для отделочных работ
+      const finishingWorksOrder: Record<string, number> = {
+        'Отделка полов': 1,
+        'Отделка Стен': 2,
+        'Отделка Потолков': 3,
+        'навигация': 4,
+        'Почтовые ящики': 5,
+        'Лифтовые порталы': 6,
+        'Мебель': 7,
+      };
+
+      // Кастомный порядок для дверей по локализациям
+      const doorsOrder: Record<string, Record<string, number>> = {
+        'Автостоянка': {
+          'Двери тех помещений': 1,
+          'двери кладовых': 2,
+          'ворота': 3,
+          'противопожарные шторы': 4,
+        },
+        'МОПы': {
+          'двери лифтового холла': 1,
+          'двери лестничной клетки': 2,
+          'двери квартирные': 3,
+          'выход на кровлю': 4,
+          'люки скрытые': 5,
+          'Двери тех помещений': 6,
+          'потолочные люки': 7,
+        },
+        '1-й этаж лобби': {
+          'двери скрытого монтажа': 1,
+          'двери входные': 2,
+        },
+      };
+
+      const sortDetailRows = (rows: CostRow[], categoryName: string, locationName?: string): CostRow[] => {
+        if (categoryName.toLowerCase().includes('отделочн')) {
+          return [...rows].sort((a, b) => {
+            const orderA = finishingWorksOrder[a.detail_category_name] || 999;
+            const orderB = finishingWorksOrder[b.detail_category_name] || 999;
+            if (orderA !== orderB) return orderA - orderB;
+            return (a.order_num || 0) - (b.order_num || 0);
           });
         }
 
-        const categoryRow = categoryMap.get(categoryName)!;
-        categoryRow.children!.push(detailRow);
+        if (categoryName.toLowerCase().includes('двер') && locationName) {
+          const locationOrder = doorsOrder[locationName];
+          if (locationOrder) {
+            return [...rows].sort((a, b) => {
+              const orderA = locationOrder[a.detail_category_name] || 999;
+              const orderB = locationOrder[b.detail_category_name] || 999;
+              if (orderA !== orderB) return orderA - orderB;
+              return (a.order_num || 0) - (b.order_num || 0);
+            });
+          }
+        }
 
-        categoryRow.materials_cost += costs.materials;
-        categoryRow.works_cost += costs.works;
-        categoryRow.sub_materials_cost += costs.subMaterials;
-        categoryRow.sub_works_cost += costs.subWorks;
-        categoryRow.materials_comp_cost += costs.materialsComp;
-        categoryRow.works_comp_cost += costs.worksComp;
-        categoryRow.total_cost += totalCost;
-      });
+        return rows;
+      };
+
+      // Второй проход: строим иерархию с учетом локализаций
+      for (const [categoryName, detailRows] of detailRowsByCategory.entries()) {
+        const locations = categoryLocations.get(categoryName) || new Set();
+        const hasMultipleLocations = locations.size > 1;
+
+        // Создаем категорию
+        const categoryRow: CostRow = {
+          key: `category-${categoryName}`,
+          cost_category_name: categoryName,
+          detail_category_name: '',
+          location_name: '',
+          volume: 0,
+          unit: '',
+          materials_cost: 0,
+          works_cost: 0,
+          sub_materials_cost: 0,
+          sub_works_cost: 0,
+          materials_comp_cost: 0,
+          works_comp_cost: 0,
+          total_cost: 0,
+          cost_per_unit: 0,
+          is_category: true,
+          children: [],
+          order_num: detailRows[0]?.order_num || 0,
+        };
+
+        if (hasMultipleLocations) {
+          // Группируем по локализациям
+          const locationGroups = new Map<string, CostRow[]>();
+
+          detailRows.forEach(row => {
+            const location = row.location_name || '';
+            if (!locationGroups.has(location)) {
+              locationGroups.set(location, []);
+            }
+            locationGroups.get(location)!.push(row);
+          });
+
+          // Создаем строки локализаций
+          for (const [location, rows] of locationGroups.entries()) {
+            const sortedRows = sortDetailRows(rows, categoryName, location);
+
+            const locationRow: CostRow = {
+              key: `location-${categoryName}-${location}`,
+              cost_category_name: categoryName,
+              detail_category_name: '',
+              location_name: location,
+              volume: 0,
+              unit: '',
+              materials_cost: 0,
+              works_cost: 0,
+              sub_materials_cost: 0,
+              sub_works_cost: 0,
+              materials_comp_cost: 0,
+              works_comp_cost: 0,
+              total_cost: 0,
+              cost_per_unit: 0,
+              is_location: true,
+              children: sortedRows,
+              order_num: sortedRows[0]?.order_num || 0,
+            };
+
+            // Суммируем затраты для локализации
+            sortedRows.forEach(row => {
+              locationRow.materials_cost += row.materials_cost;
+              locationRow.works_cost += row.works_cost;
+              locationRow.sub_materials_cost += row.sub_materials_cost;
+              locationRow.sub_works_cost += row.sub_works_cost;
+              locationRow.materials_comp_cost += row.materials_comp_cost;
+              locationRow.works_comp_cost += row.works_comp_cost;
+              locationRow.total_cost += row.total_cost;
+            });
+
+            categoryRow.children!.push(locationRow);
+
+            // Суммируем в категорию
+            categoryRow.materials_cost += locationRow.materials_cost;
+            categoryRow.works_cost += locationRow.works_cost;
+            categoryRow.sub_materials_cost += locationRow.sub_materials_cost;
+            categoryRow.sub_works_cost += locationRow.sub_works_cost;
+            categoryRow.materials_comp_cost += locationRow.materials_comp_cost;
+            categoryRow.works_comp_cost += locationRow.works_comp_cost;
+            categoryRow.total_cost += locationRow.total_cost;
+          }
+        } else {
+          // Одна локализация или без локализации - добавляем напрямую
+          const sortedRows = sortDetailRows(detailRows, categoryName);
+          categoryRow.children = sortedRows;
+
+          // Суммируем в категорию
+          sortedRows.forEach(row => {
+            categoryRow.materials_cost += row.materials_cost;
+            categoryRow.works_cost += row.works_cost;
+            categoryRow.sub_materials_cost += row.sub_materials_cost;
+            categoryRow.sub_works_cost += row.sub_works_cost;
+            categoryRow.materials_comp_cost += row.materials_comp_cost;
+            categoryRow.works_comp_cost += row.works_comp_cost;
+            categoryRow.total_cost += row.total_cost;
+          });
+        }
+
+        categoryMap.set(categoryName, categoryRow);
+      }
 
       // Добавляем категорию "Не распределено" если есть items без detail_cost_category_id
       if (costMap.has('uncategorized')) {
@@ -336,12 +487,30 @@ export const useCostData = () => {
         (a.order_num || 0) - (b.order_num || 0)
       );
 
-      rows = rows.map(category => ({
-        ...category,
-        children: category.children?.filter(child => child.total_cost > 0)
-      })).filter(category =>
-        category.children && category.children.length > 0
-      );
+      // Рекурсивная фильтрация нулевых затрат на всех уровнях
+      const filterZeroCosts = (items: CostRow[]): CostRow[] => {
+        return items
+          .map(item => {
+            if (item.children) {
+              const filteredChildren = filterZeroCosts(item.children);
+              return {
+                ...item,
+                children: filteredChildren.length > 0 ? filteredChildren : undefined
+              };
+            }
+            return item;
+          })
+          .filter(item => {
+            // Для категорий и локализаций - проверяем наличие children
+            if (item.is_category || item.is_location) {
+              return item.children && item.children.length > 0;
+            }
+            // Для деталей - проверяем total_cost
+            return item.total_cost > 0;
+          });
+      };
+
+      rows = filterZeroCosts(rows);
 
       setData(rows);
     } catch (error: any) {
@@ -356,20 +525,41 @@ export const useCostData = () => {
     if (value === null || value === record.volume) return;
 
     try {
-      const { error } = await supabase
-        .from('construction_cost_volumes')
-        .upsert({
-          tender_id: selectedTenderId!,
-          detail_cost_category_id: record.detail_cost_category_id,
-          volume: value,
-        }, {
-          onConflict: 'tender_id,detail_cost_category_id'
+      // Для деталей - сохраняем в базу
+      if (record.detail_cost_category_id) {
+        const { error } = await supabase
+          .from('construction_cost_volumes')
+          .upsert({
+            tender_id: selectedTenderId!,
+            detail_cost_category_id: record.detail_cost_category_id,
+            volume: value,
+          }, {
+            onConflict: 'tender_id,detail_cost_category_id'
+          });
+
+        if (error) throw error;
+
+        message.success('Объем сохранен');
+        fetchConstructionCosts();
+      }
+      // Для категорий и локализаций - обновляем только в локальном state
+      else if (record.is_category || record.is_location) {
+        setData(prevData => {
+          const updateVolume = (rows: CostRow[]): CostRow[] => {
+            return rows.map(row => {
+              if (row.key === record.key) {
+                return { ...row, volume: value };
+              }
+              if (row.children) {
+                return { ...row, children: updateVolume(row.children) };
+              }
+              return row;
+            });
+          };
+          return updateVolume(prevData);
         });
-
-      if (error) throw error;
-
-      message.success('Объем сохранен');
-      fetchConstructionCosts();
+        message.success('Объем группы обновлен');
+      }
     } catch (error: any) {
       message.error('Ошибка сохранения: ' + error.message);
     }

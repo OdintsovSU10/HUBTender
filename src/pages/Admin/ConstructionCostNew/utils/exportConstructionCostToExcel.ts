@@ -118,6 +118,65 @@ async function fetchOppositeCosts(
   return oppositeCostMap;
 }
 
+// Кастомный порядок для отделочных работ
+const finishingWorksOrder: Record<string, number> = {
+  'Отделка полов': 1,
+  'Отделка Стен': 2,
+  'Отделка Потолков': 3,
+  'навигация': 4,
+  'Почтовые ящики': 5,
+  'Лифтовые порталы': 6,
+  'Мебель': 7,
+};
+
+// Кастомный порядок для дверей по локализациям
+const doorsOrder: Record<string, Record<string, number>> = {
+  'Автостоянка': {
+    'Двери тех помещений': 1,
+    'двери кладовых': 2,
+    'ворота': 3,
+    'противопожарные шторы': 4,
+  },
+  'МОПы': {
+    'двери лифтового холла': 1,
+    'двери лестничной клетки': 2,
+    'двери квартирные': 3,
+    'выход на кровлю': 4,
+    'люки скрытые': 5,
+    'Двери тех помещений': 6,
+    'потолочные люки': 7,
+  },
+  '1-й этаж лобби': {
+    'двери скрытого монтажа': 1,
+    'двери входные': 2,
+  },
+};
+
+const sortDetailRows = (rows: CostRow[], categoryName: string, locationName?: string): CostRow[] => {
+  if (categoryName.toLowerCase().includes('отделочн')) {
+    return [...rows].sort((a, b) => {
+      const orderA = finishingWorksOrder[a.detail_category_name] || 999;
+      const orderB = finishingWorksOrder[b.detail_category_name] || 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.order_num || 0) - (b.order_num || 0);
+    });
+  }
+
+  if (categoryName.toLowerCase().includes('двер') && locationName) {
+    const locationOrder = doorsOrder[locationName];
+    if (locationOrder) {
+      return [...rows].sort((a, b) => {
+        const orderA = locationOrder[a.detail_category_name] || 999;
+        const orderB = locationOrder[b.detail_category_name] || 999;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.order_num || 0) - (b.order_num || 0);
+      });
+    }
+  }
+
+  return rows;
+};
+
 /**
  * Формирует данные для экспорта в Excel
  */
@@ -263,20 +322,159 @@ function buildExportData(
         categoryTotalVolume ? oppCatTotal / categoryTotalVolume : '',
       ]);
 
-      // Строки деталей
+      // Строки деталей (с учетом локализаций)
       let detailIndex = 1;
-      category.children?.forEach((detail) => {
-        if (detail.total_cost > 0) {
+      const sortedChildren = category.children ? sortDetailRows(category.children, category.cost_category_name) : [];
+      sortedChildren.forEach((child) => {
+        if (child.is_location && child.total_cost > 0) {
+          // Строка локализации
+          const locationNum = `${catNum}.${String(detailIndex).padStart(2, '0')}.`;
+          const locationTotalWorks =
+            child.works_cost + child.sub_works_cost + child.works_comp_cost;
+          const locationTotalMaterials =
+            child.materials_cost +
+            child.sub_materials_cost +
+            child.materials_comp_cost;
+
+          // Суммируем противоположные затраты для локализации
+          let oppLocWorks = 0,
+            oppLocMaterials = 0,
+            oppLocSubWorks = 0,
+            oppLocSubMaterials = 0,
+            oppLocWorksComp = 0,
+            oppLocMaterialsComp = 0;
+
+          child.children?.forEach((detail) => {
+            if (detail.detail_cost_category_id) {
+              const oppCosts = oppositeCostMap.get(detail.detail_cost_category_id);
+              if (oppCosts) {
+                oppLocWorks += oppCosts.works;
+                oppLocMaterials += oppCosts.materials;
+                oppLocSubWorks += oppCosts.subWorks;
+                oppLocSubMaterials += oppCosts.subMaterials;
+                oppLocWorksComp += oppCosts.worksComp;
+                oppLocMaterialsComp += oppCosts.materialsComp;
+              }
+            }
+          });
+
+          const oppLocTotalWorks = oppLocWorks + oppLocSubWorks + oppLocWorksComp;
+          const oppLocTotalMaterials = oppLocMaterials + oppLocSubMaterials + oppLocMaterialsComp;
+          const oppLocTotal = oppLocTotalWorks + oppLocTotalMaterials;
+
+          exportData.push([
+            `${locationNum} ${child.location_name}`,
+            '',
+            '',
+            '',
+            child.works_cost || '',
+            child.materials_cost || '',
+            child.sub_works_cost || '',
+            child.sub_materials_cost || '',
+            child.works_comp_cost || '',
+            child.materials_comp_cost || '',
+            locationTotalWorks || '',
+            locationTotalMaterials || '',
+            child.total_cost || '',
+            '',
+            '',
+            '',
+            oppLocWorks || '',
+            oppLocMaterials || '',
+            oppLocSubWorks || '',
+            oppLocSubMaterials || '',
+            oppLocWorksComp || '',
+            oppLocMaterialsComp || '',
+            oppLocTotalWorks || '',
+            oppLocTotalMaterials || '',
+            oppLocTotal || '',
+            '',
+            '',
+            '',
+          ]);
+
+          // Детали внутри локализации
+          let locationDetailIndex = 1;
+          const sortedLocationChildren = child.children ? sortDetailRows(child.children, category.cost_category_name, child.location_name) : [];
+          sortedLocationChildren.forEach((detail) => {
+            if (detail.total_cost > 0) {
+              const detailNum = `${catNum}.${String(detailIndex).padStart(2, '0')}.${String(locationDetailIndex).padStart(2, '0')}.`;
+              const detailTotalWorks =
+                detail.works_cost + detail.sub_works_cost + detail.works_comp_cost;
+              const detailTotalMaterials =
+                detail.materials_cost +
+                detail.sub_materials_cost +
+                detail.materials_comp_cost;
+
+              const oppDetailCosts = oppositeCostMap.get(
+                detail.detail_cost_category_id || ''
+              ) || {
+                materials: 0,
+                works: 0,
+                subMaterials: 0,
+                subWorks: 0,
+                materialsComp: 0,
+                worksComp: 0,
+              };
+
+              const oppDetailTotalWorks =
+                oppDetailCosts.works +
+                oppDetailCosts.subWorks +
+                oppDetailCosts.worksComp;
+              const oppDetailTotalMaterials =
+                oppDetailCosts.materials +
+                oppDetailCosts.subMaterials +
+                oppDetailCosts.materialsComp;
+              const oppDetailTotal = oppDetailTotalWorks + oppDetailTotalMaterials;
+
+              exportData.push([
+                `${detailNum} ${detail.detail_category_name}`,
+                detail.location_name || '',
+                detail.volume || '',
+                detail.unit || '',
+                detail.works_cost || '',
+                detail.materials_cost || '',
+                detail.sub_works_cost || '',
+                detail.sub_materials_cost || '',
+                detail.works_comp_cost || '',
+                detail.materials_comp_cost || '',
+                detailTotalWorks || '',
+                detailTotalMaterials || '',
+                detail.total_cost || '',
+                detail.volume ? detailTotalWorks / detail.volume : '',
+                detail.volume ? detailTotalMaterials / detail.volume : '',
+                detail.volume ? detail.total_cost / detail.volume : '',
+                oppDetailCosts.works || '',
+                oppDetailCosts.materials || '',
+                oppDetailCosts.subWorks || '',
+                oppDetailCosts.subMaterials || '',
+                oppDetailCosts.worksComp || '',
+                oppDetailCosts.materialsComp || '',
+                oppDetailTotalWorks || '',
+                oppDetailTotalMaterials || '',
+                oppDetailTotal || '',
+                detail.volume ? oppDetailTotalWorks / detail.volume : '',
+                detail.volume ? oppDetailTotalMaterials / detail.volume : '',
+                detail.volume ? oppDetailTotal / detail.volume : '',
+              ]);
+
+              locationDetailIndex++;
+            }
+          });
+
+          detailIndex++;
+        } else if (!child.is_location && child.total_cost > 0) {
+          // Обычная детальная строка (без локализации)
           const detailNum = `${catNum}.${String(detailIndex).padStart(2, '0')}.`;
           const detailTotalWorks =
-            detail.works_cost + detail.sub_works_cost + detail.works_comp_cost;
+            child.works_cost + child.sub_works_cost + child.works_comp_cost;
           const detailTotalMaterials =
-            detail.materials_cost +
-            detail.sub_materials_cost +
-            detail.materials_comp_cost;
+            child.materials_cost +
+            child.sub_materials_cost +
+            child.materials_comp_cost;
 
           const oppDetailCosts = oppositeCostMap.get(
-            detail.detail_cost_category_id || ''
+            child.detail_cost_category_id || ''
           ) || {
             materials: 0,
             works: 0,
@@ -297,22 +495,22 @@ function buildExportData(
           const oppDetailTotal = oppDetailTotalWorks + oppDetailTotalMaterials;
 
           exportData.push([
-            `${detailNum} ${detail.detail_category_name}`,
-            '',
-            detail.volume || '',
-            detail.unit || '',
-            detail.works_cost || '',
-            detail.materials_cost || '',
-            detail.sub_works_cost || '',
-            detail.sub_materials_cost || '',
-            detail.works_comp_cost || '',
-            detail.materials_comp_cost || '',
+            `${detailNum} ${child.detail_category_name}`,
+            child.location_name || '',
+            child.volume || '',
+            child.unit || '',
+            child.works_cost || '',
+            child.materials_cost || '',
+            child.sub_works_cost || '',
+            child.sub_materials_cost || '',
+            child.works_comp_cost || '',
+            child.materials_comp_cost || '',
             detailTotalWorks || '',
             detailTotalMaterials || '',
-            detail.total_cost || '',
-            detail.volume ? detailTotalWorks / detail.volume : '',
-            detail.volume ? detailTotalMaterials / detail.volume : '',
-            detail.volume ? detail.total_cost / detail.volume : '',
+            child.total_cost || '',
+            child.volume ? detailTotalWorks / child.volume : '',
+            child.volume ? detailTotalMaterials / child.volume : '',
+            child.volume ? child.total_cost / child.volume : '',
             oppDetailCosts.works || '',
             oppDetailCosts.materials || '',
             oppDetailCosts.subWorks || '',
@@ -322,9 +520,9 @@ function buildExportData(
             oppDetailTotalWorks || '',
             oppDetailTotalMaterials || '',
             oppDetailTotal || '',
-            detail.volume ? oppDetailTotalWorks / detail.volume : '',
-            detail.volume ? oppDetailTotalMaterials / detail.volume : '',
-            detail.volume ? oppDetailTotal / detail.volume : '',
+            child.volume ? oppDetailTotalWorks / child.volume : '',
+            child.volume ? oppDetailTotalMaterials / child.volume : '',
+            child.volume ? oppDetailTotal / child.volume : '',
           ]);
 
           detailIndex++;

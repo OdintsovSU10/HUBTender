@@ -57,24 +57,43 @@ export const useTendersData = () => {
         return;
       }
 
-      // Получаем все boq_items для всех тендеров одним запросом через tender_id
+      // Получаем все boq_items для всех тендеров с батчингом
       const tenderIds = data.map(t => t.id);
       let commercialCostsByTender: Record<string, number> = {};
 
-      const { data: allBoqItems } = await supabase
-        .from('boq_items')
-        .select('tender_id, total_commercial_material_cost, total_commercial_work_cost')
-        .in('tender_id', tenderIds);
+      // Батчинг по tenderIds (максимум 100 ID за запрос, чтобы избежать URL too long)
+      const tenderIdBatchSize = 100;
+      for (let i = 0; i < tenderIds.length; i += tenderIdBatchSize) {
+        const tenderIdBatch = tenderIds.slice(i, i + tenderIdBatchSize);
 
-      if (allBoqItems) {
-        allBoqItems.forEach(item => {
-          if (!commercialCostsByTender[item.tender_id]) {
-            commercialCostsByTender[item.tender_id] = 0;
+        // Загружаем все boq_items для батча тендеров с батчингом по 1000 строк
+        let from = 0;
+        const boqBatchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data: boqItems } = await supabase
+            .from('boq_items')
+            .select('tender_id, total_commercial_material_cost, total_commercial_work_cost')
+            .in('tender_id', tenderIdBatch)
+            .range(from, from + boqBatchSize - 1);
+
+          if (boqItems && boqItems.length > 0) {
+            boqItems.forEach(item => {
+              if (!commercialCostsByTender[item.tender_id]) {
+                commercialCostsByTender[item.tender_id] = 0;
+              }
+              commercialCostsByTender[item.tender_id] +=
+                (item.total_commercial_material_cost || 0) +
+                (item.total_commercial_work_cost || 0);
+            });
+
+            from += boqBatchSize;
+            hasMore = boqItems.length === boqBatchSize;
+          } else {
+            hasMore = false;
           }
-          commercialCostsByTender[item.tender_id] +=
-            (item.total_commercial_material_cost || 0) +
-            (item.total_commercial_work_cost || 0);
-        });
+        }
       }
 
       // Форматируем данные

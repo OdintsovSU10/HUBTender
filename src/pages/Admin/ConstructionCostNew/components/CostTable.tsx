@@ -41,6 +41,9 @@ const CostTable: React.FC<CostTableProps> = ({
         if (record.is_category) {
           return <Text strong style={{ fontSize: '14px' }}>{value}</Text>;
         }
+        if (record.is_location) {
+          return <Text strong style={{ fontSize: '13px' }}>{record.location_name}</Text>;
+        }
         return null;
       },
     },
@@ -49,14 +52,22 @@ const CostTable: React.FC<CostTableProps> = ({
       dataIndex: 'detail_category_name',
       key: 'detail_category_name',
       width: 180,
-      render: (value: string, record: CostRow) => record.is_category ? null : value,
+      render: (value: string, record: CostRow) => {
+        if (record.is_category) return null;
+        if (record.is_location) return null;
+        return value;
+      },
     },
     {
-      title: <div style={{ textAlign: 'center' }}>Локация</div>,
+      title: <div style={{ textAlign: 'center' }}>Локализация</div>,
       dataIndex: 'location_name',
       key: 'location_name',
       width: 110,
-      render: (value: string, record: CostRow) => record.is_category ? null : value,
+      render: (value: string, record: CostRow) => {
+        if (record.is_category) return null;
+        if (record.is_location) return null;
+        return value;
+      },
     },
     {
       title: <div style={{ textAlign: 'center' }}>Объем</div>,
@@ -65,7 +76,35 @@ const CostTable: React.FC<CostTableProps> = ({
       width: 100,
       align: 'right',
       render: (value: number, record: CostRow) => {
-        if (record.is_category) return null;
+        // Для категорий и локализаций - показываем InputNumber для ввода объема группы
+        if (record.is_category || record.is_location) {
+          return (
+            <InputNumber
+              value={value}
+              onBlur={(e) => {
+                const newValue = parseFloat(e.target.value);
+                if (!isNaN(newValue)) {
+                  onVolumeChange(newValue, record);
+                }
+              }}
+              onPressEnter={(e) => {
+                const target = e.target as HTMLInputElement;
+                const newValue = parseFloat(target.value);
+                if (!isNaN(newValue)) {
+                  onVolumeChange(newValue, record);
+                  target.blur();
+                }
+              }}
+              min={0}
+              step={0.01}
+              precision={2}
+              style={{ width: '100%' }}
+              size="small"
+              placeholder="Объем группы"
+            />
+          );
+        }
+        // Для деталей - обычный InputNumber
         return (
           <InputNumber
             value={value}
@@ -98,7 +137,7 @@ const CostTable: React.FC<CostTableProps> = ({
       key: 'unit',
       width: 60,
       align: 'center',
-      render: (value: string, record: CostRow) => record.is_category ? null : value,
+      render: (value: string, record: CostRow) => (record.is_category || record.is_location) ? null : value,
     },
     {
       title: <div style={{ textAlign: 'center' }}>₽/ед.</div>,
@@ -107,7 +146,14 @@ const CostTable: React.FC<CostTableProps> = ({
       width: 110,
       align: 'right',
       render: (value: number, record: CostRow) => {
-        if (record.is_category) return null;
+        // Для категорий и локализаций - показываем расчет стоимости за единицу, если введен объем
+        if (record.is_category || record.is_location) {
+          if (record.volume > 0) {
+            const costPerUnit = record.total_cost / record.volume;
+            return <Text strong style={{ color: '#0891b2' }}>{costPerUnit.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</Text>;
+          }
+          return null;
+        }
         return <Text strong>{value.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</Text>;
       },
     },
