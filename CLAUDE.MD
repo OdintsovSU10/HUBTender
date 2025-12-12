@@ -241,6 +241,26 @@ App.tsx
 - **Dark**: Black background (`#000`), sidebar `#0a0a0a`
 - **Light**: Ant Design defaults
 
+**Dark Theme Modal Pattern:**
+```typescript
+// Modal.confirm is a static function without Context access
+// MUST read theme from localStorage directly
+const theme = localStorage.getItem('tenderHub_theme') || 'light';
+
+Modal.confirm({
+  title: 'Confirmation',
+  content: 'Message here',
+  rootClassName: theme === 'dark' ? 'dark-modal' : '',
+  // ...
+});
+```
+
+**Dark Modal Styles** (`App.css`):
+- `.dark-modal .ant-modal-content` - Dark background (#1f1f1f) with white text
+- `.dark-modal .anticon-exclamation-circle` - Yellow warning icon (#faad14)
+- `.dark-modal .ant-btn-default` - Dark buttons with proper hover states
+- `.dark-modal .ant-btn-dangerous` - Muted red for delete actions
+
 ### Custom SVG Icons
 Two parameterized components in `src/components/Icons/`:
 - `LogoIcon` - Building + crane design (sidebar)
@@ -568,7 +588,7 @@ All database migrations have been executed and consolidated into `supabase/schem
 - `/positions/:positionId/items` - BOQ items with calculated prices and instant add
 - `/commerce` - Commercial calculations with position analysis and profit tracking
 - `/costs` - Construction costs analysis with tender-specific calculations
-- `/bsm` - Building Systems Model page
+- `/bsm` - BSM (Базовая Стоимость Материалов и работ) - aggregated view of all BOQ items grouped by material/work with quote link management
 - `/analytics/comparison` - Object comparison analytics
 - `/financial-indicators` - Financial indicators with Chart.js visualizations
 - `/settings` - Application settings (font configuration, etc.)
@@ -742,6 +762,51 @@ Color coding for material/work types in Library:
 - `conversion_coefficient` - material consumption per work unit
 - Materials can be standalone or linked to specific works
 
+**Nomenclature Loading (CRITICAL):**
+```typescript
+// MUST use batching for work_names and material_names
+// Supabase 1000 row limit - simple SELECT only loads first 1000
+const fetchMaterialNames = async () => {
+  let allMaterials: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('material_names')
+      .select('*')
+      .order('name', { ascending: true })
+      .range(from, from + batchSize - 1);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allMaterials = [...allMaterials, ...data];
+      from += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  setMaterialNames(allMaterials);
+};
+```
+Without batching, AutoComplete dropdowns will be missing items beyond row 1000.
+
+**Quote Link Rendering:**
+- `quote_link` column checks if value starts with `http://` or `https://`
+- URLs render as clickable `<a>` tag with text "Ссылка" (opens in new tab)
+- Non-URLs display as plain text
+- Empty values show "-"
+
+**Construction Cost Management:**
+- AutoComplete field (525px) for selecting detail_cost_category_id
+- "Распространить затрату на все строки" button applies selected cost to all items
+- UPDATE query: `SET detail_cost_category_id = X WHERE client_position_id = Y`
+- Modal confirmation shows count of affected items
+
 ## Commerce Page (`/commerce`)
 **Position-level commercial analysis**
 - Shows all positions with calculated totals
@@ -753,6 +818,49 @@ Color coding for material/work types in Library:
 - **Excel Export**: "Коммерческие стоимости_{tender}_{version}.xlsx"
   - Highlights zero-cost leaf rows in pale red (#FFCCCC)
   - ДОП works styled with orange "ДОП" tag inline with work name
+
+## BSM Page (`/bsm`)
+**Базовая Стоимость Материалов и работ - aggregated BOQ analysis**
+
+**Purpose**: Grouped view of all materials and works across all positions in a tender, showing average prices and total usage.
+
+**Data Aggregation:**
+```typescript
+// Groups boq_items by work_name_id or material_name_id
+const key = `${boq_item_type}_${work_name_id || material_name_id}`;
+
+grouped.set(key, {
+  name: work_names?.name || material_names?.name,
+  total_quantity: sum(quantity),
+  price_per_unit: sum(total_amount) / sum(quantity), // Average base price
+  total_amount: sum(total_amount),
+  usage_count: count(*), // Number of positions using this item
+  boq_item_type, // раб/мат/суб-раб/суб-мат/раб-комп/мат-комп
+  material_type, // основн./вспомогат (for materials only)
+  quote_link, // КП reference link
+});
+```
+
+**Quote Link Management:**
+- Inline editing column "Ссылка на КП" (325px Input field)
+- UPDATE propagates to ALL boq_items with same material_name_id/work_name_id in current tender
+- "Проставить ссылки" button for bulk application:
+  - Matches by: boq_item_type + material_type + name + unit_code (exact match)
+  - NO price comparison (BSM shows averages, boq_items have individual prices)
+  - Updates all matching items in batch
+  - Shows Russian pluralized count: "запись/записи/записей"
+
+**Table Features:**
+- Three tabs: "Все" (All), "Материалы" (Materials), "Работы" (Works)
+- Colored tags with rgba(12% opacity) backgrounds matching ItemsTable.tsx
+- Sortable columns: "Вид строки", "Тип материала", "Наименование", "Ссылка на КП"
+- Centered values except name/link columns
+- Rounded total amounts without currency symbol
+
+**Color Scheme** (matches `/positions/:id/items`):
+- Work types: раб orange, суб-раб purple, раб-комп red
+- Material types: мат blue, суб-мат green, мат-комп teal
+- Material categories: основн. orange, вспомогат blue
 
 ## Construction Costs Pages
 

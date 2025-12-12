@@ -3,7 +3,7 @@ import { Card, Table, Select, Tabs, Tag, Input, message, Button, Typography, Spa
 import { SearchOutlined, FileExcelOutlined, ArrowLeftOutlined, LinkOutlined } from '@ant-design/icons';
 import { supabase } from '../../lib/supabase';
 import type { UnitType, BoqItemType } from '../../lib/supabase';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 const { Title, Text } = Typography;
 
@@ -577,20 +577,164 @@ const Bsm: React.FC = () => {
       return;
     }
 
-    const exportData = filteredItems.map((item, index) => ({
-      '№': index + 1,
-      'Тип': item.boq_item_type,
-      'Наименование': item.name,
-      'Количество': item.total_quantity,
-      'Ед.изм.': item.unit_code,
-      'Цена за ед., ₽': item.price_per_unit,
-      'Сумма, ₽': item.total_amount,
-      'Кол-во позиций': item.usage_count,
-    }));
+    // Заголовки
+    const headers = [
+      '№',
+      'Тип',
+      'Наименование',
+      'Количество',
+      'Ед.изм.',
+      'Цена за ед., ₽',
+      'Сумма, ₽',
+      'Кол-во позиций',
+      'Ссылка на КП',
+    ];
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    // Данные (числа как числа, не как строки!)
+    const data = filteredItems.map((item, index) => [
+      index + 1,
+      item.boq_item_type,
+      item.name,
+      item.total_quantity,
+      item.unit_code,
+      item.price_per_unit,
+      item.total_amount,
+      item.usage_count,
+      item.quote_link || '',
+    ]);
+
+    // Создать рабочий лист
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+    // Стиль заголовков
+    const headerStyle = {
+      font: { bold: true },
+      fill: { fgColor: { rgb: 'E0E0E0' } },
+      alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+        wrapText: true
+      },
+      border: {
+        top: { style: 'thin', color: { rgb: 'D3D3D3' } },
+        bottom: { style: 'thin', color: { rgb: 'D3D3D3' } },
+        left: { style: 'thin', color: { rgb: 'D3D3D3' } },
+        right: { style: 'thin', color: { rgb: 'D3D3D3' } },
+      },
+    };
+
+    // Применить стили к заголовкам
+    for (let col = 0; col < headers.length; col++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+      if (!ws[cellRef]) ws[cellRef] = { t: 's', v: headers[col] };
+      ws[cellRef].s = headerStyle;
+    }
+
+    // Применить стили к ячейкам данных
+    filteredItems.forEach((item, rowIndex) => {
+      for (let col = 0; col < headers.length; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: rowIndex + 1, c: col });
+        if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+
+        // Базовый стиль: все по центру и вертикали
+        const baseStyle = {
+          border: {
+            top: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            bottom: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            left: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            right: { style: 'thin', color: { rgb: 'D3D3D3' } },
+          },
+          alignment: {
+            wrapText: true,
+            vertical: 'center',
+            horizontal: col === 2 ? 'left' : 'center', // Колонка 2 (Наименование) - по левому краю
+          },
+        };
+
+        ws[cellRef].s = baseStyle;
+
+        // Установить числовой формат для числовых колонок
+        // Колонка 3 (Количество) - 2 знака после запятой
+        // Колонка 5 (Цена за ед.) - 2 знака после запятой с разделителем тысяч
+        // Колонка 6 (Сумма) - целое число с разделителем тысяч
+        // Колонка 7 (Кол-во позиций) - целое число
+        if (col === 3) {
+          ws[cellRef].z = '0.00';
+          if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
+            if (typeof ws[cellRef].v === 'number') {
+              ws[cellRef].t = 'n';
+            } else if (typeof ws[cellRef].v === 'string') {
+              const numValue = parseFloat(ws[cellRef].v);
+              if (!isNaN(numValue)) {
+                ws[cellRef].t = 'n';
+                ws[cellRef].v = numValue;
+              }
+            }
+          }
+        } else if (col === 5) {
+          ws[cellRef].z = '# ##0.00';
+          if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
+            if (typeof ws[cellRef].v === 'number') {
+              ws[cellRef].t = 'n';
+            } else if (typeof ws[cellRef].v === 'string') {
+              const numValue = parseFloat(ws[cellRef].v);
+              if (!isNaN(numValue)) {
+                ws[cellRef].t = 'n';
+                ws[cellRef].v = numValue;
+              }
+            }
+          }
+        } else if (col === 6) {
+          ws[cellRef].z = '# ##0';
+          if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
+            if (typeof ws[cellRef].v === 'number') {
+              ws[cellRef].t = 'n';
+            } else if (typeof ws[cellRef].v === 'string') {
+              const numValue = parseFloat(ws[cellRef].v);
+              if (!isNaN(numValue)) {
+                ws[cellRef].t = 'n';
+                ws[cellRef].v = numValue;
+              }
+            }
+          }
+        } else if (col === 7) {
+          ws[cellRef].z = '0';
+          if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
+            if (typeof ws[cellRef].v === 'number') {
+              ws[cellRef].t = 'n';
+            } else if (typeof ws[cellRef].v === 'string') {
+              const numValue = parseFloat(ws[cellRef].v);
+              if (!isNaN(numValue)) {
+                ws[cellRef].t = 'n';
+                ws[cellRef].v = numValue;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Установить ширину колонок
+    ws['!cols'] = [
+      { wch: 5 },   // №
+      { wch: 12 },  // Тип
+      { wch: 40 },  // Наименование
+      { wch: 12 },  // Количество
+      { wch: 10 },  // Ед.изм.
+      { wch: 15 },  // Цена за ед., ₽
+      { wch: 15 },  // Сумма, ₽
+      { wch: 14 },  // Кол-во позиций
+      { wch: 30 },  // Ссылка на КП
+    ];
+
+    // Установить высоту строки заголовка
+    ws['!rows'] = [{ hpt: 30 }];
+
+    // Заморозить первую строку
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'БСМ');
+    XLSX.utils.book_append_sheet(workbook, ws, 'БСМ');
 
     const fileName = `БСМ_${selectedTenderTitle || 'тендер'}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);

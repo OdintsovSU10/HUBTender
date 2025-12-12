@@ -1,5 +1,5 @@
 -- Database Schema SQL Export
--- Generated: 2025-12-10T11:58:40.139724
+-- Generated: 2025-12-11T16:29:02.856797
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -967,13 +967,13 @@ CREATE TABLE IF NOT EXISTS public.users (
     registration_date timestamp with time zone NOT NULL DEFAULT now(),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
-    password text NOT NULL,
     access_enabled boolean DEFAULT true,
     role_code text NOT NULL,
     allowed_pages jsonb DEFAULT '[]'::jsonb,
     tender_deadline_extensions jsonb DEFAULT '[]'::jsonb,
     current_work_mode USER-DEFINED DEFAULT 'office'::work_mode,
     current_work_status USER-DEFINED DEFAULT 'working'::work_status,
+    CONSTRAINT fk_users_auth_users FOREIGN KEY (id) REFERENCES None.None(None),
     CONSTRAINT users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id),
     CONSTRAINT users_email_key UNIQUE (email),
     CONSTRAINT users_pkey PRIMARY KEY (id),
@@ -1033,20 +1033,6 @@ CREATE TABLE IF NOT EXISTS realtime.messages (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     CONSTRAINT messages_pkey PRIMARY KEY (id),
     CONSTRAINT messages_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_07
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_07 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_07_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_07_pkey PRIMARY KEY (inserted_at)
 );
 
 -- Table: realtime.messages_2025_12_08
@@ -1131,6 +1117,20 @@ CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_13 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     CONSTRAINT messages_2025_12_13_pkey PRIMARY KEY (id),
     CONSTRAINT messages_2025_12_13_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_14
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_14 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_14_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_14_pkey PRIMARY KEY (inserted_at)
 );
 
 -- Table: realtime.schema_migrations
@@ -2440,10 +2440,7 @@ $function$
 
 
 -- Function: public.register_user
--- Description: Registers a new user with role_code. First administrator/director/developer    
-   is auto-approved, subsequent users get pending status. Uses SECURITY DEFINER      
-  to bypass RLS during registration.
-CREATE OR REPLACE FUNCTION public.register_user(p_user_id uuid, p_full_name text, p_email text, p_role_code text, p_allowed_pages jsonb, p_password text)
+CREATE OR REPLACE FUNCTION public.register_user(p_user_id uuid, p_full_name text, p_email text, p_role_code text, p_allowed_pages jsonb)
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -2453,38 +2450,32 @@ AS $function$
     v_is_first_user BOOLEAN;
     v_access_status access_status_type;
   BEGIN
-    -- Check if this is the first user in the system
-    SELECT NOT EXISTS (SELECT 1 FROM public.users LIMIT 1) INTO v_is_first_user;     
+    -- Проверка первого пользователя
+    SELECT NOT EXISTS (SELECT 1 FROM public.users LIMIT 1) INTO v_is_first_user;
 
-    -- First administrator, director or developer should be auto-approved
-    IF v_is_first_user AND p_role_code IN ('administrator', 'director',
-  'developer') THEN
+    -- Первый admin/director/developer → auto-approved
+    IF v_is_first_user AND p_role_code IN ('administrator', 'director', 'developer') THEN
       v_access_status := 'approved';
 
-      -- Insert user with approved status and self-approval
       INSERT INTO public.users (
-        id, full_name, email, role_code, access_status, allowed_pages, password,     
+        id, full_name, email, role_code, access_status, allowed_pages,
         approved_by, approved_at
-      )
-      VALUES (
-        p_user_id, p_full_name, p_email, p_role_code, v_access_status,
-  p_allowed_pages, p_password,
+      ) VALUES (
+        p_user_id, p_full_name, p_email, p_role_code, v_access_status, p_allowed_pages,
         p_user_id, NOW()
       );
     ELSE
-      -- Subsequent users need approval
+      -- Остальные → pending (ждут одобрения)
       v_access_status := 'pending';
 
       INSERT INTO public.users (
-        id, full_name, email, role_code, access_status, allowed_pages, password      
-      )
-      VALUES (
-        p_user_id, p_full_name, p_email, p_role_code, v_access_status,
-  p_allowed_pages, p_password
+        id, full_name, email, role_code, access_status, allowed_pages
+      ) VALUES (
+        p_user_id, p_full_name, p_email, p_role_code, v_access_status, p_allowed_pages
       );
     END IF;
   END;
-  $function$
+$function$
 
 
 -- Function: public.remove_subcontract_growth_exclusion
@@ -4817,9 +4808,6 @@ CREATE INDEX idx_users_deadline_extensions ON public.users USING gin (tender_dea
 CREATE INDEX idx_users_email ON public.users USING btree (email);
 
 -- Index on public.users
-CREATE INDEX idx_users_email_password ON public.users USING btree (email, password);
-
--- Index on public.users
 CREATE INDEX idx_users_role_code ON public.users USING btree (role_code);
 
 -- Index on public.users
@@ -4849,9 +4837,6 @@ CREATE INDEX idx_works_library_work_name_id ON public.works_library USING btree 
 -- Index on realtime.messages
 CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
--- Index on realtime.messages_2025_12_07
-CREATE INDEX messages_2025_12_07_inserted_at_topic_idx ON realtime.messages_2025_12_07 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
 -- Index on realtime.messages_2025_12_08
 CREATE INDEX messages_2025_12_08_inserted_at_topic_idx ON realtime.messages_2025_12_08 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
@@ -4869,6 +4854,9 @@ CREATE INDEX messages_2025_12_12_inserted_at_topic_idx ON realtime.messages_2025
 
 -- Index on realtime.messages_2025_12_13
 CREATE INDEX messages_2025_12_13_inserted_at_topic_idx ON realtime.messages_2025_12_13 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_14
+CREATE INDEX messages_2025_12_14_inserted_at_topic_idx ON realtime.messages_2025_12_14 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
 -- Index on realtime.subscription
 CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btree (entity);
@@ -5008,6 +4996,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA graphql_public TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_0 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_1 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_10 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_11 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_12 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_13 TO postgres;
@@ -5015,6 +5004,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_15 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_16 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_17 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_18 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_19 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_2 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_20 TO postgres;
@@ -5026,6 +5016,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_27 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_28 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_29 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_3 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_30 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_31 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_32 TO postgres;
@@ -5056,8 +5047,10 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_58 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_7 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_8 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_9 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_0 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_1 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_10 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_11 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_12 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_13 TO postgres;
@@ -5065,6 +5058,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_15 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_16 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_17 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_18 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_19 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_2 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_20 TO postgres;
@@ -5076,6 +5070,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_27 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_28 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_29 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_3 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_30 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_31 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_32 TO postgres;
@@ -5106,6 +5101,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_58 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_7 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_8 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_9 TO postgres;
 -- GRANT USAGE ON SCHEMA pgbouncer TO postgres;
 -- GRANT CREATE, USAGE ON SCHEMA public TO postgres;
 -- GRANT CREATE, USAGE ON SCHEMA realtime TO postgres;
@@ -5141,6 +5137,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA graphql_public TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_0 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_1 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_10 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_11 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_12 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_13 TO supabase_admin;
@@ -5148,6 +5145,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_15 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_16 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_17 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_18 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_19 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_2 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_20 TO supabase_admin;
@@ -5159,6 +5157,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_27 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_28 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_29 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_3 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_30 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_31 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_32 TO supabase_admin;
@@ -5189,8 +5188,10 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_58 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_7 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_8 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_9 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_0 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_1 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_10 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_11 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_12 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_13 TO supabase_admin;
@@ -5198,6 +5199,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_15 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_16 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_17 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_18 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_19 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_2 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_20 TO supabase_admin;
@@ -5209,6 +5211,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_27 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_28 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_29 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_3 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_30 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_31 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_32 TO supabase_admin;
@@ -5239,6 +5242,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_58 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_7 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_8 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_9 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pgbouncer TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA public TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA realtime TO supabase_admin;
@@ -5267,6 +5271,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA graphql_public TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_0 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_1 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_10 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_11 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_12 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_13 TO supabase_etl_admin;
@@ -5274,6 +5279,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_15 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_16 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_17 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_18 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_19 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_2 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_20 TO supabase_etl_admin;
@@ -5285,6 +5291,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_27 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_28 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_29 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_3 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_30 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_31 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_32 TO supabase_etl_admin;
@@ -5315,8 +5322,10 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_58 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_7 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_8 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_9 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_0 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_1 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_10 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_11 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_12 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_13 TO supabase_etl_admin;
@@ -5324,6 +5333,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_15 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_16 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_17 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_18 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_19 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_2 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_20 TO supabase_etl_admin;
@@ -5335,6 +5345,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_27 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_28 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_29 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_3 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_30 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_31 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_32 TO supabase_etl_admin;
@@ -5365,6 +5376,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_58 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_7 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_8 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_9 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pgbouncer TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA public TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA realtime TO supabase_etl_admin;
@@ -5385,6 +5397,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA graphql_public TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_0 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_1 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_10 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_11 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_12 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_13 TO supabase_read_only_user;
@@ -5392,6 +5405,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_15 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_16 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_17 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_18 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_19 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_2 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_20 TO supabase_read_only_user;
@@ -5403,6 +5417,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_27 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_28 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_29 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_3 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_30 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_31 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_32 TO supabase_read_only_user;
@@ -5433,8 +5448,10 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_58 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_7 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_8 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_9 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_0 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_1 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_10 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_11 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_12 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_13 TO supabase_read_only_user;
@@ -5442,6 +5459,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_15 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_16 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_17 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_18 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_19 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_2 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_20 TO supabase_read_only_user;
@@ -5453,6 +5471,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_27 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_28 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_29 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_3 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_30 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_31 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_32 TO supabase_read_only_user;
@@ -5483,6 +5502,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_58 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_7 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_8 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_9 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pgbouncer TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA public TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA realtime TO supabase_read_only_user;

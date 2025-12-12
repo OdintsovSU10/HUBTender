@@ -103,9 +103,15 @@ const TemplateSelectModal: React.FC<TemplateSelectModalProps> = ({
   // Опции для автопоиска шаблонов
   const templateOptions = useMemo(() => {
     if (templateNameSearch.length < 2) return [];
-    return filteredTemplates.slice(0, 50).map((t) => ({
-      value: t.name,
-      label: t.name,
+
+    // Дедуплицируем имена шаблонов через Set
+    const uniqueNames = Array.from(
+      new Set(filteredTemplates.slice(0, 50).map((t) => t.name))
+    );
+
+    return uniqueNames.map((name) => ({
+      value: name,
+      label: name,
     }));
   }, [filteredTemplates, templateNameSearch]);
 

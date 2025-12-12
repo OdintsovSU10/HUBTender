@@ -14,8 +14,11 @@ export default function ForgotPassword() {
     try {
       setLoading(true);
 
+      // Используем VITE_APP_URL для production, window.location.origin для локальной разработки
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${baseUrl}/reset-password`,
       });
 
       if (error) throw error;
