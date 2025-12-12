@@ -161,8 +161,7 @@ export const useCostData = () => {
       }>();
 
       (boqItems || []).forEach((item: any) => {
-        const catId = item.detail_cost_category_id;
-        if (!catId) return;
+        const catId = item.detail_cost_category_id || 'uncategorized';
 
         if (!costMap.has(catId)) {
           costMap.set(catId, { materials: 0, works: 0, subMaterials: 0, subWorks: 0, materialsComp: 0, worksComp: 0 });
@@ -287,6 +286,51 @@ export const useCostData = () => {
         categoryRow.works_comp_cost += costs.worksComp;
         categoryRow.total_cost += totalCost;
       });
+
+      // Добавляем категорию "Не распределено" если есть items без detail_cost_category_id
+      if (costMap.has('uncategorized')) {
+        const uncategorizedCosts = costMap.get('uncategorized')!;
+        const uncategorizedTotal = uncategorizedCosts.materials + uncategorizedCosts.works +
+          uncategorizedCosts.subMaterials + uncategorizedCosts.subWorks +
+          uncategorizedCosts.materialsComp + uncategorizedCosts.worksComp;
+
+        if (uncategorizedTotal > 0) {
+          categoryMap.set('Не распределено', {
+            key: 'category-uncategorized',
+            cost_category_name: 'Не распределено',
+            detail_category_name: '',
+            location_name: '',
+            volume: 0,
+            unit: '',
+            materials_cost: uncategorizedCosts.materials,
+            works_cost: uncategorizedCosts.works,
+            sub_materials_cost: uncategorizedCosts.subMaterials,
+            sub_works_cost: uncategorizedCosts.subWorks,
+            materials_comp_cost: uncategorizedCosts.materialsComp,
+            works_comp_cost: uncategorizedCosts.worksComp,
+            total_cost: uncategorizedTotal,
+            cost_per_unit: 0,
+            is_category: true,
+            children: [{
+              key: 'uncategorized-detail',
+              cost_category_name: 'Не распределено',
+              detail_category_name: 'Элементы без затрат',
+              location_name: '-',
+              volume: 0,
+              unit: '-',
+              materials_cost: uncategorizedCosts.materials,
+              works_cost: uncategorizedCosts.works,
+              sub_materials_cost: uncategorizedCosts.subMaterials,
+              sub_works_cost: uncategorizedCosts.subWorks,
+              materials_comp_cost: uncategorizedCosts.materialsComp,
+              works_comp_cost: uncategorizedCosts.worksComp,
+              total_cost: uncategorizedTotal,
+              cost_per_unit: 0,
+            }],
+            order_num: 999999, // В конец списка
+          });
+        }
+      }
 
       let rows: CostRow[] = Array.from(categoryMap.values()).sort((a, b) =>
         (a.order_num || 0) - (b.order_num || 0)
