@@ -102,22 +102,38 @@ export function useCommerceData() {
       if (posError) throw posError;
       console.log(`📋 Загружено позиций: ${clientPositions?.length || 0}`);
 
-      // ОПТИМИЗАЦИЯ: Загружаем ВСЕ BOQ элементы для тендера ОДНИМ запросом
-      const { data: allBoqItems, error: itemsError } = await supabase
-        .from('boq_items')
-        .select('client_position_id, total_amount, total_commercial_material_cost, total_commercial_work_cost')
-        .eq('tender_id', tenderId);
+      // Загружаем ВСЕ BOQ элементы для тендера с батчингом (Supabase лимит 1000 строк)
+      let allBoqItems: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (itemsError) {
-        console.error('Ошибка загрузки элементов:', itemsError);
-        throw itemsError;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select('client_position_id, total_amount, total_commercial_material_cost, total_commercial_work_cost')
+          .eq('tender_id', tenderId)
+          .range(from, from + batchSize - 1);
+
+        if (error) {
+          console.error('Ошибка загрузки элементов:', error);
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          allBoqItems = [...allBoqItems, ...data];
+          from += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
       }
 
-      console.log(`📝 Загружено BOQ элементов: ${allBoqItems?.length || 0}`);
+      console.log(`📝 Загружено BOQ элементов: ${allBoqItems.length}`);
 
       // Группируем элементы по позициям в памяти
       const itemsByPosition = new Map<string, typeof allBoqItems>();
-      for (const item of allBoqItems || []) {
+      for (const item of allBoqItems) {
         if (!itemsByPosition.has(item.client_position_id)) {
           itemsByPosition.set(item.client_position_id, []);
         }

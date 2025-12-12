@@ -48,19 +48,35 @@ export const usePricingConsistency = (tenderId: string | undefined) => {
     setConsistencyCheck(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Получаем все BOQ items для тендера - это источник истины
-      const { data: boqItems, error: boqError } = await supabase
-        .from('boq_items')
-        .select(`
-          id,
-          total_amount,
-          total_commercial_material_cost,
-          total_commercial_work_cost,
-          client_positions!inner(tender_id)
-        `)
-        .eq('client_positions.tender_id', tenderId);
+      // Получаем все BOQ items для тендера с батчингом (Supabase лимит 1000 строк)
+      let boqItems: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (boqError) throw boqError;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select(`
+            id,
+            total_amount,
+            total_commercial_material_cost,
+            total_commercial_work_cost,
+            client_positions!inner(tender_id)
+          `)
+          .eq('client_positions.tender_id', tenderId)
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          boqItems = [...boqItems, ...data];
+          from += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Базовые суммы из BOQ items
       const boqTotalBase = boqItems?.reduce((sum, item) => sum + (item.total_amount || 0), 0) || 0;

@@ -85,37 +85,70 @@ const ObjectComparison: React.FC = () => {
       setTender1Info(tender1Data);
       setTender2Info(tender2Data);
 
-      // Загружаем данные по затратам для первого тендера
-      const { data: costs1, error: costsError1 } = await supabase
-        .from('boq_items')
-        .select(`
-          total_amount,
-          boq_item_type,
-          detail_cost_category_id,
-          detail_cost_categories!inner(
-            name,
-            cost_categories(name)
-          ),
-          client_positions!inner(tender_id)
-        `)
-        .eq('client_positions.tender_id', selectedTender1);
+      // Загружаем данные по затратам для первого тендера с батчингом
+      let costs1: any[] = [];
+      let from1 = 0;
+      const batchSize = 1000;
+      let hasMore1 = true;
 
-      // Загружаем данные по затратам для второго тендера
-      const { data: costs2, error: costsError2 } = await supabase
-        .from('boq_items')
-        .select(`
-          total_amount,
-          boq_item_type,
-          detail_cost_category_id,
-          detail_cost_categories!inner(
-            name,
-            cost_categories(name)
-          ),
-          client_positions!inner(tender_id)
-        `)
-        .eq('client_positions.tender_id', selectedTender2);
+      while (hasMore1) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select(`
+            total_amount,
+            boq_item_type,
+            detail_cost_category_id,
+            detail_cost_categories!inner(
+              name,
+              cost_categories(name)
+            ),
+            client_positions!inner(tender_id)
+          `)
+          .eq('client_positions.tender_id', selectedTender1)
+          .range(from1, from1 + batchSize - 1);
 
-      if (costsError1 || costsError2) throw costsError1 || costsError2;
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          costs1 = [...costs1, ...data];
+          from1 += batchSize;
+          hasMore1 = data.length === batchSize;
+        } else {
+          hasMore1 = false;
+        }
+      }
+
+      // Загружаем данные по затратам для второго тендера с батчингом
+      let costs2: any[] = [];
+      let from2 = 0;
+      let hasMore2 = true;
+
+      while (hasMore2) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select(`
+            total_amount,
+            boq_item_type,
+            detail_cost_category_id,
+            detail_cost_categories!inner(
+              name,
+              cost_categories(name)
+            ),
+            client_positions!inner(tender_id)
+          `)
+          .eq('client_positions.tender_id', selectedTender2)
+          .range(from2, from2 + batchSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          costs2 = [...costs2, ...data];
+          from2 += batchSize;
+          hasMore2 = data.length === batchSize;
+        } else {
+          hasMore2 = false;
+        }
+      }
 
       // Группируем данные по категориям
       const categories = new Map<string, TenderComparison>();

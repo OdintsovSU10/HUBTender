@@ -112,29 +112,46 @@ const Bsm: React.FC = () => {
   const fetchBoqItems = async (tenderId: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('boq_items')
-        .select(`
-          id,
-          boq_item_type,
-          material_type,
-          quantity,
-          unit_code,
-          total_amount,
-          work_name_id,
-          material_name_id,
-          quote_link,
-          work_names (
-            name
-          ),
-          material_names (
-            name
-          )
-        `)
-        .eq('tender_id', tenderId)
-        .order('created_at', { ascending: false });
+      // Загружаем ВСЕ BOQ элементы с батчингом (Supabase лимит 1000 строк)
+      let data: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: batchData, error } = await supabase
+          .from('boq_items')
+          .select(`
+            id,
+            boq_item_type,
+            material_type,
+            quantity,
+            unit_code,
+            total_amount,
+            work_name_id,
+            material_name_id,
+            quote_link,
+            work_names (
+              name
+            ),
+            material_names (
+              name
+            )
+          `)
+          .eq('tender_id', tenderId)
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+
+        if (batchData && batchData.length > 0) {
+          data = [...data, ...batchData];
+          from += batchSize;
+          hasMore = batchData.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Group by material/work and aggregate
       const grouped = new Map<string, BoqItemData>();
@@ -249,26 +266,48 @@ const Bsm: React.FC = () => {
         return;
       }
 
-      // Шаг 2: Получить все boq_items текущего тендера
-      const { data: boqItems, error: fetchError } = await supabase
-        .from('boq_items')
-        .select(`
-          id,
-          boq_item_type,
-          material_type,
-          work_name_id,
-          material_name_id,
-          unit_code,
-          quantity,
-          total_amount,
-          work_names (
-            name
-          ),
-          material_names (
-            name
-          )
-        `)
-        .eq('tender_id', selectedTenderId);
+      // Шаг 2: Получить все boq_items текущего тендера с батчингом
+      let boqItems: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select(`
+            id,
+            boq_item_type,
+            material_type,
+            work_name_id,
+            material_name_id,
+            unit_code,
+            quantity,
+            total_amount,
+            work_names (
+              name
+            ),
+            material_names (
+              name
+            )
+          `)
+          .eq('tender_id', selectedTenderId)
+          .range(from, from + batchSize - 1);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          boqItems = [...boqItems, ...data];
+          from += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const fetchError = null; // для совместимости с кодом ниже
 
       if (fetchError) throw fetchError;
 

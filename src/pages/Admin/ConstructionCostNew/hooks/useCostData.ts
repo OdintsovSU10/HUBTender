@@ -122,17 +122,34 @@ export const useCostData = () => {
         (volumes || []).map(v => [v.detail_cost_category_id, v.volume || 0])
       );
 
-      const { data: boqItems, error: boqError } = await supabase
-        .from('boq_items')
-        .select(`
-          detail_cost_category_id,
-          boq_item_type,
-          ${costType === 'base' ? 'total_amount' : 'total_commercial_material_cost, total_commercial_work_cost'},
-          client_positions!inner(tender_id)
-        `)
-        .eq('client_positions.tender_id', selectedTenderId);
+      // Загружаем ВСЕ BOQ элементы с батчингом (Supabase лимит 1000 строк)
+      let boqItems: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (boqError) throw boqError;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select(`
+            detail_cost_category_id,
+            boq_item_type,
+            ${costType === 'base' ? 'total_amount' : 'total_commercial_material_cost, total_commercial_work_cost'},
+            client_positions!inner(tender_id)
+          `)
+          .eq('client_positions.tender_id', selectedTenderId)
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          boqItems = [...boqItems, ...data];
+          from += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
 
       const costMap = new Map<string, {
         materials: number;
