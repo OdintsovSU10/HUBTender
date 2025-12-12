@@ -6,10 +6,10 @@ const { Text } = Typography;
 
 interface CostFiltersProps {
   costType: 'base' | 'commercial';
-  viewMode: 'detailed' | 'summary';
+  viewMode: 'detailed' | 'summary' | 'simplified';
   searchText: string;
   onCostTypeChange: (value: 'base' | 'commercial') => void;
-  onViewModeChange: (value: 'detailed' | 'summary') => void;
+  onViewModeChange: (value: 'detailed' | 'summary' | 'simplified') => void;
   onSearchChange: (value: string) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
@@ -54,9 +54,10 @@ const CostFilters: React.FC<CostFiltersProps> = ({
                 options={[
                   { label: 'Детальное', value: 'detailed' },
                   { label: 'Итоговое', value: 'summary' },
+                  { label: 'Упрощенное', value: 'simplified' },
                 ]}
                 value={viewMode}
-                onChange={(value) => onViewModeChange(value as 'detailed' | 'summary')}
+                onChange={(value) => onViewModeChange(value as 'detailed' | 'summary' | 'simplified')}
               />
             </Space>
             <Space>

@@ -12,11 +12,12 @@ const { Text } = Typography;
 
 interface CostTableProps {
   data: CostRow[];
-  viewMode: 'detailed' | 'summary';
+  viewMode: 'detailed' | 'summary' | 'simplified';
   loading: boolean;
   expandedRowKeys: string[];
   onExpandedRowsChange: (keys: string[]) => void;
   onVolumeChange: (value: number, record: CostRow) => void;
+  areaSp: number;
 }
 
 const CostTable: React.FC<CostTableProps> = ({
@@ -26,6 +27,7 @@ const CostTable: React.FC<CostTableProps> = ({
   expandedRowKeys,
   onExpandedRowsChange,
   onVolumeChange,
+  areaSp,
 }) => {
   const { theme } = useTheme();
 
@@ -248,12 +250,52 @@ const CostTable: React.FC<CostTableProps> = ({
     },
   ];
 
-  // Собираем все колонки в зависимости от режима просмотра
-  const columns: ColumnsType<CostRow> = [
-    ...baseColumns,
-    ...(viewMode === 'detailed' ? detailedColumns : summaryColumns),
-    ...totalColumn,
+  // Упрощенные колонки для simplified режима
+  const simplifiedColumns: ColumnsType<CostRow> = [
+    {
+      title: <div style={{ textAlign: 'center' }}>Итого</div>,
+      dataIndex: 'total_cost',
+      key: 'total_cost',
+      width: 150,
+      align: 'right',
+      render: (value: number) => (
+        <Text strong style={{ color: '#10b981' }}>
+          {value.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}
+        </Text>
+      ),
+    },
+    {
+      title: <div style={{ textAlign: 'center' }}>Итого за ед общей площади</div>,
+      key: 'cost_per_total_area',
+      width: 200,
+      align: 'right',
+      fixed: 'right',
+      render: (_: any, record: CostRow) => {
+        if (!areaSp) return '-';
+        const costPerArea = record.total_cost / areaSp;
+        return (
+          <Text strong style={{ color: '#0891b2' }}>
+            {costPerArea.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </Text>
+        );
+      },
+    },
   ];
+
+  // Собираем все колонки в зависимости от режима просмотра
+  const columns: ColumnsType<CostRow> =
+    viewMode === 'simplified'
+      ? [
+          baseColumns[0], // Категория
+          baseColumns[1], // Вид
+          baseColumns[2], // Локализация
+          ...simplifiedColumns,
+        ]
+      : [
+          ...baseColumns,
+          ...(viewMode === 'detailed' ? detailedColumns : summaryColumns),
+          ...totalColumn,
+        ];
 
   // Вычисляем итоговую строку
   const totals = data.reduce(
@@ -299,10 +341,23 @@ const CostTable: React.FC<CostTableProps> = ({
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={6}>
+                <Table.Summary.Cell index={0} colSpan={viewMode === 'simplified' ? 3 : 6}>
                   <Text strong>Итого:</Text>
                 </Table.Summary.Cell>
-                {viewMode === 'detailed' ? (
+                {viewMode === 'simplified' ? (
+                  <>
+                    <Table.Summary.Cell index={3} align="right">
+                      <Text strong style={{ color: '#10b981', fontSize: 16 }}>
+                        {totals.total.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}
+                      </Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={4} align="right">
+                      <Text strong style={{ color: '#0891b2', fontSize: 16 }}>
+                        {areaSp ? (totals.total / areaSp).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '-'}
+                      </Text>
+                    </Table.Summary.Cell>
+                  </>
+                ) : viewMode === 'detailed' ? (
                   <>
                     <Table.Summary.Cell index={6} align="right">
                       <Text strong>{(totals.materials + totals.materialsComp).toLocaleString('ru-RU', { minimumFractionDigits: 0 })}</Text>
@@ -315,6 +370,11 @@ const CostTable: React.FC<CostTableProps> = ({
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={9} align="right">
                       <Text strong>{totals.subWorks.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={10} align="right">
+                      <Text strong style={{ color: '#10b981', fontSize: 16 }}>
+                        {totals.total.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}
+                      </Text>
                     </Table.Summary.Cell>
                   </>
                 ) : (
@@ -329,13 +389,13 @@ const CostTable: React.FC<CostTableProps> = ({
                         {totals.totalMaterials.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}
                       </Text>
                     </Table.Summary.Cell>
+                    <Table.Summary.Cell index={8} align="right">
+                      <Text strong style={{ color: '#10b981', fontSize: 16 }}>
+                        {totals.total.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}
+                      </Text>
+                    </Table.Summary.Cell>
                   </>
                 )}
-                <Table.Summary.Cell index={viewMode === 'detailed' ? 10 : 8} align="right">
-                  <Text strong style={{ color: '#10b981', fontSize: 16 }}>
-                    {totals.total.toLocaleString('ru-RU', { minimumFractionDigits: 0 })}
-                  </Text>
-                </Table.Summary.Cell>
               </Table.Summary.Row>
             </Table.Summary>
           )}

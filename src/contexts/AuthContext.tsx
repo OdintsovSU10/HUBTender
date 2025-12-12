@@ -23,8 +23,8 @@ interface AuthProviderProps {
  */
 const retryWithBackoff = async <T,>(
   fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
+  maxRetries: number = 2,
+  baseDelay: number = 200
 ): Promise<T | null> => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -279,26 +279,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           initialSessionHandled.current = true;
           isProcessingEvent.current = false;
         } else if (event === 'SIGNED_IN' && session?.user) {
-          // SIGNED_IN игнорируем, НО запускаем таймер
-          // Если через 1.5 секунды INITIAL_SESSION не придет - обработаем вручную
-          console.log('⚠️ Ignoring SIGNED_IN, waiting for INITIAL_SESSION...');
+          // После логина пользователя - обрабатываем SIGNED_IN немедленно
+          console.log('🟢 Handling SIGNED_IN event');
+          isProcessingEvent.current = true;
 
-          // Запускаем таймер только если INITIAL_SESSION еще не был обработан
-          if (!initialSessionHandled.current) {
-            signedInTimeout = setTimeout(async () => {
-              if (!initialSessionHandled.current && isSubscribed) {
-                console.log('⚠️ INITIAL_SESSION did not arrive, handling SIGNED_IN manually');
-                isProcessingEvent.current = true;
-
-                const userData = await loadUserData(session.user);
-                setUser(userData);
-                setLoading(false);
-                initialSessionHandled.current = true;
-                isProcessingEvent.current = false;
-                console.log('✅ User loaded from SIGNED_IN fallback');
-              }
-            }, 1500);
+          // Отменяем таймер если он был запущен
+          if (signedInTimeout) {
+            clearTimeout(signedInTimeout);
+            signedInTimeout = null;
           }
+
+          const userData = await loadUserData(session.user);
+          setUser(userData);
+          setLoading(false);
+          initialSessionHandled.current = true;
+          isProcessingEvent.current = false;
+          console.log('✅ User loaded from SIGNED_IN');
         } else if (event === 'SIGNED_OUT') {
           console.log('🔴 SIGNED_OUT event', {
             currentUserId: user?.id,

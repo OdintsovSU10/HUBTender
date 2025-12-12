@@ -38,6 +38,7 @@ export const useCostData = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<CostRow[]>([]);
   const [costType, setCostType] = useState<'base' | 'commercial'>('base');
+  const [groupVolumes, setGroupVolumes] = useState<Map<string, number>>(new Map());
 
   const getTenderTitles = (): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
@@ -69,6 +70,7 @@ export const useCostData = () => {
     setSelectedVersion(null);
     setSelectedTenderId(null);
     setData([]);
+    setGroupVolumes(new Map());
   };
 
   const handleVersionChange = (version: number) => {
@@ -76,6 +78,7 @@ export const useCostData = () => {
     const tender = tenders.find(t => t.title === selectedTenderTitle && t.version === version);
     if (tender) {
       setSelectedTenderId(tender.id);
+      setGroupVolumes(new Map());
     }
   };
 
@@ -119,9 +122,24 @@ export const useCostData = () => {
 
       if (volError) throw volError;
 
-      const volumeMap = new Map(
-        (volumes || []).map(v => [v.detail_cost_category_id, v.volume || 0])
-      );
+      // Разделяем объемы деталей и групп
+      const volumeMap = new Map<string, number>();
+      const groupVolumesMap = new Map<string, number>();
+
+      (volumes || []).forEach(v => {
+        if (v.detail_cost_category_id) {
+          // Объем детали
+          volumeMap.set(v.detail_cost_category_id, v.volume || 0);
+        } else if (v.group_key) {
+          // Объем группы
+          groupVolumesMap.set(v.group_key, v.volume || 0);
+        }
+      });
+
+      console.log('Loaded group volumes from DB:', Array.from(groupVolumesMap.entries()));
+
+      // Сохраняем объемы групп в state
+      setGroupVolumes(groupVolumesMap);
 
       // Загружаем ВСЕ BOQ элементы с батчингом (Supabase лимит 1000 строк)
       let boqItems: any[] = [];
@@ -309,14 +327,48 @@ export const useCostData = () => {
         },
       };
 
+      // Функция для определения порядка отделочных работ по частичному совпадению
+      const getFinishingWorkOrder = (name: string): number => {
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('отделка полов')) return 1;
+        if (lowerName.includes('отделка стен')) return 2;
+        if (lowerName.includes('отделка потолков')) return 3;
+        return finishingWorksOrder[name] || 999;
+      };
+
       const sortDetailRows = (rows: CostRow[], categoryName: string, locationName?: string): CostRow[] => {
+        // Для отделочных работ - всегда первые 3 элемента в строгом порядке внутри любой локализации
         if (categoryName.toLowerCase().includes('отделочн')) {
-          return [...rows].sort((a, b) => {
-            const orderA = finishingWorksOrder[a.detail_category_name] || 999;
-            const orderB = finishingWorksOrder[b.detail_category_name] || 999;
+          const priorityItems: CostRow[] = [];
+          const otherItems: CostRow[] = [];
+
+          // Разделяем на приоритетные (первые 3) и остальные
+          rows.forEach(row => {
+            const order = getFinishingWorkOrder(row.detail_category_name);
+            if (order <= 3) {
+              priorityItems.push(row);
+            } else {
+              otherItems.push(row);
+            }
+          });
+
+          // Сортируем приоритетные в строгом порядке 1-2-3
+          priorityItems.sort((a, b) => {
+            const orderA = getFinishingWorkOrder(a.detail_category_name);
+            const orderB = getFinishingWorkOrder(b.detail_category_name);
+            return orderA - orderB;
+          });
+
+          // Сортируем остальные по своему порядку
+          otherItems.sort((a, b) => {
+            const orderA = getFinishingWorkOrder(a.detail_category_name);
+            const orderB = getFinishingWorkOrder(b.detail_category_name);
             if (orderA !== orderB) return orderA - orderB;
             return (a.order_num || 0) - (b.order_num || 0);
           });
+
+          // Объединяем: сначала приоритетные, потом остальные
+          return [...priorityItems, ...otherItems];
         }
 
         if (categoryName.toLowerCase().includes('двер') && locationName) {
@@ -512,6 +564,28 @@ export const useCostData = () => {
 
       rows = filterZeroCosts(rows);
 
+      // Восстанавливаем объемы групп из загруженных значений
+      const restoreGroupVolumes = (items: CostRow[], volumesMap: Map<string, number>): CostRow[] => {
+        return items.map(item => {
+          if ((item.is_category || item.is_location) && volumesMap.has(item.key)) {
+            const restoredVolume = volumesMap.get(item.key)!;
+            console.log('Restoring volume for group:', item.key, 'volume:', restoredVolume);
+            return {
+              ...item,
+              volume: restoredVolume,
+              children: item.children ? restoreGroupVolumes(item.children, volumesMap) : undefined
+            };
+          }
+          if (item.children) {
+            return { ...item, children: restoreGroupVolumes(item.children, volumesMap) };
+          }
+          return item;
+        });
+      };
+
+      rows = restoreGroupVolumes(rows, groupVolumesMap);
+      console.log('Rows after restoring group volumes:', rows.length);
+
       setData(rows);
     } catch (error: any) {
       console.error('Ошибка загрузки затрат:', error);
@@ -525,25 +599,38 @@ export const useCostData = () => {
     if (value === null || value === record.volume) return;
 
     try {
-      // Для деталей - сохраняем в базу
+      // Для деталей - сохраняем в базу с detail_cost_category_id
       if (record.detail_cost_category_id) {
-        const { error } = await supabase
+        // Проверяем существование записи
+        const { data: existing } = await supabase
           .from('construction_cost_volumes')
-          .upsert({
-            tender_id: selectedTenderId!,
-            detail_cost_category_id: record.detail_cost_category_id,
-            volume: value,
-          }, {
-            onConflict: 'tender_id,detail_cost_category_id'
-          });
+          .select('id')
+          .eq('tender_id', selectedTenderId!)
+          .eq('detail_cost_category_id', record.detail_cost_category_id)
+          .single();
+
+        let error;
+        if (existing) {
+          // Обновляем существующую запись
+          ({ error } = await supabase
+            .from('construction_cost_volumes')
+            .update({ volume: value })
+            .eq('tender_id', selectedTenderId!)
+            .eq('detail_cost_category_id', record.detail_cost_category_id));
+        } else {
+          // Создаем новую запись
+          ({ error } = await supabase
+            .from('construction_cost_volumes')
+            .insert({
+              tender_id: selectedTenderId!,
+              detail_cost_category_id: record.detail_cost_category_id,
+              volume: value,
+            }));
+        }
 
         if (error) throw error;
 
-        message.success('Объем сохранен');
-        fetchConstructionCosts();
-      }
-      // Для категорий и локализаций - обновляем только в локальном state
-      else if (record.is_category || record.is_location) {
+        // Обновляем локально без перезагрузки
         setData(prevData => {
           const updateVolume = (rows: CostRow[]): CostRow[] => {
             return rows.map(row => {
@@ -558,7 +645,74 @@ export const useCostData = () => {
           };
           return updateVolume(prevData);
         });
-        message.success('Объем группы обновлен');
+
+        message.success('Объем сохранен');
+      }
+      // Для категорий и локализаций - сохраняем в базу с group_key
+      else if (record.is_category || record.is_location) {
+        console.log('Saving group volume:', { key: record.key, value, tenderId: selectedTenderId });
+
+        // Проверяем существование записи
+        const { data: existing, error: checkError } = await supabase
+          .from('construction_cost_volumes')
+          .select('id')
+          .eq('tender_id', selectedTenderId!)
+          .eq('group_key', record.key)
+          .maybeSingle();
+
+        console.log('Existing record:', existing);
+
+        let error;
+        if (existing) {
+          // Обновляем существующую запись
+          console.log('Updating existing record');
+          ({ error } = await supabase
+            .from('construction_cost_volumes')
+            .update({ volume: value })
+            .eq('tender_id', selectedTenderId!)
+            .eq('group_key', record.key));
+        } else {
+          // Создаем новую запись
+          console.log('Creating new record');
+          ({ error } = await supabase
+            .from('construction_cost_volumes')
+            .insert({
+              tender_id: selectedTenderId!,
+              group_key: record.key,
+              volume: value,
+            }));
+        }
+
+        if (error) {
+          console.error('Save error:', error);
+          throw error;
+        }
+
+        console.log('Group volume saved successfully');
+
+        // Сохраняем в Map
+        setGroupVolumes(prev => {
+          const newMap = new Map(prev);
+          newMap.set(record.key, value);
+          return newMap;
+        });
+
+        // Обновляем в данных
+        setData(prevData => {
+          const updateVolume = (rows: CostRow[]): CostRow[] => {
+            return rows.map(row => {
+              if (row.key === record.key) {
+                return { ...row, volume: value };
+              }
+              if (row.children) {
+                return { ...row, children: updateVolume(row.children) };
+              }
+              return row;
+            });
+          };
+          return updateVolume(prevData);
+        });
+        message.success('Объем группы сохранен');
       }
     } catch (error: any) {
       message.error('Ошибка сохранения: ' + error.message);
@@ -571,6 +725,7 @@ export const useCostData = () => {
 
   useEffect(() => {
     if (selectedTenderId) {
+      setGroupVolumes(new Map());
       fetchConstructionCosts();
     }
   }, [selectedTenderId, costType]);

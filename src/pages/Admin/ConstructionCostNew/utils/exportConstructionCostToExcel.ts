@@ -15,6 +15,7 @@ interface ExportParams {
   selectedVersion: number | null;
   costType: 'base' | 'commercial';
   filteredData: CostRow[];
+  areaSp: number;
 }
 
 interface OppositeCosts {
@@ -152,14 +153,48 @@ const doorsOrder: Record<string, Record<string, number>> = {
   },
 };
 
+// Функция для определения порядка отделочных работ по частичному совпадению
+const getFinishingWorkOrder = (name: string): number => {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('отделка полов')) return 1;
+  if (lowerName.includes('отделка стен')) return 2;
+  if (lowerName.includes('отделка потолков')) return 3;
+  return finishingWorksOrder[name] || 999;
+};
+
 const sortDetailRows = (rows: CostRow[], categoryName: string, locationName?: string): CostRow[] => {
+  // Для отделочных работ - всегда первые 3 элемента в строгом порядке внутри любой локализации
   if (categoryName.toLowerCase().includes('отделочн')) {
-    return [...rows].sort((a, b) => {
-      const orderA = finishingWorksOrder[a.detail_category_name] || 999;
-      const orderB = finishingWorksOrder[b.detail_category_name] || 999;
+    const priorityItems: CostRow[] = [];
+    const otherItems: CostRow[] = [];
+
+    // Разделяем на приоритетные (первые 3) и остальные
+    rows.forEach(row => {
+      const order = getFinishingWorkOrder(row.detail_category_name);
+      if (order <= 3) {
+        priorityItems.push(row);
+      } else {
+        otherItems.push(row);
+      }
+    });
+
+    // Сортируем приоритетные в строгом порядке 1-2-3
+    priorityItems.sort((a, b) => {
+      const orderA = getFinishingWorkOrder(a.detail_category_name);
+      const orderB = getFinishingWorkOrder(b.detail_category_name);
+      return orderA - orderB;
+    });
+
+    // Сортируем остальные по своему порядку
+    otherItems.sort((a, b) => {
+      const orderA = getFinishingWorkOrder(a.detail_category_name);
+      const orderB = getFinishingWorkOrder(b.detail_category_name);
       if (orderA !== orderB) return orderA - orderB;
       return (a.order_num || 0) - (b.order_num || 0);
     });
+
+    // Объединяем: сначала приоритетные, потом остальные
+    return [...priorityItems, ...otherItems];
   }
 
   if (categoryName.toLowerCase().includes('двер') && locationName) {
@@ -177,19 +212,29 @@ const sortDetailRows = (rows: CostRow[], categoryName: string, locationName?: st
   return rows;
 };
 
+// Типы строк для стилизации
+type RowType = 'header' | 'subheader' | 'category' | 'location' | 'detail';
+
+interface ExportDataWithTypes {
+  data: any[][];
+  rowTypes: RowType[];
+}
+
 /**
  * Формирует данные для экспорта в Excel
  */
 function buildExportData(
   filteredData: CostRow[],
-  oppositeCostMap: Map<string, OppositeCosts>
-): any[][] {
+  oppositeCostMap: Map<string, OppositeCosts>,
+  areaSp: number
+): ExportDataWithTypes {
   const exportData: any[][] = [];
+  const rowTypes: RowType[] = [];
 
   // Заголовки
   exportData.push([
     'Затрата тендера',
-    'Комментарий',
+    'Локализация',
     'Объем',
     'Ед. изм.',
     'Прямые Затраты',
@@ -216,7 +261,9 @@ function buildExportData(
     '',
     '',
     '',
+    '',
   ]);
+  rowTypes.push('header');
 
   exportData.push([
     '',
@@ -247,7 +294,9 @@ function buildExportData(
     'Итого работ за ед.',
     'Итого материалы за ед.',
     'Итого за единицу',
+    'Итого за единицу общей площади',
   ]);
+  rowTypes.push('subheader');
 
   let categoryIndex = 1;
 
@@ -320,7 +369,9 @@ function buildExportData(
         categoryTotalVolume ? oppCatTotalWorks / categoryTotalVolume : '',
         categoryTotalVolume ? oppCatTotalMaterials / categoryTotalVolume : '',
         categoryTotalVolume ? oppCatTotal / categoryTotalVolume : '',
+        areaSp ? oppCatTotal / areaSp : '',
       ]);
+      rowTypes.push('category');
 
       // Строки деталей (с учетом локализаций)
       let detailIndex = 1;
@@ -391,7 +442,9 @@ function buildExportData(
             '',
             '',
             '',
+            areaSp && oppLocTotal ? oppLocTotal / areaSp : '',
           ]);
+          rowTypes.push('location');
 
           // Детали внутри локализации
           let locationDetailIndex = 1;
@@ -456,7 +509,9 @@ function buildExportData(
                 detail.volume ? oppDetailTotalWorks / detail.volume : '',
                 detail.volume ? oppDetailTotalMaterials / detail.volume : '',
                 detail.volume ? oppDetailTotal / detail.volume : '',
+                areaSp && oppDetailTotal ? oppDetailTotal / areaSp : '',
               ]);
+              rowTypes.push('detail');
 
               locationDetailIndex++;
             }
@@ -523,7 +578,9 @@ function buildExportData(
             child.volume ? oppDetailTotalWorks / child.volume : '',
             child.volume ? oppDetailTotalMaterials / child.volume : '',
             child.volume ? oppDetailTotal / child.volume : '',
+            areaSp && oppDetailTotal ? oppDetailTotal / areaSp : '',
           ]);
+          rowTypes.push('detail');
 
           detailIndex++;
         }
@@ -533,13 +590,13 @@ function buildExportData(
     }
   });
 
-  return exportData;
+  return { data: exportData, rowTypes };
 }
 
 /**
  * Настройка стилей и структуры листа Excel
  */
-function configureWorksheet(ws: XLSX.WorkSheet): void {
+function configureWorksheet(ws: XLSX.WorkSheet, rowTypes: RowType[]): void {
   // Ширина колонок
   ws['!cols'] = [
     { wch: 50 },
@@ -570,6 +627,7 @@ function configureWorksheet(ws: XLSX.WorkSheet): void {
     { wch: 18 },
     { wch: 20 },
     { wch: 18 },
+    { wch: 25 },
   ];
 
   // Объединение ячеек в заголовке
@@ -579,8 +637,75 @@ function configureWorksheet(ws: XLSX.WorkSheet): void {
     { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // Объем
     { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // Ед. изм.
     { s: { r: 0, c: 4 }, e: { r: 0, c: 15 } }, // Прямые Затраты
-    { s: { r: 0, c: 16 }, e: { r: 0, c: 27 } }, // Коммерческие Затраты
+    { s: { r: 0, c: 16 }, e: { r: 0, c: 28 } }, // Коммерческие Затраты
   ];
+
+  // Применение стилей к ячейкам
+  const beigeHeaderFill = { fgColor: { rgb: 'F5F5DC' } };
+  const yellowCategoryFill = { fgColor: { rgb: 'FFFFE0' } };
+  const whiteFill = { fgColor: { rgb: 'FFFFFF' } };
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: '000000' } },
+    bottom: { style: 'thin', color: { rgb: '000000' } },
+    left: { style: 'thin', color: { rgb: '000000' } },
+    right: { style: 'thin', color: { rgb: '000000' } },
+  };
+
+  // Применяем стили к каждой ячейке
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    const rowType = rowTypes[R];
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[cellAddress]) continue;
+
+      let fill = whiteFill;
+      if (rowType === 'header' || rowType === 'subheader') {
+        fill = beigeHeaderFill;
+      } else if (rowType === 'category' || rowType === 'location') {
+        fill = yellowCategoryFill;
+      }
+
+      // Выравнивание
+      let alignment: any = { vertical: 'center' };
+      if (rowType === 'header' || rowType === 'subheader') {
+        alignment.horizontal = 'center';
+      } else if (C === 1) {
+        // Столбец "Локализация" - центральное выравнивание
+        alignment.horizontal = 'center';
+      } else {
+        alignment.horizontal = C === 0 ? 'left' : 'right';
+      }
+
+      // Формат чисел для колонок начиная с C (индекс 2)
+      let numFmt = undefined;
+      if (C >= 2 && rowType !== 'header' && rowType !== 'subheader') {
+        numFmt = '#,##0';
+      }
+
+      // Жирный шрифт и цвет
+      let font: any = {};
+      if (rowType === 'header' || rowType === 'subheader') {
+        font.bold = true;
+      } else if (rowType === 'category' || rowType === 'location') {
+        font.bold = true;
+      }
+
+      // Зеленый цвет и жирный шрифт для столбцов "Итого за единицу" (индексы 15, 27, 28)
+      if ((C === 15 || C === 27 || C === 28) && rowType !== 'header' && rowType !== 'subheader') {
+        font.color = { rgb: '008000' };
+        font.bold = true;
+      }
+
+      ws[cellAddress].s = {
+        fill,
+        border: thinBorder,
+        alignment,
+        ...(numFmt && { numFmt }),
+        ...(Object.keys(font).length > 0 && { font }),
+      };
+    }
+  }
 }
 
 /**
@@ -595,6 +720,7 @@ export async function exportConstructionCostToExcel(
     selectedVersion,
     costType,
     filteredData,
+    areaSp,
   } = params;
 
   if (!selectedTenderId || !selectedTenderTitle) {
@@ -607,14 +733,14 @@ export async function exportConstructionCostToExcel(
     const oppositeCostMap = await fetchOppositeCosts(selectedTenderId, costType);
 
     // Формируем данные для экспорта
-    const exportData = buildExportData(filteredData, oppositeCostMap);
+    const { data: exportData, rowTypes } = buildExportData(filteredData, oppositeCostMap, areaSp);
 
     // Создаем рабочую книгу и лист
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(exportData);
 
     // Настраиваем стили и структуру
-    configureWorksheet(ws);
+    configureWorksheet(ws, rowTypes);
 
     // Добавляем лист в книгу
     XLSX.utils.book_append_sheet(wb, ws, 'Затраты');

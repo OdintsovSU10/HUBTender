@@ -60,16 +60,33 @@ const Dashboard: React.FC = () => {
 
       // Для каждого тендера загружаем стоимость BOQ
       const formattedData: TenderTableData[] = await Promise.all((data || []).map(async (tender: Tender) => {
-        // Загружаем позиции тендера
-        const { data: positions } = await supabase
-          .from('client_positions')
-          .select('id')
-          .eq('tender_id', tender.id);
+        // Загружаем все позиции тендера с батчингом (Supabase limit 1000 rows)
+        let allPositions: { id: string }[] = [];
+        let from = 0;
+        const positionBatchSize = 1000;
+        let hasMorePositions = true;
+
+        while (hasMorePositions) {
+          const { data: positions } = await supabase
+            .from('client_positions')
+            .select('id')
+            .eq('tender_id', tender.id)
+            .order('position_number', { ascending: true })
+            .range(from, from + positionBatchSize - 1);
+
+          if (positions && positions.length > 0) {
+            allPositions = [...allPositions, ...positions];
+            from += positionBatchSize;
+            hasMorePositions = positions.length === positionBatchSize;
+          } else {
+            hasMorePositions = false;
+          }
+        }
 
         // Рассчитываем итоговую стоимость BOQ из boq_items
         let boqCost = 0;
-        if (positions && positions.length > 0) {
-          const positionIds = positions.map(p => p.id);
+        if (allPositions.length > 0) {
+          const positionIds = allPositions.map(p => p.id);
 
           // Разбиваем на батчи по 100 ID для избежания ошибки 400 (URL too long)
           const boqBatchSize = 100;
@@ -271,7 +288,7 @@ const Dashboard: React.FC = () => {
       ),
     },
     {
-      title: <div style={{ textAlign: 'center' }}>BOQ стоимость</div>,
+      title: <div style={{ textAlign: 'center' }}>Итого стоимость ПЗ</div>,
       dataIndex: 'boq_cost',
       key: 'boq_cost',
       width: '10%',

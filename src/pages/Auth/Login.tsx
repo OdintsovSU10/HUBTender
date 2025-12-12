@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Typography } from 'antd';
-import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Form, Input, Button, Card, message, Typography, Spin } from 'antd';
+import { UserOutlined, LockOutlined, LoginOutlined, LoadingOutlined } from '@ant-design/icons';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { HeaderIcon } from '../../components/Icons/HeaderIcon';
@@ -17,34 +17,21 @@ const Login: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
-
-  // Получаем путь, с которого пользователь был перенаправлен
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   // Автоматический редирект если пользователь уже авторизован
   useEffect(() => {
     // Если пользователь уже авторизован и одобрен, перенаправляем
-    if (user && user.access_status === 'approved' && !authLoading) {
-      // Определяем, куда перенаправить пользователя
-      let targetPath = from;
-
-      // Если пользователь пытается попасть на страницу, к которой у него нет доступа
-      // или это дефолтный редирект на /dashboard
-      if (from === '/dashboard' || from === '/') {
-        // Если allowed_pages пуст - полный доступ, идем на /dashboard
-        if (user.allowed_pages.length === 0) {
-          targetPath = '/dashboard';
-        } else {
-          // Иначе берем первую доступную страницу
-          targetPath = user.allowed_pages[0];
-        }
-      }
+    // Не ждем authLoading - редиректим сразу как только user доступен
+    if (user && user.access_status === 'approved') {
+      // Всегда перенаправляем на dashboard после входа
+      const targetPath = user.allowed_pages.length === 0
+        ? '/dashboard'
+        : user.allowed_pages[0];
 
       navigate(targetPath, { replace: true });
     }
-  }, [user, authLoading, navigate, from]);
+  }, [user, navigate]);
 
   const handleLogin = async (values: LoginFormValues) => {
     setLoading(true);
@@ -110,16 +97,37 @@ const Login: React.FC = () => {
         return;
       }
 
-      // 5. Успешный вход - AuthContext автоматически обновит пользователя через onAuthStateChange
-      // useEffect сработает когда user загрузится и сделает редирект
-      message.success('Вход выполнен успешно');
+      // 5. Успешный вход - AuthContext обновит user, и useEffect сделает редирект
+      // Оставляем loading=true, чтобы показать индикатор загрузки
     } catch (error) {
       console.error('Неожиданная ошибка при входе:', error);
       message.error('Произошла неожиданная ошибка при входе');
-    } finally {
       setLoading(false);
     }
   };
+
+  // Полноэкранный индикатор загрузки
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <Spin
+          indicator={<LoadingOutlined style={{ fontSize: 48, color: '#fff' }} spin />}
+        />
+        <Text style={{ marginTop: 24, fontSize: 18, color: '#fff' }}>
+          Вход в систему...
+        </Text>
+      </div>
+    );
+  }
 
   return (
     <div

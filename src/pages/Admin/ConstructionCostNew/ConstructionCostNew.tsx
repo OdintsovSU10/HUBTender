@@ -16,7 +16,7 @@ const { Title, Text } = Typography;
 
 const ConstructionCostNew: React.FC = () => {
   const [searchText, setSearchText] = useState('');
-  const [viewMode, setViewMode] = useState<'detailed' | 'summary'>('detailed');
+  const [viewMode, setViewMode] = useState<'detailed' | 'summary' | 'simplified'>('detailed');
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
 
   const {
@@ -50,11 +50,15 @@ const ConstructionCostNew: React.FC = () => {
       selectedVersion,
       costType,
       filteredData,
+      areaSp: selectedTender?.area_sp || 0,
     });
   };
 
   // Фильтрация данных
   const filteredData = filterCostData(data, searchText);
+
+  // Получаем выбранный тендер для отображения area_sp
+  const selectedTender = tenders.find(t => t.id === selectedTenderId);
 
   // Обработчик выбора тендера из карточек
   const handleTenderSelect = (tenderId: string, title: string, version: number) => {
@@ -99,10 +103,15 @@ const ConstructionCostNew: React.FC = () => {
         </Button>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'baseline', gap: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
           Затраты на строительство
         </Title>
+        {selectedTender?.area_sp && (
+          <Text type="secondary">
+            Площадь объекта по СП: <Text strong>{selectedTender.area_sp.toLocaleString('ru-RU')} м²</Text>
+          </Text>
+        )}
       </div>
 
       <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -161,6 +170,7 @@ const ConstructionCostNew: React.FC = () => {
           expandedRowKeys={expandedRowKeys}
           onExpandedRowsChange={setExpandedRowKeys}
           onVolumeChange={handleVolumeChange}
+          areaSp={selectedTender?.area_sp || 0}
         />
       </Card>
     </div>
