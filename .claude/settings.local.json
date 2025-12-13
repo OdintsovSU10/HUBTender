@@ -68,7 +68,8 @@
       "Bash(git log:*)",
       "Bash(curl:*)",
       "Bash(mv:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

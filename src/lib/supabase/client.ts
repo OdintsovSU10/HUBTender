@@ -9,8 +9,27 @@ if (!supabaseUrl || !supabasePublishableKey) {
   console.error('Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your .env.local file');
 }
 
-// Создание клиента Supabase
+// Создание клиента Supabase с настройками timeout
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabasePublishableKey || 'placeholder-key'
+  supabasePublishableKey || 'placeholder-key',
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'supabase-js-web',
+      },
+    },
+    db: {
+      schema: 'public',
+    },
+    // Увеличиваем timeout для медленных соединений
+    realtime: {
+      timeout: 30000,
+    },
+  }
 );

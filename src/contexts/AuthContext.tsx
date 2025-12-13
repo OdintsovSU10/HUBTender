@@ -68,10 +68,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isRetry: boolean = false
   ): Promise<AuthUser | null> => {
     const startTime = Date.now();
+    console.log('🔵 loadUserData START', { userId: authUser.id, isRetry });
 
     try {
       const result = await retryWithBackoff(async () => {
-        const { data, error } = await supabase
+        console.log('🔵 Fetching user from database...', { userId: authUser.id });
+
+        // Добавляем таймаут к запросу
+        const queryPromise = supabase
           .from('users')
           .select(`
             *,
@@ -83,6 +87,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .eq('id', authUser.id)
           .single();
 
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Database query timeout after 10s')), 10000);
+        });
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+        console.log('🔵 Database response', { hasData: !!data, hasError: !!error, error: error?.message });
         if (error) throw error;
         if (!data) throw new Error('USER_NOT_FOUND');
 
@@ -279,22 +290,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           initialSessionHandled.current = true;
           isProcessingEvent.current = false;
         } else if (event === 'SIGNED_IN' && session?.user) {
-          // После логина пользователя - обрабатываем SIGNED_IN немедленно
-          console.log('🟢 Handling SIGNED_IN event');
-          isProcessingEvent.current = true;
-
-          // Отменяем таймер если он был запущен
-          if (signedInTimeout) {
-            clearTimeout(signedInTimeout);
-            signedInTimeout = null;
-          }
-
-          const userData = await loadUserData(session.user);
-          setUser(userData);
-          setLoading(false);
-          initialSessionHandled.current = true;
-          isProcessingEvent.current = false;
-          console.log('✅ User loaded from SIGNED_IN');
+          // Пропускаем SIGNED_IN - полагаемся на INITIAL_SESSION
+          // SIGNED_IN приходит и при входе, и при открытии новой вкладки
+          // Но при открытии новой вкладки сессия может быть еще не готова
+          console.log('⚠️ Skipping SIGNED_IN - waiting for INITIAL_SESSION');
+          return;
         } else if (event === 'SIGNED_OUT') {
           console.log('🔴 SIGNED_OUT event', {
             currentUserId: user?.id,
