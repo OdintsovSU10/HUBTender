@@ -290,11 +290,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           initialSessionHandled.current = true;
           isProcessingEvent.current = false;
         } else if (event === 'SIGNED_IN' && session?.user) {
-          // Пропускаем SIGNED_IN - полагаемся на INITIAL_SESSION
-          // SIGNED_IN приходит и при входе, и при открытии новой вкладки
-          // Но при открытии новой вкладки сессия может быть еще не готова
-          console.log('⚠️ Skipping SIGNED_IN - waiting for INITIAL_SESSION');
-          return;
+          // Обрабатываем SIGNED_IN только если INITIAL_SESSION уже был обработан
+          // Это позволяет обработать вход через форму, но избежать двойной обработки при монтировании
+          if (!initialSessionHandled.current) {
+            console.log('⚠️ Skipping SIGNED_IN - waiting for INITIAL_SESSION');
+            return;
+          }
+
+          console.log('🟢 Handling SIGNED_IN event (after login)');
+          isProcessingEvent.current = true;
+
+          const userData = await loadUserData(session.user);
+          if (userData) {
+            setUser(userData);
+            console.log('✅ User loaded from SIGNED_IN');
+          } else {
+            console.warn('⚠️ Failed to load user from SIGNED_IN');
+            setUser(null);
+          }
+
+          isProcessingEvent.current = false;
         } else if (event === 'SIGNED_OUT') {
           console.log('🔴 SIGNED_OUT event', {
             currentUserId: user?.id,
