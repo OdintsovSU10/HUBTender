@@ -60,22 +60,20 @@ async function loadAllBoqItemsForTender(tenderId: string): Promise<Map<string, B
   const batchSize = 1000;
   let hasMore = true;
 
-  // Батчинг для обхода лимита Supabase 1000 rows
+  // Основной запрос с JOIN и двойной сортировкой для стабильности батчинга
   while (hasMore) {
     const { data, error } = await supabase
       .from('boq_items')
       .select(`
         *,
-        work_names(name, unit),
         material_names(name, unit),
-        detail_cost_categories(
-          name,
-          location,
-          cost_categories(name)
-        )
+        work_names(name, unit),
+        parent_work:parent_work_item_id(work_names(name)),
+        detail_cost_categories(name, cost_categories(name), location)
       `)
       .eq('tender_id', tenderId)
       .order('sort_number', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, from + batchSize - 1);
 
     if (error) {
@@ -91,10 +89,19 @@ async function loadAllBoqItemsForTender(tenderId: string): Promise<Map<string, B
     }
   }
 
+  // Дедуплицировать по ID (LEFT JOIN может возвращать дубликаты)
+  const uniqueItems = new Map<string, any>();
+
+  allItems.forEach((item: any) => {
+    if (!uniqueItems.has(item.id)) {
+      uniqueItems.set(item.id, item);
+    }
+  });
+
   // Группировать по client_position_id
   const itemsByPosition = new Map<string, BoqItemFull[]>();
 
-  allItems.forEach((item: any) => {
+  uniqueItems.forEach((item: any) => {
     const positionId = item.client_position_id;
     if (!itemsByPosition.has(positionId)) {
       itemsByPosition.set(positionId, []);
@@ -106,6 +113,83 @@ async function loadAllBoqItemsForTender(tenderId: string): Promise<Map<string, B
 }
 
 /**
+ * Сортирует элементы по иерархии (как на UI)
+ */
+function sortItemsByHierarchy(items: BoqItemFull[], positionName?: string): BoqItemFull[] {
+  const works = items.filter(item => isWorkType(item.boq_item_type));
+  const materials = items.filter(item => isMaterialType(item.boq_item_type));
+
+  const linkedMaterials = materials.filter(m => m.parent_work_item_id);
+  const unlinkedMaterials = materials.filter(m => !m.parent_work_item_id);
+
+  const result: BoqItemFull[] = [];
+
+  works.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
+
+  const worksWithMaterials: BoqItemFull[] = [];
+  const worksWithoutMaterials: BoqItemFull[] = [];
+
+  works.forEach(work => {
+    const workMaterials = linkedMaterials.filter(m => m.parent_work_item_id === work.id);
+    if (workMaterials.length > 0) {
+      worksWithMaterials.push(work);
+    } else {
+      worksWithoutMaterials.push(work);
+    }
+  });
+
+  worksWithMaterials.forEach(work => {
+    result.push(work);
+    const workMaterials = linkedMaterials.filter(m => m.parent_work_item_id === work.id);
+    workMaterials.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
+    result.push(...workMaterials);
+  });
+
+  result.push(...worksWithoutMaterials);
+  unlinkedMaterials.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
+  result.push(...unlinkedMaterials);
+
+  return result;
+}
+
+/**
+ * Вычисляет листовые позиции (ТА ЖЕ логика что в useClientPositions)
+ * Возвращает Set с ID позиций (не индексами!)
+ */
+function computeLeafPositions(positions: ClientPosition[]): Set<string> {
+  const leafIds = new Set<string>();
+
+  positions.forEach((position, index) => {
+    // Последняя позиция всегда листовая
+    if (index === positions.length - 1) {
+      leafIds.add(position.id);
+      return;
+    }
+
+    const currentLevel = position.hierarchy_level || 0;
+    let nextIndex = index + 1;
+
+    // Пропускаем ДОП работы при определении листового узла
+    while (nextIndex < positions.length && positions[nextIndex].is_additional) {
+      nextIndex++;
+    }
+
+    if (nextIndex >= positions.length) {
+      leafIds.add(position.id);
+      return;
+    }
+
+    const nextLevel = positions[nextIndex].hierarchy_level || 0;
+    // Если текущий уровень >= следующего → листовая
+    if (currentLevel >= nextLevel) {
+      leafIds.add(position.id);
+    }
+  });
+
+  return leafIds;
+}
+
+/**
  * Собирает все строки для экспорта в правильном порядке
  */
 function collectExportRows(
@@ -114,57 +198,43 @@ function collectExportRows(
 ): ExportRow[] {
   const rows: ExportRow[] = [];
 
+  // Вычислить листовые позиции ТОЙ ЖЕ логикой что на странице /positions (для ВСЕХ позиций)
+  const leafIds = computeLeafPositions(positions);
+
   // Разделить на обычные и ДОП работы
   const normalPositions = positions.filter(p => !p.is_additional);
   const additionalPositions = positions.filter(p => p.is_additional);
 
   // Обработать обычные позиции
-  for (const position of normalPositions) {
-    // Проверить является ли позиция конечной (листовой)
-    // Позиция листовая если у неё НЕТ дочерних позиций
-    const hasChildren = normalPositions.some(p => p.parent_position_id === position.id) ||
-                        additionalPositions.some(p => p.parent_position_id === position.id);
-    const isLeaf = !hasChildren;
+  normalPositions.forEach((position, index) => {
+    // Проверить является ли позиция листовой (по ID, не по индексу!)
+    const isLeaf = leafIds.has(position.id);
 
-    // Рассчитать реальную сумму из BOQ items ТОЛЬКО для листовых позиций
-    let actualTotal = null;
-    if (isLeaf) {
-      const boqItems = boqItemsByPosition.get(position.id) || [];
-      actualTotal = boqItems.length > 0
-        ? boqItems.reduce((sum, item) => sum + (item.total_amount || 0), 0)
-        : null;
-    }
+    // Получить BOQ items для позиции
+    const boqItems = boqItemsByPosition.get(position.id) || [];
+    const hasBOQItems = boqItems.length > 0;
 
-    // Добавить строку позиции (для нелистовых actualTotal=null → используются поля position)
-    rows.push(createPositionRow(position, isLeaf, actualTotal));
+    // Рассчитать итоговую сумму для строки позиции:
+    // - Если есть BOQ items → сумма из них
+    // - Если нет BOQ items И это ЛИСТОВАЯ позиция → null (красная подсветка в Excel)
+    // - Если нет BOQ items И это РАЗДЕЛ → агрегированные поля position
+    const finalTotal = hasBOQItems
+      ? boqItems.reduce((sum, item) => sum + (item.total_amount || 0), 0)
+      : isLeaf
+        ? null  // Листовая позиция без BOQ items → null для красной подсветки
+        : (position.total_material || 0) + (position.total_works || 0);  // Раздел → агрегированная сумма
 
-    // Если конечная позиция, добавить её BOQ items
-    if (isLeaf) {
-      const boqItems = boqItemsByPosition.get(position.id) || [];
+    // Добавить строку позиции
+    rows.push(createPositionRow(position, isLeaf, finalTotal));
 
-      // Разделить на работы и материалы
-      const works = boqItems.filter(item => isWorkType(item.boq_item_type));
-      const materials = boqItems.filter(item => isMaterialType(item.boq_item_type));
+    // Если у позиции есть BOQ items, добавить их
+    if (hasBOQItems) {
+      // Сортировать по иерархии (как на UI)
+      const sortedItems = sortItemsByHierarchy(boqItems, position.work_name);
 
-      // Для каждой работы: работа + её материалы
-      for (const work of works) {
-        rows.push(createBoqItemRow(work, position));
-
-        // Материалы привязанные к этой работе
-        const linkedMaterials = materials.filter(
-          m => m.parent_work_item_id === work.id
-        );
-        linkedMaterials.forEach(mat => {
-          rows.push(createBoqItemRow(mat, position));
-        });
-      }
-
-      // Непривязанные материалы (standalone)
-      const standaloneMaterials = materials.filter(
-        m => !m.parent_work_item_id || m.parent_work_item_id === null
-      );
-      standaloneMaterials.forEach(mat => {
-        rows.push(createBoqItemRow(mat, position));
+      // Выводить в порядке иерархии
+      sortedItems.forEach(item => {
+        rows.push(createBoqItemRow(item, position));
       });
     }
 
@@ -183,28 +253,15 @@ function collectExportRows(
       // Добавить строку ДОП работы с реальной суммой
       rows.push(createPositionRow(dopWork, true, dopActualTotal));
 
-      const dopWorks = dopBoqItems.filter(item => isWorkType(item.boq_item_type));
-      const dopMaterials = dopBoqItems.filter(item => isMaterialType(item.boq_item_type));
+      // Сортировать по иерархии (как на UI)
+      const sortedDopItems = sortItemsByHierarchy(dopBoqItems, `ДОП ${dopWork.position_number}: ${dopWork.work_name}`);
 
-      for (const work of dopWorks) {
-        rows.push(createBoqItemRow(work, dopWork));
-
-        const linkedMaterials = dopMaterials.filter(
-          m => m.parent_work_item_id === work.id
-        );
-        linkedMaterials.forEach(mat => {
-          rows.push(createBoqItemRow(mat, dopWork));
-        });
-      }
-
-      const standaloneMaterials = dopMaterials.filter(
-        m => !m.parent_work_item_id || m.parent_work_item_id === null
-      );
-      standaloneMaterials.forEach(mat => {
-        rows.push(createBoqItemRow(mat, dopWork));
+      // Выводить в порядке иерархии
+      sortedDopItems.forEach(item => {
+        rows.push(createBoqItemRow(item, dopWork));
       });
     }
-  }
+  });
 
   return rows;
 }

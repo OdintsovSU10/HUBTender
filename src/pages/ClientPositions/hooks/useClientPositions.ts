@@ -97,26 +97,31 @@ export const useClientPositions = () => {
       const leafIndices = computeLeafPositions(allPositions);
       setLeafPositionIndices(leafIndices);
 
-      // Загружаем счетчики работ/материалов и общую сумму батчами
+      // Загружаем счетчики работ/материалов и общую сумму
+      // КРИТИЧНО: Загружаем напрямую по tender_id с батчингом (.range),
+      // а НЕ через client_position_id, чтобы избежать потери элементов из-за лимита 1000
       if (allPositions.length > 0) {
-        const positionIds = allPositions.map(p => p.id);
-
-        // Разбиваем на батчи по 100 ID для избежания ошибки 400 (URL too long)
-        const boqBatchSize = 100;
-        const batches = [];
-        for (let i = 0; i < positionIds.length; i += boqBatchSize) {
-          batches.push(positionIds.slice(i, i + boqBatchSize));
-        }
-
         let allBoqData: any[] = [];
-        for (const batch of batches) {
+        let from = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
           const { data: boqData, error: boqError } = await supabase
             .from('boq_items')
             .select('client_position_id, boq_item_type, total_amount')
-            .in('client_position_id', batch);
+            .eq('tender_id', tenderId)
+            .range(from, from + batchSize - 1);
 
           if (boqError) throw boqError;
-          allBoqData = [...allBoqData, ...(boqData || [])];
+
+          if (boqData && boqData.length > 0) {
+            allBoqData = [...allBoqData, ...boqData];
+            from += batchSize;
+            hasMore = boqData.length === batchSize;
+          } else {
+            hasMore = false;
+          }
         }
 
         // Обрабатываем данные в памяти

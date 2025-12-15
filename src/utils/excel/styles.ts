@@ -20,18 +20,11 @@ export function getCellStyle(row: ExportRow) {
   // Для позиций заказчика
   if (row.isPosition) {
     // Красная подсветка ТОЛЬКО для листовых позиций БЕЗ BOQ items
-    // НЕ подсвечиваем позиции верхних уровней (01, 01.01) - они всегда родительские
     if (row.isLeaf && row.totalAmount === null) {
-      // Проверить уровень вложенности по itemNo
-      const itemNoStr = String(row.itemNo);
-      const dotCount = (itemNoStr.match(/\./g) || []).length;
-      // Если меньше 2 точек (уровни 01, 01.01) - НЕ подсвечивать (это родительские)
-      if (dotCount >= 2) {
-        return {
-          ...baseStyle,
-          fill: { fgColor: { rgb: 'FFCCCC' } },
-        };
-      }
+      return {
+        ...baseStyle,
+        fill: { fgColor: { rgb: 'FFCCCC' } },
+      };
     }
     return baseStyle;
   }
