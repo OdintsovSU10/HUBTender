@@ -13,12 +13,14 @@ interface CommerceTableProps {
   positions: PositionWithCommercialCost[];
   selectedTenderId: string | undefined;
   onNavigateToPosition: (positionId: string) => void;
+  referenceTotal: number;
 }
 
 export default function CommerceTable({
   positions,
   selectedTenderId,
-  onNavigateToPosition
+  onNavigateToPosition,
+  referenceTotal
 }: CommerceTableProps) {
   // Определение конечной позиции (листового узла) на основе иерархии
   const isLeafPosition = (record: PositionWithCommercialCost, index: number): boolean => {
@@ -83,14 +85,22 @@ export default function CommerceTable({
       title: 'Кол-во',
       key: 'volume',
       width: 100,
-      render: (_, record) => (
-        <div>
-          <div>{record.manual_volume || 0} {record.unit_code || ''}</div>
-          <div style={{ fontSize: '11px', color: '#999' }}>
-            {record.items_count || 0} элем.
+      render: (_, record) => {
+        const gpVolume = record.manual_volume || 0;
+        const clientVolume = record.volume || 0;
+        const volumesMatch = gpVolume === clientVolume && gpVolume > 0;
+
+        return (
+          <div>
+            <div style={{ color: volumesMatch ? '#ff4d4f' : undefined, fontWeight: volumesMatch ? 600 : undefined }}>
+              {gpVolume} {record.unit_code || ''}
+            </div>
+            <div style={{ fontSize: '11px', color: '#999' }}>
+              {clientVolume} {record.unit_code || ''}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Цена за единицу',
@@ -241,6 +251,10 @@ export default function CommerceTable({
         const materialPercent = totalCommercial > 0 ? ((totalMaterials / totalCommercial) * 100).toFixed(1) : '0.0';
         const workPercent = totalCommercial > 0 ? ((totalWorks / totalCommercial) * 100).toFixed(1) : '0.0';
 
+        // Проверка соответствия базовой стоимости эталонной сумме из позиций заказчика
+        const baseTotalMatches = Math.abs(totalBase - referenceTotal) < 0.01;
+        const baseColor = baseTotalMatches ? '#52c41a' : '#ff4d4f';
+
         return (
           <Table.Summary fixed>
             <Table.Summary.Row>
@@ -248,7 +262,7 @@ export default function CommerceTable({
                 <Text strong>Итого:</Text>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={5} align="right">
-                <Text strong>{formatCommercialCost(totalBase)}</Text>
+                <Text strong style={{ color: baseColor }}>{formatCommercialCost(totalBase)}</Text>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={6} align="right">
                 <div>

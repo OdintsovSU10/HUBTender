@@ -7,8 +7,6 @@ import { message } from 'antd';
 import { supabase } from '../../../lib/supabase';
 import type { Tender } from '../../../lib/supabase';
 import type { PositionWithCommercialCost, MarkupTactic } from '../types';
-import { checkCommercialData } from '../../../utils/checkCommercialData';
-import { checkDatabaseStructure } from '../../../utils/checkDatabaseStructure';
 
 export function useCommerceData() {
   const [loading, setLoading] = useState(false);
@@ -21,15 +19,12 @@ export function useCommerceData() {
   const [markupTactics, setMarkupTactics] = useState<MarkupTactic[]>([]);
   const [selectedTacticId, setSelectedTacticId] = useState<string | undefined>();
   const [tacticChanged, setTacticChanged] = useState(false);
+  const [referenceTotal, setReferenceTotal] = useState<number>(0);
 
   // Загрузка списка тендеров и тактик
   useEffect(() => {
     loadTenders();
     loadMarkupTactics();
-    // В dev режиме проверяем структуру БД при первой загрузке
-    if (process.env.NODE_ENV === 'development') {
-      checkDatabaseStructure();
-    }
   }, []);
 
   // Загрузка позиций при выборе тендера
@@ -82,11 +77,6 @@ export function useCommerceData() {
 
   const loadPositions = async (tenderId: string) => {
     setLoading(true);
-
-    // Диагностика данных (только в dev режиме)
-    if (process.env.NODE_ENV === 'development') {
-      checkCommercialData(tenderId);
-    }
 
     try {
       console.log('🔄 Загрузка позиций для тендера:', tenderId);
@@ -147,6 +137,10 @@ export function useCommerceData() {
       }
 
       console.log(`📝 Загружено BOQ элементов: ${allBoqItems.length}`);
+
+      // Вычисляем эталонную сумму напрямую из boq_items (как на странице позиций)
+      const refTotal = allBoqItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+      setReferenceTotal(refTotal);
 
       // Группируем элементы по позициям в памяти
       const itemsByPosition = new Map<string, typeof allBoqItems>();
@@ -252,6 +246,7 @@ export function useCommerceData() {
     loadTenders,
     loadPositions,
     handleTacticChange,
-    totals
+    totals,
+    referenceTotal
   };
 }

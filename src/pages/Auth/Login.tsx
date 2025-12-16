@@ -20,57 +20,46 @@ const Login: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Очистка таймаута при размонтировании
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Автоматический редирект если пользователь уже авторизован
   useEffect(() => {
-    console.log('[Login] useEffect: проверка user для редиректа', {
-      user: !!user,
-      access_status: user?.access_status,
-      authLoading,
-      loading,
-    });
-
-    // Если пользователь уже авторизован и одобрен, перенаправляем
-    // Не ждем authLoading - редиректим сразу как только user доступен
     if (user && user.access_status === 'approved') {
-      console.log('[Login] useEffect: пользователь авторизован, готовим редирект');
-      // Отменяем таймаут загрузки если он был установлен
+      // Отменяем таймаут загрузки
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
       }
+      setLoading(false);
 
-      // Всегда перенаправляем на dashboard после входа
-      const targetPath = user.allowed_pages.length === 0
-        ? '/dashboard'
-        : user.allowed_pages[0];
-
-      console.log('[Login] useEffect: редирект на', targetPath);
+      // Перенаправляем на dashboard или первую доступную страницу
+      const targetPath = user.allowed_pages.length === 0 ? '/dashboard' : user.allowed_pages[0];
       navigate(targetPath, { replace: true });
     }
-  }, [user, navigate, authLoading, loading]);
+  }, [user, navigate]);
 
   const handleLogin = async (values: LoginFormValues) => {
-    console.log('[Login] handleLogin: начало входа для email:', values.email);
     setLoading(true);
 
     try {
-      // 1. Аутентификация через Supabase Auth
-      console.log('[Login] handleLogin: вызываем signInWithPassword');
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      // Аутентификация через Supabase Auth
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
       });
 
-      console.log('[Login] handleLogin: результат signInWithPassword:', {
-        userId: authData?.user?.id,
-        error: authError,
-      });
-
       if (authError) {
-        console.error('[Login] handleLogin: ошибка аутентификации:', authError);
-
         if (authError.message.includes('Invalid login credentials')) {
           message.error('Неверный email или пароль');
+        } else if (authError.message.includes('Email not confirmed')) {
+          message.error('Email не подтверждён');
         } else {
           message.error(`Ошибка входа: ${authError.message}`);
         }
@@ -78,76 +67,40 @@ const Login: React.FC = () => {
         return;
       }
 
-      if (!authData.user) {
-        console.error('[Login] handleLogin: authData.user отсутствует');
-        message.error('Не удалось получить данные пользователя');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Проверяем пользователя в таблице users (теперь мы авторизованы)
-      console.log('[Login] handleLogin: запрашиваем данные из public.users');
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-
-      console.log('[Login] handleLogin: результат запроса public.users:', {
-        userData: !!userData,
-        access_status: userData?.access_status,
-        access_enabled: userData?.access_enabled,
-        error: userError,
-      });
-
-      if (userError || !userData) {
-        console.error('[Login] handleLogin: ошибка загрузки данных пользователя:', userError);
-        await supabase.auth.signOut(); // Выходим из auth
-        message.error('Ошибка загрузки данных пользователя');
-        setLoading(false);
-        return;
-      }
-
-      // 3. Проверяем access_enabled
-      if (!userData.access_enabled) {
-        console.log('[Login] handleLogin: access_enabled = false, выходим');
-        await supabase.auth.signOut(); // Выходим из auth
-        message.error('Доступ запрещен. Обратитесь к Администратору');
-        setLoading(false);
-        return;
-      }
-
-      // 4. Проверяем статус одобрения
-      if (userData.access_status !== 'approved') {
-        console.log('[Login] handleLogin: access_status != approved:', userData.access_status);
-        await supabase.auth.signOut(); // Выходим из auth
-
-        if (userData.access_status === 'pending') {
-          message.warning('Ваша заявка ожидает одобрения администратором');
-        } else if (userData.access_status === 'blocked') {
-          message.error('Ваш аккаунт заблокирован. Обратитесь к Администратору');
-        }
-        setLoading(false);
-        return;
-      }
-
-      // 5. Успешный вход - AuthContext обновит user, и useEffect сделает редирект
-      // Оставляем loading=true, чтобы показать индикатор загрузки
-      // Но добавляем fallback таймаут на случай если AuthContext не загрузит user
-      console.log('[Login] handleLogin: вход успешен, ожидаем AuthContext');
+      // Успешный вход - AuthContext получит событие SIGNED_IN и загрузит user
+      // useEffect сделает редирект когда user появится
+      // Таймаут на случай если что-то пойдёт не так
       loadingTimeoutRef.current = setTimeout(() => {
-        console.error('[Login] handleLogin: таймаут ожидания AuthContext');
         setLoading(false);
-        message.error('Превышено время ожидания загрузки. Попробуйте обновить страницу');
-      }, 10000);
+        message.error('Превышено время ожидания. Попробуйте обновить страницу');
+      }, 15000);
     } catch (error) {
-      console.error('[Login] handleLogin: неожиданная ошибка:', error);
-      message.error('Произошла неожиданная ошибка при входе');
+      console.error('Ошибка при входе:', error);
+      message.error('Произошла ошибка при входе');
       setLoading(false);
     }
   };
 
-  // Полноэкранный индикатор загрузки
+  // Показываем загрузку пока AuthContext инициализируется
+  if (authLoading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: '#fff' }} spin />} />
+        <Text style={{ marginTop: 24, fontSize: 18, color: '#fff' }}>Загрузка...</Text>
+      </div>
+    );
+  }
+
+  // Полноэкранный индикатор загрузки при входе
   if (loading) {
     return (
       <div
@@ -160,12 +113,8 @@ const Login: React.FC = () => {
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         }}
       >
-        <Spin
-          indicator={<LoadingOutlined style={{ fontSize: 48, color: '#fff' }} spin />}
-        />
-        <Text style={{ marginTop: 24, fontSize: 18, color: '#fff' }}>
-          Вход в систему...
-        </Text>
+        <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: '#fff' }} spin />} />
+        <Text style={{ marginTop: 24, fontSize: 18, color: '#fff' }}>Вход в систему...</Text>
       </div>
     );
   }
@@ -190,12 +139,7 @@ const Login: React.FC = () => {
         }}
       >
         {/* Логотип и заголовок */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: 32,
-          }}
-        >
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ marginBottom: 16 }}>
             <HeaderIcon size={64} color="#10b981" />
           </div>

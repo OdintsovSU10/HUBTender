@@ -12,17 +12,8 @@ import {
 } from '@ant-design/icons';
 import type { Tender } from '../../../lib/supabase';
 import type { MarkupTactic, TenderOption } from '../types';
-import PricingConsistencyIndicator from './PricingConsistencyIndicator';
 
 const { Title, Text } = Typography;
-
-interface ConsistencyCheck {
-  commerce: boolean;
-  costs: boolean;
-  financial: boolean;
-  loading: boolean;
-  error: string | null;
-}
 
 interface CommerceHeaderProps {
   tenders: Tender[];
@@ -34,7 +25,6 @@ interface CommerceHeaderProps {
   loading: boolean;
   calculating: boolean;
   positionsCount: number;
-  consistencyCheck: ConsistencyCheck;
   onBack: () => void;
   onTenderTitleChange: (title: string) => void;
   onVersionChange: (version: number) => void;
@@ -55,7 +45,6 @@ export default function CommerceHeader({
   loading,
   calculating,
   positionsCount,
-  consistencyCheck,
   onBack,
   onTenderTitleChange,
   onVersionChange,
@@ -114,21 +103,6 @@ export default function CommerceHeader({
         <Title level={4} style={{ margin: 0 }}>
           <DollarOutlined /> Коммерция
         </Title>
-        <PricingConsistencyIndicator
-            commerce={consistencyCheck.commerce}
-            costs={consistencyCheck.costs}
-            financial={consistencyCheck.financial}
-            loading={consistencyCheck.loading}
-            error={consistencyCheck.error}
-            // @ts-ignore
-            boqTotalBase={consistencyCheck.boqTotalBase}
-            // @ts-ignore
-            boqTotalCommercial={consistencyCheck.boqTotalCommercial}
-            // @ts-ignore
-            boqItemsCount={consistencyCheck.boqItemsCount}
-            // @ts-ignore
-            costsTotal={consistencyCheck.costsTotal}
-          />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <Space size="middle" wrap>

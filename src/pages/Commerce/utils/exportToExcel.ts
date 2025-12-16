@@ -35,7 +35,7 @@ export function exportCommerceToExcel(
     'Примечание клиента',
     'Единица',
     'Количество (ГП)',
-    'Кол-во элементов',
+    'Кол-во Заказчика',
     'Базовая стоимость',
     'Итого материалов (КП), руб',
     'Итого работ (КП), руб',
@@ -51,6 +51,9 @@ export function exportCommerceToExcel(
     const isLeaf = isLeafPosition(index);
     const totalCost = pos.commercial_total || 0;
     const isZeroCost = isLeaf && totalCost === 0;
+    const gpVolume = pos.manual_volume || 0;
+    const clientVolume = pos.volume || 0;
+    const volumesMatch = gpVolume === clientVolume && gpVolume > 0;
 
     return {
       data: [
@@ -58,18 +61,19 @@ export function exportCommerceToExcel(
         pos.work_name,
         pos.client_note || '',
         pos.unit_code || '',
-        pos.manual_volume || 0,
-        pos.items_count || 0,
+        gpVolume,
+        clientVolume,
         pos.base_total || 0,
         pos.material_cost_total || 0,
         pos.work_cost_total || 0,
         pos.commercial_total || 0,
-        pos.manual_volume && pos.manual_volume > 0 ? (pos.base_total || 0) / pos.manual_volume : 0,
-        pos.manual_volume && pos.manual_volume > 0 ? (pos.commercial_total || 0) / pos.manual_volume : 0,
-        pos.manual_volume && pos.manual_volume > 0 ? (pos.material_cost_total || 0) / pos.manual_volume : 0,
-        pos.manual_volume && pos.manual_volume > 0 ? (pos.work_cost_total || 0) / pos.manual_volume : 0,
+        gpVolume > 0 ? (pos.base_total || 0) / gpVolume : 0,
+        gpVolume > 0 ? (pos.commercial_total || 0) / gpVolume : 0,
+        gpVolume > 0 ? (pos.material_cost_total || 0) / gpVolume : 0,
+        gpVolume > 0 ? (pos.work_cost_total || 0) / gpVolume : 0,
       ],
       isZeroCost,
+      volumesMatch,
     };
   });
 
@@ -183,6 +187,11 @@ export function exportCommerceToExcel(
       // Добавляем бледно-красный фон для листовых строк с нулевой стоимостью
       if (isZeroCostRow) {
         baseStyle.fill = { fgColor: { rgb: 'FFCCCC' } };
+      }
+
+      // Красный текст для колонки "Количество (ГП)" (индекс 4) если объёмы совпадают
+      if (col === 4 && rowMeta.volumesMatch) {
+        baseStyle.font = { color: { rgb: 'FF4D4F' }, bold: true };
       }
 
       ws[cellAddress].s = baseStyle;

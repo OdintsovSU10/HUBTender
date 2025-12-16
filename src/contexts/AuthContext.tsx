@@ -29,7 +29,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Загрузка данных пользователя из public.users
   const loadUserData = useCallback(async (authUserId: string): Promise<AuthUser | null> => {
-    console.log('[AuthContext] loadUserData: начало для userId:', authUserId);
     try {
       const { data, error } = await supabase
         .from('users')
@@ -49,10 +48,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .eq('id', authUserId)
         .single();
 
-      console.log('[AuthContext] loadUserData: ответ:', { hasData: !!data, error: error?.message });
-
       if (error || !data) {
-        console.error('[AuthContext] loadUserData: ошибка:', error?.message);
+        console.error('[AuthContext] Ошибка загрузки пользователя:', error?.message);
         return null;
       }
 
@@ -70,7 +67,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         access_enabled: data.access_enabled,
       };
     } catch (err) {
-      console.error('[AuthContext] loadUserData: исключение:', err);
+      console.error('[AuthContext] Исключение при загрузке пользователя:', err);
       return null;
     }
   }, []);
@@ -92,47 +89,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
-      console.error('Ошибка при выходе:', error);
+      console.error('[AuthContext] Ошибка при выходе:', error);
     }
   }, []);
 
   // Инициализация при монтировании
   useEffect(() => {
     let mounted = true;
-    console.log('[AuthContext] useEffect: монтирование');
 
     // Подписываемся на изменения auth состояния
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] onAuthStateChange:', event);
-
       if (!mounted) return;
 
       // Игнорируем INITIAL_SESSION - обработаем в initAuth
       if (event === 'INITIAL_SESSION') {
-        console.log('[AuthContext] INITIAL_SESSION: пропускаем');
         return;
       }
 
       if (event === 'SIGNED_IN' && session?.user) {
         // Обрабатываем только если initAuth завершился И user ещё не установлен
         if (initCompletedRef.current && !userRef.current) {
-          console.log('[AuthContext] SIGNED_IN: загружаем пользователя');
           const userData = await loadUserData(session.user.id);
-          if (mounted && userData?.access_enabled && userData?.access_status === 'approved') {
-            setUser(userData);
+          if (mounted) {
+            if (userData?.access_enabled && userData?.access_status === 'approved') {
+              setUser(userData);
+            } else if (userData && (!userData.access_enabled || userData.access_status !== 'approved')) {
+              // Пользователь не одобрен или заблокирован - выходим
+              await supabase.auth.signOut();
+            }
+            setLoading(false);
           }
-          setLoading(false);
-        } else {
-          console.log('[AuthContext] SIGNED_IN: пропускаем (init:', initCompletedRef.current, ', user:', !!userRef.current, ')');
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('[AuthContext] SIGNED_OUT');
         if (mounted) {
           setUser(null);
           setLoading(false);
         }
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('[AuthContext] TOKEN_REFRESHED');
         const userData = await loadUserData(session.user.id);
         if (mounted && userData) {
           setUser(userData);
@@ -141,40 +134,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
 
     const initAuth = async () => {
-      console.log('[AuthContext] initAuth: начало');
       try {
         // Таймаут для getSession - если зависнет, продолжаем без сессии
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<{ data: { session: null }, error: null }>((resolve) => {
-          setTimeout(() => {
-            console.warn('[AuthContext] initAuth: таймаут getSession (5с)');
-            resolve({ data: { session: null }, error: null });
-          }, 5000);
+          setTimeout(() => resolve({ data: { session: null }, error: null }), 5000);
         });
 
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-        console.log('[AuthContext] initAuth: сессия:', session?.user?.id ? 'есть' : 'нет');
 
         if (session?.user && mounted) {
           const userData = await loadUserData(session.user.id);
-          console.log('[AuthContext] initAuth: userData:', !!userData);
 
           if (mounted) {
             if (userData?.access_enabled && userData?.access_status === 'approved') {
-              console.log('[AuthContext] initAuth: устанавливаем user');
               setUser(userData);
             } else {
-              console.log('[AuthContext] initAuth: пользователь не одобрен');
+              // Пользователь не одобрен - выходим молча
               await supabase.auth.signOut();
             }
           }
         }
       } catch (error) {
-        console.error('[AuthContext] initAuth: ошибка:', error);
+        console.error('[AuthContext] Ошибка инициализации:', error);
       } finally {
         initCompletedRef.current = true;
         if (mounted) {
-          console.log('[AuthContext] initAuth: loading=false');
           setLoading(false);
         }
       }
@@ -183,7 +168,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initAuth();
 
     return () => {
-      console.log('[AuthContext] размонтирование');
       mounted = false;
       subscription.unsubscribe();
     };
