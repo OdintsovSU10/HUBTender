@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Select, Row, Col, Typography, Tag } from 'antd';
 import type { Tender } from '../../../lib/supabase';
+import { getVersionColorByTitle } from '../../../utils/versionColor';
 
 const { Title, Text } = Typography;
 
@@ -41,6 +42,7 @@ export const TenderSelectionScreen: React.FC<TenderSelectionScreenProps> = ({
           Выберите тендер для просмотра позиций
         </Text>
         <Select
+          className="tender-select"
           style={{ width: 400, marginBottom: 32 }}
           placeholder="Выберите тендер"
           value={selectedTenderTitle}
@@ -78,18 +80,32 @@ export const TenderSelectionScreen: React.FC<TenderSelectionScreenProps> = ({
                     style={{
                       width: 200,
                       textAlign: 'center',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      borderColor: '#10b981',
+                      borderWidth: 1,
                     }}
                     onClick={() => onTenderCardClick(tender)}
                   >
                     <div style={{ marginBottom: 8 }}>
-                      <Tag color="blue">{tender.tender_number}</Tag>
+                      <Tag color="#10b981">{tender.tender_number}</Tag>
                     </div>
-                    <div style={{ marginBottom: 8 }}>
-                      <Text strong style={{ marginRight: 8 }}>
+                    <div style={{
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexWrap: 'nowrap',
+                      gap: 4
+                    }}>
+                      <Text strong style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: 140
+                      }}>
                         {tender.title}
                       </Text>
-                      <Tag color="orange">v{tender.version || 1}</Tag>
+                      <Tag color={getVersionColorByTitle(tender.version, tender.title, tenders)} style={{ flexShrink: 0, margin: 0 }}>v{tender.version || 1}</Tag>
                     </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {tender.client_name}

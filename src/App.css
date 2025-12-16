@@ -139,3 +139,17 @@
   border-color: #b56565 !important;
   color: #ffffff !important;
 }
+
+/* Зелёная обводка для Select выбора тендера */
+.tender-select .ant-select-selector {
+  border-color: #10b981 !important;
+}
+
+.tender-select .ant-select-selector:hover {
+  border-color: #059669 !important;
+}
+
+.tender-select.ant-select-focused .ant-select-selector {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+}

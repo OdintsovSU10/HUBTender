@@ -18,6 +18,7 @@ import { SaveOutlined, ReloadOutlined, ArrowLeftOutlined } from '@ant-design/ico
 import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupTactic } from '../../../lib/supabase';
 import { parseNumberInput, formatNumberInput } from '../../../utils/numberFormat';
 import { SubcontractGrowthTab } from './SubcontractGrowthTab';
+import { getVersionColorByTitle } from '../../../utils/versionColor';
 
 const { Title, Text } = Typography;
 
@@ -312,6 +313,7 @@ const MarkupPercentages: React.FC = () => {
             Выберите тендер для корректирования процентов
           </Text>
           <Select
+            className="tender-select"
             style={{ width: 400, marginBottom: 32 }}
             placeholder="Выберите тендер"
             value={selectedTenderTitle}
@@ -350,7 +352,9 @@ const MarkupPercentages: React.FC = () => {
                       style={{
                         width: 200,
                         textAlign: 'center',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
                       }}
                       onClick={async () => {
                         setSelectedTenderId(tender.id);
@@ -364,13 +368,25 @@ const MarkupPercentages: React.FC = () => {
                       }}
                     >
                       <div style={{ marginBottom: 8 }}>
-                        <Tag color="blue">{tender.tender_number}</Tag>
+                        <Tag color="#10b981">{tender.tender_number}</Tag>
                       </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ marginRight: 8 }}>
+                      <div style={{
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexWrap: 'nowrap',
+                        gap: 4
+                      }}>
+                        <Text strong style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 140
+                        }}>
                           {tender.title}
                         </Text>
-                        <Tag color="orange">v{tender.version || 1}</Tag>
+                        <Tag color={getVersionColorByTitle(tender.version, tender.title, tenders)} style={{ flexShrink: 0, margin: 0 }}>v{tender.version || 1}</Tag>
                       </div>
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {tender.client_name}
@@ -421,6 +437,7 @@ const MarkupPercentages: React.FC = () => {
               <Space size="small">
                 <Text type="secondary" style={{ fontSize: 16 }}>Тендер:</Text>
                 <Select
+                  className="tender-select"
                   placeholder="Выберите тендер"
                   value={selectedTenderTitle}
                   onChange={handleTenderTitleChange}

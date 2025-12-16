@@ -450,13 +450,16 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
         style={{
           background: currentTheme === 'dark' ? '#0a0a0a' : '#fff',
           borderRight: currentTheme === 'light' ? '1px solid #f0f0f0' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100vh',
         }}
         width={250}
       >
         <div
           className={`logo logo-${currentTheme}`}
           onClick={() => navigate('/dashboard')}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', flexShrink: 0 }}
         >
           {collapsed ? (
             <div className="logo-collapsed">
@@ -474,23 +477,32 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
             </div>
           )}
         </div>
-        <Menu
-          theme={currentTheme}
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          defaultOpenKeys={
-            location.pathname.startsWith('/admin') ? ['admin'] :
-            location.pathname.startsWith('/library') ? ['library'] :
-            location.pathname.startsWith('/analytics') ? ['analytics'] :
-            []
-          }
-          items={filteredMenuItems}
-          onClick={handleMenuClick}
+        <div
+          className="sidebar-menu-container"
           style={{
-            background: 'transparent',
-            borderRight: 0,
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
           }}
-        />
+        >
+          <Menu
+            theme={currentTheme}
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            defaultOpenKeys={
+              location.pathname.startsWith('/admin') ? ['admin'] :
+              location.pathname.startsWith('/library') ? ['library'] :
+              location.pathname.startsWith('/analytics') ? ['analytics'] :
+              []
+            }
+            items={filteredMenuItems}
+            onClick={handleMenuClick}
+            style={{
+              background: 'transparent',
+              borderRight: 0,
+            }}
+          />
+        </div>
       </Sider>
       <Layout>
         <Header

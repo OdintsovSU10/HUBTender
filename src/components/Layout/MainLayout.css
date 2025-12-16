@@ -128,18 +128,54 @@
   background: rgba(16, 185, 129, 0.08) !important;
 }
 
-/* Custom scrollbar for sidebar */
-.ant-layout-sider::-webkit-scrollbar {
+/* Sidebar scroll fix */
+.sidebar-dark,
+.sidebar-light {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.sidebar-dark > .ant-layout-sider-children,
+.sidebar-light > .ant-layout-sider-children {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.sidebar-menu-container {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Custom scrollbar for sidebar menu container */
+.sidebar-menu-container::-webkit-scrollbar {
   width: 6px;
 }
 
-.ant-layout-sider::-webkit-scrollbar-thumb {
+.sidebar-menu-container::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
 
-.ant-layout-sider::-webkit-scrollbar-thumb:hover {
+.sidebar-menu-container::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar-menu-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Light theme scrollbar */
+.sidebar-light .sidebar-menu-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-light .sidebar-menu-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 /* Submenu popup styles - менее прозрачный фон для лучшей читаемости */

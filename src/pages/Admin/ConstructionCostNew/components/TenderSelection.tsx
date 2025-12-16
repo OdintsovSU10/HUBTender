@@ -6,6 +6,7 @@ import React from 'react';
 import { Card, Select, Typography, Row, Col, Tag } from 'antd';
 import type { Tender } from '../../../../lib/supabase';
 import type { TenderOption } from '../hooks/useCostData';
+import { getVersionColorByTitle } from '../../../../utils/versionColor';
 
 const { Title, Text } = Typography;
 
@@ -41,6 +42,7 @@ const TenderSelection: React.FC<TenderSelectionProps> = ({
             Выберите тендер для просмотра затрат
           </Text>
           <Select
+            className="tender-select"
             style={{ width: 400, marginBottom: 32 }}
             placeholder="Выберите тендер"
             value={selectedTenderTitle}
@@ -79,19 +81,33 @@ const TenderSelection: React.FC<TenderSelectionProps> = ({
                         width: 200,
                         textAlign: 'center',
                         cursor: 'pointer',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
                       }}
                       onClick={() => {
                         onTenderSelect(tender.id, tender.title, tender.version || 1);
                       }}
                     >
                       <div style={{ marginBottom: 8 }}>
-                        <Tag color="blue">{tender.tender_number}</Tag>
+                        <Tag color="#10b981">{tender.tender_number}</Tag>
                       </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ marginRight: 8 }}>
+                      <div style={{
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexWrap: 'nowrap',
+                        gap: 4
+                      }}>
+                        <Text strong style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 140
+                        }}>
                           {tender.title}
                         </Text>
-                        <Tag color="orange">v{tender.version || 1}</Tag>
+                        <Tag color={getVersionColorByTitle(tender.version, tender.title, tenders)} style={{ flexShrink: 0, margin: 0 }}>v{tender.version || 1}</Tag>
                       </div>
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {tender.client_name}
