@@ -118,6 +118,21 @@ const ClientPositions: React.FC = () => {
     }
   };
 
+  // Автоматический выбор тендера из URL параметров
+  useEffect(() => {
+    const tenderId = searchParams.get('tenderId');
+    if (tenderId && tenders.length > 0 && !selectedTender) {
+      const tender = tenders.find(t => t.id === tenderId);
+      if (tender) {
+        setSelectedTenderTitle(tender.title);
+        setSelectedVersion(tender.version || 1);
+        setSelectedTender(tender);
+        setSelectedTenderId(tender.id);
+        fetchClientPositions(tender.id);
+      }
+    }
+  }, [searchParams, tenders, selectedTender]);
+
   // Обработчики модального окна
   const handleOpenAdditionalModal = useCallback((parentId: string, event: React.MouseEvent) => {
     event.stopPropagation();

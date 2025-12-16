@@ -452,6 +452,12 @@ export const PositionTable: React.FC<PositionTableProps> = ({
           const isLeaf = leafPositionIndices.has(index!);
           return {
             onClick: () => onRowClick(record, index!),
+            onAuxClick: (e: React.MouseEvent) => {
+              if (e.button === 1 && isLeaf && selectedTender) {
+                e.preventDefault();
+                window.open(`/positions/${record.id}/items?tenderId=${selectedTender.id}&positionId=${record.id}`, '_blank');
+              }
+            },
             style: {
               cursor: isLeaf ? 'pointer' : 'default',
             },

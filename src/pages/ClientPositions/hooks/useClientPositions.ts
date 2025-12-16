@@ -97,7 +97,7 @@ export const useClientPositions = () => {
       const leafIndices = computeLeafPositions(allPositions);
       setLeafPositionIndices(leafIndices);
 
-      // Загружаем счетчики работ/материалов и общую сумму батчами
+      // Загружаем счетчики работ/материалов батчами по позициям
       if (allPositions.length > 0) {
         const positionIds = allPositions.map(p => p.id);
 
@@ -119,9 +119,8 @@ export const useClientPositions = () => {
           allBoqData = [...allBoqData, ...(boqData || [])];
         }
 
-        // Обрабатываем данные в памяти
+        // Обрабатываем данные в памяти для счётчиков по позициям
         const counts: Record<string, { works: number; materials: number; total: number }> = {};
-        let sum = 0;
 
         allBoqData.forEach((item) => {
           // Подсчет работ и материалов
@@ -135,14 +134,36 @@ export const useClientPositions = () => {
             counts[item.client_position_id].materials += 1;
           }
 
-          // Суммирование для каждой позиции и общей суммы
-          const itemTotal = item.total_amount || 0;
+          // Суммирование для позиции
+          const itemTotal = Number(item.total_amount) || 0;
           counts[item.client_position_id].total += itemTotal;
-          sum += itemTotal;
         });
 
         setPositionCounts(counts);
-        setTotalSum(sum);
+
+        // Загружаем общую сумму напрямую по tender_id с батчингом (как в Dashboard)
+        let totalSum = 0;
+        let from = 0;
+        const sumBatchSize = 1000;
+        let hasMoreSum = true;
+
+        while (hasMoreSum) {
+          const { data: sumData } = await supabase
+            .from('boq_items')
+            .select('total_amount')
+            .eq('tender_id', tenderId)
+            .range(from, from + sumBatchSize - 1);
+
+          if (sumData && sumData.length > 0) {
+            totalSum += sumData.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
+            from += sumBatchSize;
+            hasMoreSum = sumData.length === sumBatchSize;
+          } else {
+            hasMoreSum = false;
+          }
+        }
+
+        setTotalSum(totalSum);
       } else {
         setPositionCounts({});
         setTotalSum(0);

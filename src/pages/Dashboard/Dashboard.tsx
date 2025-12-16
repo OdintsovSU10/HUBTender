@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase, Tender } from '../../lib/supabase';
 import { formatNumberWithSpaces } from '../../utils/numberFormat';
+import { getVersionColorByTitle } from '../../utils/versionColor';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -60,50 +61,25 @@ const Dashboard: React.FC = () => {
 
       // Для каждого тендера загружаем стоимость BOQ
       const formattedData: TenderTableData[] = await Promise.all((data || []).map(async (tender: Tender) => {
-        // Загружаем все позиции тендера с батчингом (Supabase limit 1000 rows)
-        let allPositions: { id: string }[] = [];
-        let from = 0;
-        const positionBatchSize = 1000;
-        let hasMorePositions = true;
-
-        while (hasMorePositions) {
-          const { data: positions } = await supabase
-            .from('client_positions')
-            .select('id')
-            .eq('tender_id', tender.id)
-            .order('position_number', { ascending: true })
-            .range(from, from + positionBatchSize - 1);
-
-          if (positions && positions.length > 0) {
-            allPositions = [...allPositions, ...positions];
-            from += positionBatchSize;
-            hasMorePositions = positions.length === positionBatchSize;
-          } else {
-            hasMorePositions = false;
-          }
-        }
-
-        // Рассчитываем итоговую стоимость BOQ из boq_items
+        // Рассчитываем итоговую стоимость BOQ напрямую из boq_items по tender_id с батчингом
         let boqCost = 0;
-        if (allPositions.length > 0) {
-          const positionIds = allPositions.map(p => p.id);
+        let from = 0;
+        const batchSize = 1000;
+        let hasMore = true;
 
-          // Разбиваем на батчи по 100 ID для избежания ошибки 400 (URL too long)
-          const boqBatchSize = 100;
-          const batches = [];
-          for (let i = 0; i < positionIds.length; i += boqBatchSize) {
-            batches.push(positionIds.slice(i, i + boqBatchSize));
-          }
+        while (hasMore) {
+          const { data: boqData } = await supabase
+            .from('boq_items')
+            .select('total_amount')
+            .eq('tender_id', tender.id)
+            .range(from, from + batchSize - 1);
 
-          for (const batch of batches) {
-            const { data: boqData } = await supabase
-              .from('boq_items')
-              .select('total_amount')
-              .in('client_position_id', batch);
-
-            if (boqData && boqData.length > 0) {
-              boqCost += boqData.reduce((sum, item) => sum + (item.total_amount || 0), 0);
-            }
+          if (boqData && boqData.length > 0) {
+            boqCost += boqData.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
+            from += batchSize;
+            hasMore = boqData.length === batchSize;
+          } else {
+            hasMore = false;
           }
         }
 
@@ -189,7 +165,7 @@ const Dashboard: React.FC = () => {
         <div>
           <Space size={4}>
             <Text strong style={{ fontSize: 13 }}>{text}</Text>
-            <Tag color="blue" style={{ fontSize: 11 }}>v{record.version || 1}</Tag>
+            <Tag color={getVersionColorByTitle(record.version, record.name, tenders.map(t => ({ title: t.name, version: t.version })))} style={{ fontSize: 11 }}>v{record.version || 1}</Tag>
           </Space>
           {record.client && (
             <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>

@@ -108,6 +108,12 @@ export default function TenderSelector({
                       borderWidth: 1,
                     }}
                     onClick={() => onTenderSelect(tender.id, tender.title, tender.version || 1)}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        window.open(`/commerce?tenderId=${tender.id}`, '_blank');
+                      }
+                    }}
                   >
                     <div style={{ marginBottom: 8 }}>
                       <Tag color="#10b981">{tender.tender_number}</Tag>

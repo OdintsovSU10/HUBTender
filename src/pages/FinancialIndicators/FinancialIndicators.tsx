@@ -160,6 +160,12 @@ const FinancialIndicators: React.FC = () => {
                           setSelectedVersion(tender.version || 1);
                           setSelectedTenderId(tender.id);
                         }}
+                        onAuxClick={(e) => {
+                          if (e.button === 1) {
+                            e.preventDefault();
+                            window.open(`/financial-indicators?tenderId=${tender.id}`, '_blank');
+                          }
+                        }}
                       >
                         <div style={{ marginBottom: 8 }}>
                           <Tag color="#10b981">{tender.tender_number}</Tag>

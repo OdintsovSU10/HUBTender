@@ -366,6 +366,12 @@ const MarkupPercentages: React.FC = () => {
                         }
                         fetchMarkupData(tender.id);
                       }}
+                      onAuxClick={(e) => {
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          window.open(`/admin/markup?tenderId=${tender.id}`, '_blank');
+                        }
+                      }}
                     >
                       <div style={{ marginBottom: 8 }}>
                         <Tag color="#10b981">{tender.tender_number}</Tag>
@@ -536,6 +542,19 @@ const MarkupPercentages: React.FC = () => {
                             return (
                               <span>
                                 {option.label}
+                                {tactic?.is_global && (
+                                  <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>
+                                    Глобальная
+                                  </Tag>
+                                )}
+                              </span>
+                            );
+                          }}
+                          labelRender={(props) => {
+                            const tactic = tactics.find(t => t.id === props.value);
+                            return (
+                              <span>
+                                {props.label}
                                 {tactic?.is_global && (
                                   <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>
                                     Глобальная

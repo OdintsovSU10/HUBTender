@@ -85,6 +85,12 @@ export const TenderSelectionScreen: React.FC<TenderSelectionScreenProps> = ({
                       borderWidth: 1,
                     }}
                     onClick={() => onTenderCardClick(tender)}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        window.open(`/positions?tender=${tender.id}&title=${encodeURIComponent(tender.title)}&version=${tender.version || 1}`, '_blank');
+                      }
+                    }}
                   >
                     <div style={{ marginBottom: 8 }}>
                       <Tag color="#10b981">{tender.tender_number}</Tag>
