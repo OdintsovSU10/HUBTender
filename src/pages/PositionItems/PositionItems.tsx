@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Typography, Tag, Input, InputNumber, Select, Modal, message, AutoComplete } from 'antd';
+import { Card, Button, Typography, Tag, Input, InputNumber, Select, Modal, message, AutoComplete, Tabs } from 'antd';
 import { DeleteOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import WorkEditForm from './WorkEditForm';
@@ -9,6 +9,7 @@ import { useItemActions } from './hooks/useItemActions';
 import ItemsTable from './components/ItemsTable';
 import AddItemForm from './components/AddItemForm';
 import TemplateSelectModal from './components/TemplateSelectModal';
+import AuditHistoryTab from './components/AuditHistoryTab';
 import { supabase } from '../../lib/supabase';
 import { useDeadlineCheck } from '../../hooks/useDeadlineCheck';
 
@@ -24,6 +25,7 @@ const PositionItems: React.FC = () => {
   const [templateModalVisible, setTemplateModalVisible] = useState<boolean>(false);
   const [selectedCostCategoryId, setSelectedCostCategoryId] = useState<string | null>(null);
   const [costSearchText, setCostSearchText] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>('current');
 
   const {
     position,
@@ -309,122 +311,141 @@ const PositionItems: React.FC = () => {
         </div>
       </Card>
 
-      <Card title="Добавление работ и материалов" style={{ marginBottom: 16 }}>
-        <AddItemForm
-          works={works}
-          materials={materials}
-          workSearchText={workSearchText}
-          materialSearchText={materialSearchText}
-          onWorkSearchChange={setWorkSearchText}
-          onMaterialSearchChange={setMaterialSearchText}
-          onAddWork={(workNameId) => {
-            handleAddWork(workNameId);
-            setWorkSearchText('');
-          }}
-          onAddMaterial={(materialNameId) => {
-            handleAddMaterial(materialNameId);
-            setMaterialSearchText('');
-          }}
-          onOpenTemplateModal={() => setTemplateModalVisible(true)}
-          disabled={!canEditByDeadline || deadlineLoading}
-        />
-      </Card>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'current',
+            label: 'Текущие',
+            children: (
+              <>
+                <Card title="Добавление работ и материалов" style={{ marginBottom: 16 }}>
+                  <AddItemForm
+                    works={works}
+                    materials={materials}
+                    workSearchText={workSearchText}
+                    materialSearchText={materialSearchText}
+                    onWorkSearchChange={setWorkSearchText}
+                    onMaterialSearchChange={setMaterialSearchText}
+                    onAddWork={(workNameId) => {
+                      handleAddWork(workNameId);
+                      setWorkSearchText('');
+                    }}
+                    onAddMaterial={(materialNameId) => {
+                      handleAddMaterial(materialNameId);
+                      setMaterialSearchText('');
+                    }}
+                    onOpenTemplateModal={() => setTemplateModalVisible(true)}
+                    disabled={!canEditByDeadline || deadlineLoading}
+                  />
+                </Card>
 
-      <Card
-        title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Элементы позиции</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AutoComplete
-                value={costSearchText}
-                onChange={(value) => setCostSearchText(value)}
-                onSelect={(value, option: any) => {
-                  setSelectedCostCategoryId(option.id);
-                  setCostSearchText(option.label);
-                }}
-                options={getCostCategoryOptions()}
-                placeholder="Выберите затрату на строительство"
-                style={{ width: 525 }}
-                allowClear
-                onClear={() => {
-                  setCostSearchText('');
-                  setSelectedCostCategoryId(null);
-                }}
-                filterOption={false}
-                disabled={!canEditByDeadline || deadlineLoading}
-              />
-              <Button
-                type="primary"
-                icon={<ThunderboltOutlined />}
-                onClick={handleApplyCostToAll}
-                disabled={!selectedCostCategoryId || items.length === 0 || !canEditByDeadline || deadlineLoading}
-              >
-                Распространить затрату на все строки
-              </Button>
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                onClick={handleClearAllItems}
-                disabled={items.length === 0 || !canEditByDeadline || deadlineLoading}
-              >
-                Очистить все
-              </Button>
-              <div style={{ fontSize: 16, fontWeight: 'bold' }}>
-                Итого: <span style={{ color: '#10b981' }}>{Math.round(totalSum).toLocaleString('ru-RU')}</span>
-              </div>
-            </div>
-          </div>
-        }
-      >
-        <ItemsTable
-          items={items}
-          loading={loading}
-          expandedRowKeys={expandedRowKeys}
-          onExpandedRowsChange={setExpandedRowKeys}
-          onEditClick={handleEditClick}
-          onDelete={handleDelete}
-          onMoveItem={handleMoveItem}
-          getCurrencyRate={getCurrencyRate}
-          readOnly={!canEditByDeadline || deadlineLoading}
-          expandedRowRender={(record) => {
-            const isWork = ['раб', 'суб-раб', 'раб-комп.'].includes(record.boq_item_type);
+                <Card
+                  title={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Элементы позиции</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <AutoComplete
+                          value={costSearchText}
+                          onChange={(value) => setCostSearchText(value)}
+                          onSelect={(value, option: any) => {
+                            setSelectedCostCategoryId(option.id);
+                            setCostSearchText(option.label);
+                          }}
+                          options={getCostCategoryOptions()}
+                          placeholder="Выберите затрату на строительство"
+                          style={{ width: 525 }}
+                          allowClear
+                          onClear={() => {
+                            setCostSearchText('');
+                            setSelectedCostCategoryId(null);
+                          }}
+                          filterOption={false}
+                          disabled={!canEditByDeadline || deadlineLoading}
+                        />
+                        <Button
+                          type="primary"
+                          icon={<ThunderboltOutlined />}
+                          onClick={handleApplyCostToAll}
+                          disabled={!selectedCostCategoryId || items.length === 0 || !canEditByDeadline || deadlineLoading}
+                        >
+                          Распространить затрату на все строки
+                        </Button>
+                        <Button
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={handleClearAllItems}
+                          disabled={items.length === 0 || !canEditByDeadline || deadlineLoading}
+                        >
+                          Очистить все
+                        </Button>
+                        <div style={{ fontSize: 16, fontWeight: 'bold' }}>
+                          Итого: <span style={{ color: '#10b981' }}>{Math.round(totalSum).toLocaleString('ru-RU')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                >
+                  <ItemsTable
+                    items={items}
+                    loading={loading}
+                    expandedRowKeys={expandedRowKeys}
+                    onExpandedRowsChange={setExpandedRowKeys}
+                    onEditClick={handleEditClick}
+                    onDelete={handleDelete}
+                    onMoveItem={handleMoveItem}
+                    getCurrencyRate={getCurrencyRate}
+                    readOnly={!canEditByDeadline || deadlineLoading}
+                    expandedRowRender={(record) => {
+                      const isWork = ['раб', 'суб-раб', 'раб-комп.'].includes(record.boq_item_type);
 
-            if (isWork) {
-              return (
-                <WorkEditForm
-                  record={record}
-                  workNames={workNames}
-                  costCategories={costCategories}
-                  currencyRates={currencyRates}
-                  onSave={onFormSave}
-                  onCancel={onFormCancel}
-                  readOnly={!canEditByDeadline || deadlineLoading}
-                />
-              );
-            } else {
-              const workItems = items.filter(
-                item => item.boq_item_type === 'раб' ||
-                  item.boq_item_type === 'суб-раб' ||
-                  item.boq_item_type === 'раб-комп.'
-              );
+                      if (isWork) {
+                        return (
+                          <WorkEditForm
+                            record={record}
+                            workNames={workNames}
+                            costCategories={costCategories}
+                            currencyRates={currencyRates}
+                            onSave={onFormSave}
+                            onCancel={onFormCancel}
+                            readOnly={!canEditByDeadline || deadlineLoading}
+                          />
+                        );
+                      } else {
+                        const workItems = items.filter(
+                          item => item.boq_item_type === 'раб' ||
+                            item.boq_item_type === 'суб-раб' ||
+                            item.boq_item_type === 'раб-комп.'
+                        );
 
-              return (
-                <MaterialEditForm
-                  record={record}
-                  materialNames={materialNames}
-                  workItems={workItems}
-                  costCategories={costCategories}
-                  currencyRates={currencyRates}
-                  gpVolume={gpVolume}
-                  onSave={onFormSave}
-                  onCancel={onFormCancel}
-                  readOnly={!canEditByDeadline || deadlineLoading}
-                />
-              );
-            }
-          }}
-        />
-      </Card>
+                        return (
+                          <MaterialEditForm
+                            record={record}
+                            materialNames={materialNames}
+                            workItems={workItems}
+                            costCategories={costCategories}
+                            currencyRates={currencyRates}
+                            gpVolume={gpVolume}
+                            onSave={onFormSave}
+                            onCancel={onFormCancel}
+                            readOnly={!canEditByDeadline || deadlineLoading}
+                          />
+                        );
+                      }
+                    }}
+                  />
+                </Card>
+              </>
+            ),
+          },
+          {
+            key: 'history',
+            label: 'История',
+            children: <AuditHistoryTab positionId={positionId} />,
+          },
+        ]}
+      />
 
       {/* Модалка выбора шаблона */}
       <TemplateSelectModal

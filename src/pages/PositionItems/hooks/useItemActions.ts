@@ -12,6 +12,8 @@ import {
   type BoqItemFull,
 } from '../../../lib/supabase';
 import { insertTemplateItems } from '../../../utils/insertTemplateItems';
+import { useAuth } from '../../../contexts/AuthContext';
+import { executeWithAudit } from '../../../lib/supabaseWithAudit';
 
 interface UseItemActionsProps {
   position: ClientPosition | null;
@@ -30,6 +32,8 @@ export const useItemActions = ({
   getCurrencyRate,
   fetchItems,
 }: UseItemActionsProps) => {
+  const { user } = useAuth();
+
   const updateClientPositionTotals = async (positionId: string) => {
     try {
       const { data: boqItems, error: fetchError } = await supabase
@@ -91,9 +95,10 @@ export const useItemActions = ({
         total_amount: totalAmount,
       };
 
-      const { error } = await supabase.from('boq_items').insert(newItem);
-
-      if (error) throw error;
+      await executeWithAudit(user?.id, async () => {
+        const { error } = await supabase.from('boq_items').insert(newItem);
+        if (error) throw error;
+      });
 
       message.success('Работа добавлена');
       await fetchItems();
@@ -151,9 +156,10 @@ export const useItemActions = ({
         total_amount: totalAmount,
       };
 
-      const { error } = await supabase.from('boq_items').insert(newItem);
-
-      if (error) throw error;
+      await executeWithAudit(user?.id, async () => {
+        const { error } = await supabase.from('boq_items').insert(newItem);
+        if (error) throw error;
+      });
 
       message.success('Материал добавлен');
       await fetchItems();
@@ -171,7 +177,7 @@ export const useItemActions = ({
 
     try {
       setLoading(true);
-      const result = await insertTemplateItems(templateId, position.id);
+      const result = await insertTemplateItems(templateId, position.id, user?.id);
 
       message.success(
         `Вставлено из шаблона: ${result.worksCount} работ, ${result.materialsCount} материалов`
@@ -187,9 +193,10 @@ export const useItemActions = ({
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('boq_items').delete().eq('id', id);
-
-      if (error) throw error;
+      await executeWithAudit(user?.id, async () => {
+        const { error } = await supabase.from('boq_items').delete().eq('id', id);
+        if (error) throw error;
+      });
 
       message.success('Элемент удален');
       await fetchItems();
@@ -237,13 +244,15 @@ export const useItemActions = ({
 
         const totalAmount = newQuantity * (unitRate * rate + deliveryPrice);
 
-        await supabase
-          .from('boq_items')
-          .update({
-            quantity: newQuantity,
-            total_amount: totalAmount,
-          })
-          .eq('id', material.id);
+        await executeWithAudit(user?.id, async () => {
+          await supabase
+            .from('boq_items')
+            .update({
+              quantity: newQuantity,
+              total_amount: totalAmount,
+            })
+            .eq('id', material.id);
+        });
       }
     } catch (error: any) {
       console.error('Ошибка обновления количества материалов:', error.message);
@@ -260,12 +269,14 @@ export const useItemActions = ({
       const recordId = expandedRowKeys[0];
       if (!recordId) return;
 
-      const { error } = await supabase
-        .from('boq_items')
-        .update(data)
-        .eq('id', recordId);
+      await executeWithAudit(user?.id, async () => {
+        const { error } = await supabase
+          .from('boq_items')
+          .update(data)
+          .eq('id', recordId);
 
-      if (error) throw error;
+        if (error) throw error;
+      });
 
       const updatedItem = items.find(item => item.id === recordId);
       if (updatedItem && ['раб', 'суб-раб', 'раб-комп.'].includes(updatedItem.boq_item_type)) {
@@ -420,14 +431,16 @@ export const useItemActions = ({
         { id: targetItem.id, sort_number: item.sort_number }
       ];
 
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('boq_items')
-          .update({ sort_number: update.sort_number })
-          .eq('id', update.id);
+      await executeWithAudit(user?.id, async () => {
+        for (const update of updates) {
+          const { error } = await supabase
+            .from('boq_items')
+            .update({ sort_number: update.sort_number })
+            .eq('id', update.id);
 
-        if (error) throw error;
-      }
+          if (error) throw error;
+        }
+      });
 
       await fetchItems();
       message.success('Элемент перемещен');

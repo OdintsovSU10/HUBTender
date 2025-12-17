@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { executeWithAudit } from '../lib/supabaseWithAudit';
 
 interface InsertTemplateResult {
   worksCount: number;
@@ -12,7 +13,8 @@ interface InsertTemplateResult {
  */
 export async function insertTemplateItems(
   templateId: string,
-  clientPositionId: string
+  clientPositionId: string,
+  userId?: string
 ): Promise<InsertTemplateResult> {
   // Validate template exists and get its default detail_cost_category_id
   const { data: template, error: templateError } = await supabase
@@ -172,14 +174,20 @@ export async function insertTemplateItems(
     };
   });
 
-  const { data: newBoqItems, error: insertError } = await supabase
-    .from('boq_items')
-    .insert(boqItemsToInsert)
-    .select();
+  let newBoqItems: any[] = [];
 
-  if (insertError || !newBoqItems) {
-    throw new Error(`Ошибка вставки элементов: ${insertError?.message}`);
-  }
+  await executeWithAudit(userId, async () => {
+    const { data, error: insertError } = await supabase
+      .from('boq_items')
+      .insert(boqItemsToInsert)
+      .select();
+
+    if (insertError || !data) {
+      throw new Error(`Ошибка вставки элементов: ${insertError?.message}`);
+    }
+
+    newBoqItems = data;
+  });
 
   // Step 3: Restore parent_work_item_id relationships using array indices
   const updates: Array<{ id: string; parent_work_item_id: string }> = [];
@@ -203,17 +211,19 @@ export async function insertTemplateItems(
 
   // Batch update parent_work_item_id
   if (updates.length > 0) {
-    for (const update of updates) {
-      const { error: updateError } = await supabase
-        .from('boq_items')
-        .update({ parent_work_item_id: update.parent_work_item_id })
-        .eq('id', update.id);
+    await executeWithAudit(userId, async () => {
+      for (const update of updates) {
+        const { error: updateError } = await supabase
+          .from('boq_items')
+          .update({ parent_work_item_id: update.parent_work_item_id })
+          .eq('id', update.id);
 
-      if (updateError) {
-        console.error('Error updating parent_work_item_id:', updateError);
-        // Continue with other updates even if one fails
+        if (updateError) {
+          console.error('Error updating parent_work_item_id:', updateError);
+          // Continue with other updates even if one fails
+        }
       }
-    }
+    });
   }
 
   // Step 4: Recalculate position totals
