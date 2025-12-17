@@ -328,6 +328,114 @@ export const useItemActions = ({
     }
   };
 
+  const getItemGroupBounds = (
+    item: BoqItemFull,
+    items: BoqItemFull[],
+    currentIndex: number
+  ): { start: number; end: number } => {
+    // Привязанный материал - границы блока работы
+    if (item.parent_work_item_id) {
+      const workIndex = items.findIndex(i => i.id === item.parent_work_item_id);
+      let endIndex = workIndex;
+
+      for (let i = workIndex + 1; i < items.length; i++) {
+        if (items[i].parent_work_item_id === item.parent_work_item_id) {
+          endIndex = i;
+        } else {
+          break;
+        }
+      }
+
+      return { start: workIndex + 1, end: endIndex };
+    }
+
+    // Работа с материалами - перемещается среди других работ с материалами (Группа 1)
+    const isWork = ['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type);
+    const hasMaterials = items.some(m => m.parent_work_item_id === item.id);
+
+    if (isWork && hasMaterials) {
+      // Найти первую и последнюю работу с материалами (включая их материалы)
+      let start = 0;
+      let end = items.length - 1;
+
+      for (let i = 0; i < items.length; i++) {
+        const isWorkWithMats = ['раб', 'суб-раб', 'раб-комп.'].includes(items[i].boq_item_type) &&
+          items.some(m => m.parent_work_item_id === items[i].id);
+        if (isWorkWithMats) {
+          start = i;
+          break;
+        }
+      }
+
+      // Найти последний привязанный материал
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (items[i].parent_work_item_id) {
+          end = i;
+          break;
+        }
+      }
+
+      return { start, end };
+    }
+
+    // Непривязанный элемент (работа или материал) - Группа 2
+    // Все непривязанные элементы идут после Группы 1
+    let start = 0;
+    for (let i = 0; i < items.length; i++) {
+      const isUnlinked = !items[i].parent_work_item_id &&
+        !items.some(m => m.parent_work_item_id === items[i].id);
+      if (isUnlinked) {
+        start = i;
+        break;
+      }
+    }
+
+    return { start, end: items.length - 1 };
+  };
+
+  const handleMoveItem = async (itemId: string, direction: 'up' | 'down') => {
+    try {
+      const currentIndex = items.findIndex(i => i.id === itemId);
+      const item = items[currentIndex];
+      const bounds = getItemGroupBounds(item, items, currentIndex);
+
+      // Проверка возможности перемещения
+      if (direction === 'up' && currentIndex <= bounds.start) {
+        message.warning('Невозможно переместить элемент выше');
+        return;
+      }
+
+      if (direction === 'down' && currentIndex >= bounds.end) {
+        message.warning('Невозможно переместить элемент ниже');
+        return;
+      }
+
+      // Swap с соседним элементом
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      const targetItem = items[targetIndex];
+
+      // Обновить sort_number атомарно
+      const updates = [
+        { id: item.id, sort_number: targetItem.sort_number },
+        { id: targetItem.id, sort_number: item.sort_number }
+      ];
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('boq_items')
+          .update({ sort_number: update.sort_number })
+          .eq('id', update.id);
+
+        if (error) throw error;
+      }
+
+      await fetchItems();
+      message.success('Элемент перемещен');
+    } catch (error: any) {
+      message.error('Ошибка перемещения: ' + error.message);
+    }
+  };
+
   return {
     handleAddWork,
     handleAddMaterial,
@@ -336,5 +444,6 @@ export const useItemActions = ({
     handleFormSave,
     handleSaveGPData,
     handleSaveAdditionalWorkData,
+    handleMoveItem,
   };
 };

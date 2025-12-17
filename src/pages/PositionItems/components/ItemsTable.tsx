@@ -1,5 +1,5 @@
 import { Table, Button, Space, Tag, Tooltip, Popconfirm } from 'antd';
-import { EditOutlined, DeleteOutlined, LinkOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, LinkOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
 import type { BoqItemFull, CurrencyType } from '../../../lib/supabase';
 
 const currencySymbols: Record<CurrencyType, string> = {
@@ -16,6 +16,7 @@ interface ItemsTableProps {
   onExpandedRowsChange: (keys: string[]) => void;
   onEditClick: (record: BoqItemFull) => void;
   onDelete: (id: string) => void;
+  onMoveItem: (itemId: string, direction: 'up' | 'down') => void;
   getCurrencyRate: (currency: CurrencyType) => number;
   expandedRowRender: (record: BoqItemFull) => React.ReactNode;
   readOnly?: boolean;
@@ -28,6 +29,7 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
   onExpandedRowsChange,
   onEditClick,
   onDelete,
+  onMoveItem,
   getCurrencyRate,
   expandedRowRender,
   readOnly,
@@ -53,11 +55,92 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
     }
   };
 
+  const canMoveItemUp = (record: BoqItemFull, index: number): boolean => {
+    // Привязанный материал
+    if (record.parent_work_item_id) {
+      const workIndex = items.findIndex(i => i.id === record.parent_work_item_id);
+      return index > workIndex + 1;
+    }
+
+    // Работа с материалами
+    const hasMaterials = items.some(m => m.parent_work_item_id === record.id);
+    if (hasMaterials) {
+      const firstWorkWithMats = items.findIndex(i =>
+        ['раб', 'суб-раб', 'раб-комп.'].includes(i.boq_item_type) &&
+        items.some(m => m.parent_work_item_id === i.id)
+      );
+      return index > firstWorkWithMats;
+    }
+
+    // Непривязанный элемент
+    const firstUnlinked = items.findIndex(i =>
+      !i.parent_work_item_id && !items.some(m => m.parent_work_item_id === i.id)
+    );
+    return index > firstUnlinked;
+  };
+
+  const canMoveItemDown = (record: BoqItemFull, index: number): boolean => {
+    // Привязанный материал
+    if (record.parent_work_item_id) {
+      const lastMaterialIndex = items.findLastIndex(i =>
+        i.parent_work_item_id === record.parent_work_item_id
+      );
+      return index < lastMaterialIndex;
+    }
+
+    // Работа с материалами
+    const hasMaterials = items.some(m => m.parent_work_item_id === record.id);
+    if (hasMaterials) {
+      const lastLinkedMaterialIndex = items.findLastIndex(i => i.parent_work_item_id);
+      return index < lastLinkedMaterialIndex;
+    }
+
+    // Непривязанный элемент
+    return index < items.length - 1;
+  };
+
   const calculateTotal = (record: BoqItemFull): number => {
     return record.total_amount || 0;
   };
 
   const columns: any[] = [
+    {
+      title: '',
+      key: 'sort',
+      width: 60,
+      align: 'center',
+      fixed: 'left',
+      render: (_: any, record: BoqItemFull, index: number) => (
+        <Space direction="vertical" size={0} style={{ width: '100%' }}>
+          <Tooltip title="Переместить вверх">
+            <Button
+              type="text"
+              size="small"
+              icon={<UpOutlined style={{ fontSize: 12 }} />}
+              disabled={readOnly || !canMoveItemUp(record, index)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveItem(record.id, 'up');
+              }}
+              style={{ padding: '2px 4px', height: 20 }}
+            />
+          </Tooltip>
+          <Tooltip title="Переместить вниз">
+            <Button
+              type="text"
+              size="small"
+              icon={<DownOutlined style={{ fontSize: 12 }} />}
+              disabled={readOnly || !canMoveItemDown(record, index)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveItem(record.id, 'down');
+              }}
+              style={{ padding: '2px 4px', height: 20 }}
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
     {
       title: <div style={{ textAlign: 'center' }}>Тип</div>,
       key: 'type',

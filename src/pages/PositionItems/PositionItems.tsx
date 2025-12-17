@@ -62,6 +62,7 @@ const PositionItems: React.FC = () => {
     handleFormSave,
     handleSaveGPData,
     handleSaveAdditionalWorkData,
+    handleMoveItem,
   } = useItemActions({
     position,
     works,
@@ -382,6 +383,7 @@ const PositionItems: React.FC = () => {
           onExpandedRowsChange={setExpandedRowKeys}
           onEditClick={handleEditClick}
           onDelete={handleDelete}
+          onMoveItem={handleMoveItem}
           getCurrencyRate={getCurrencyRate}
           readOnly={!canEditByDeadline || deadlineLoading}
           expandedRowRender={(record) => {
@@ -443,10 +445,16 @@ const styles = `
   .boq-row-rab {
     background-color: rgba(255, 152, 0, 0.15) !important;
   }
+  .boq-row-rab > td.ant-table-cell-fix-left {
+    background-color: rgba(255, 152, 0, 0.15) !important;
+  }
   .boq-row-rab:hover > td {
     background-color: rgba(255, 152, 0, 0.25) !important;
   }
   .boq-row-sub-rab {
+    background-color: rgba(156, 39, 176, 0.15) !important;
+  }
+  .boq-row-sub-rab > td.ant-table-cell-fix-left {
     background-color: rgba(156, 39, 176, 0.15) !important;
   }
   .boq-row-sub-rab:hover > td {
@@ -455,10 +463,16 @@ const styles = `
   .boq-row-rab-comp {
     background-color: rgba(244, 67, 54, 0.15) !important;
   }
+  .boq-row-rab-comp > td.ant-table-cell-fix-left {
+    background-color: rgba(244, 67, 54, 0.15) !important;
+  }
   .boq-row-rab-comp:hover > td {
     background-color: rgba(244, 67, 54, 0.25) !important;
   }
   .boq-row-mat {
+    background-color: rgba(33, 150, 243, 0.15) !important;
+  }
+  .boq-row-mat > td.ant-table-cell-fix-left {
     background-color: rgba(33, 150, 243, 0.15) !important;
   }
   .boq-row-mat:hover > td {
@@ -467,10 +481,16 @@ const styles = `
   .boq-row-sub-mat {
     background-color: rgba(156, 204, 101, 0.15) !important;
   }
+  .boq-row-sub-mat > td.ant-table-cell-fix-left {
+    background-color: rgba(156, 204, 101, 0.15) !important;
+  }
   .boq-row-sub-mat:hover > td {
     background-color: rgba(156, 204, 101, 0.25) !important;
   }
   .boq-row-mat-comp {
+    background-color: rgba(0, 137, 123, 0.15) !important;
+  }
+  .boq-row-mat-comp > td.ant-table-cell-fix-left {
     background-color: rgba(0, 137, 123, 0.15) !important;
   }
   .boq-row-mat-comp:hover > td {

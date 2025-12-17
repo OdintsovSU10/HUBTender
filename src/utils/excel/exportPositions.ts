@@ -124,19 +124,17 @@ function sortItemsByHierarchy(items: BoqItemFull[], positionName?: string): BoqI
 
   const result: BoqItemFull[] = [];
 
-  works.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
-
+  // ГРУППА 1: Работы с привязанными материалами
   const worksWithMaterials: BoqItemFull[] = [];
-  const worksWithoutMaterials: BoqItemFull[] = [];
 
   works.forEach(work => {
     const workMaterials = linkedMaterials.filter(m => m.parent_work_item_id === work.id);
     if (workMaterials.length > 0) {
       worksWithMaterials.push(work);
-    } else {
-      worksWithoutMaterials.push(work);
     }
   });
+
+  worksWithMaterials.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
 
   worksWithMaterials.forEach(work => {
     result.push(work);
@@ -145,9 +143,27 @@ function sortItemsByHierarchy(items: BoqItemFull[], positionName?: string): BoqI
     result.push(...workMaterials);
   });
 
-  result.push(...worksWithoutMaterials);
-  unlinkedMaterials.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
-  result.push(...unlinkedMaterials);
+  // ГРУППА 2: Непривязанные элементы (работы + материалы вперемешку)
+  const unlinkedWorks = works.filter(w => !worksWithMaterials.includes(w));
+  const unlinkedElements = [...unlinkedWorks, ...unlinkedMaterials];
+
+  // Сортировка: sort_number > 0 → по sort_number, иначе по created_at
+  unlinkedElements.sort((a, b) => {
+    const aSortNum = a.sort_number || 0;
+    const bSortNum = b.sort_number || 0;
+
+    if (aSortNum === 0 && bSortNum === 0) {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    } else if (aSortNum === 0) {
+      return 1;
+    } else if (bSortNum === 0) {
+      return -1;
+    } else {
+      return aSortNum - bSortNum;
+    }
+  });
+
+  result.push(...unlinkedElements);
 
   return result;
 }
