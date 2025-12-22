@@ -44,7 +44,8 @@ export const useTenderActions = (onRefresh: () => void) => {
         upload_folder: data.upload_folder,
         bsm_link: data.bsm_link,
         tz_link: data.tz_link,
-        qa_form_link: data.qa_form_link
+        qa_form_link: data.qa_form_link,
+        project_folder_link: data.project_folder_link
       });
 
       setIsModalVisible(true);
@@ -107,6 +108,7 @@ export const useTenderActions = (onRefresh: () => void) => {
         bsm_link: values.bsm_link || null,
         tz_link: values.tz_link || null,
         qa_form_link: values.qa_form_link || null,
+        project_folder_link: values.project_folder_link || null,
         housing_class: values.housing_class || null,
         construction_scope: values.construction_scope || null
       };

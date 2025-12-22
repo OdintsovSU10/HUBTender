@@ -23,6 +23,7 @@ export interface TenderRecord {
   bsmLink?: string;
   tzLink?: string;
   qaFormLink?: string;
+  projectFolderLink?: string;
   createdAt: string;
   description: string;
   status: 'completed' | 'in_progress' | 'pending';
@@ -113,11 +114,12 @@ export const useTendersData = () => {
         usdRate: tender.usd_rate || 0,
         eurRate: tender.eur_rate || 0,
         cnyRate: tender.cny_rate || 0,
-        hasLinks: !!(tender.upload_folder || tender.bsm_link || tender.tz_link || tender.qa_form_link),
+        hasLinks: !!(tender.upload_folder || tender.bsm_link || tender.tz_link || tender.qa_form_link || tender.project_folder_link),
         uploadFolder: tender.upload_folder || undefined,
         bsmLink: tender.bsm_link || undefined,
         tzLink: tender.tz_link || undefined,
         qaFormLink: tender.qa_form_link || undefined,
+        projectFolderLink: tender.project_folder_link || undefined,
         createdAt: dayjs(tender.created_at).format('DD.MM.YYYY'),
         description: tender.description || '',
         status: 'in_progress' as const,

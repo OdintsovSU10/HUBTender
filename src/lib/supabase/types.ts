@@ -18,6 +18,7 @@ export interface TenderInsert {
   bsm_link?: string;
   tz_link?: string;
   qa_form_link?: string;
+  project_folder_link?: string;
   markup_tactic_id?: string; // Ссылка на тактику наценок для данного тендера
   housing_class?: HousingClassType;
   construction_scope?: ConstructionScopeType;

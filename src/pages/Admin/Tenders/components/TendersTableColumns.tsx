@@ -214,6 +214,15 @@ export const getTendersTableColumns = (params: GetColumnsParams): ColumnsType<Te
           });
         }
 
+        if (record.projectFolderLink) {
+          linkItems.push({
+            key: 'project_folder_link',
+            label: 'Папка с проектом',
+            icon: <FolderOutlined />,
+            onClick: () => window.open(record.projectFolderLink, '_blank')
+          });
+        }
+
         if (linkItems.length === 0) {
           return (
             <Tooltip title="Нет доступных ссылок">

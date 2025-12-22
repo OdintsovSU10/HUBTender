@@ -358,6 +358,20 @@ const TenderModal: React.FC<TenderModalProps> = ({
             </Form.Item>
           </Col>
         </Row>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="project_folder_link"
+              label="Ссылка на папку с проектом"
+            >
+              <Input
+                prefix={<LinkOutlined />}
+                placeholder="https://..."
+              />
+            </Form.Item>
+          </Col>
+        </Row>
       </Form>
     </Modal>
   );

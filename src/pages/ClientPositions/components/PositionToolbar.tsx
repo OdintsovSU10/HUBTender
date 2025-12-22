@@ -4,6 +4,7 @@ import {
   LinkOutlined,
   FileTextOutlined,
   QuestionCircleOutlined,
+  FolderOutlined,
   ArrowLeftOutlined,
   DashboardOutlined,
 } from '@ant-design/icons';
@@ -200,6 +201,16 @@ export const PositionToolbar: React.FC<PositionToolbarProps> = ({
                           size="small"
                         >
                           Вопросы
+                        </Button>
+                      )}
+                      {selectedTender.project_folder_link && (
+                        <Button
+                          icon={<FolderOutlined />}
+                          href={selectedTender.project_folder_link}
+                          target="_blank"
+                          size="small"
+                        >
+                          Папка с проектом
                         </Button>
                       )}
                     </Space>
