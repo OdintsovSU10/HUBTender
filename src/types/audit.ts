@@ -28,6 +28,8 @@ export interface BoqItemAudit {
   // Denormalized для отображения в таблице
   item_name?: string;
   cost_categories_map?: Map<string, string>;
+  work_names_map?: Map<string, string>;
+  material_names_map?: Map<string, string>;
 }
 
 /**

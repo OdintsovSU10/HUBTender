@@ -47,10 +47,10 @@ const AuditDiffCell: React.FC<AuditDiffCellProps> = ({ record }) => {
             <Text strong>{diff.displayName}: </Text>
           </Tooltip>
           <Text delete type="secondary">
-            {formatFieldValue(diff.field, diff.oldValue, record.cost_categories_map)}
+            {formatFieldValue(diff.field, diff.oldValue, record.cost_categories_map, record.work_names_map, record.material_names_map)}
           </Text>
           {' → '}
-          <Text strong>{formatFieldValue(diff.field, diff.newValue, record.cost_categories_map)}</Text>
+          <Text strong>{formatFieldValue(diff.field, diff.newValue, record.cost_categories_map, record.work_names_map, record.material_names_map)}</Text>
         </div>
       ))}
     </Space>

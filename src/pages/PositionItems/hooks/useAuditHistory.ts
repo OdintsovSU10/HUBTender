@@ -165,6 +165,8 @@ export function useAuditHistory(
           ...record,
           item_name,
           cost_categories_map: costCategoriesMap,
+          work_names_map: workNamesMap,
+          material_names_map: materialNamesMap,
         };
       });
 

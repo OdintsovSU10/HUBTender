@@ -70,9 +70,17 @@ export function getFieldDisplayName(field: string): string {
  * @param field - Название поля
  * @param value - Значение поля
  * @param costCategoriesMap - Map для резолва detail_cost_category_id
+ * @param workNamesMap - Map для резолва work_name_id
+ * @param materialNamesMap - Map для резолва material_name_id
  * @returns Отформатированная строка
  */
-export function formatFieldValue(field: string, value: any, costCategoriesMap?: Map<string, string>): string {
+export function formatFieldValue(
+  field: string,
+  value: any,
+  costCategoriesMap?: Map<string, string>,
+  workNamesMap?: Map<string, string>,
+  materialNamesMap?: Map<string, string>
+): string {
   if (value === null || value === undefined) {
     return '-';
   }
@@ -81,6 +89,22 @@ export function formatFieldValue(field: string, value: any, costCategoriesMap?: 
   if (field === 'detail_cost_category_id' && typeof value === 'string') {
     if (costCategoriesMap && costCategoriesMap.has(value)) {
       return costCategoriesMap.get(value)!;
+    }
+    return value.substring(0, 8) + '...';
+  }
+
+  // Наименование работы - показываем название вместо UUID
+  if (field === 'work_name_id' && typeof value === 'string') {
+    if (workNamesMap && workNamesMap.has(value)) {
+      return workNamesMap.get(value)!;
+    }
+    return value.substring(0, 8) + '...';
+  }
+
+  // Наименование материала - показываем название вместо UUID
+  if (field === 'material_name_id' && typeof value === 'string') {
+    if (materialNamesMap && materialNamesMap.has(value)) {
+      return materialNamesMap.get(value)!;
     }
     return value.substring(0, 8) + '...';
   }
