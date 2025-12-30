@@ -270,6 +270,10 @@ export const useFinancialCalculations = () => {
         p.label.toLowerCase().includes('непредвиден')
       );
 
+      const vatParam = markupParams.find(p =>
+        p.label.toLowerCase().includes('ндс')
+      );
+
       // Получение коэффициентов
       const mechanizationCoeff = mechanizationParam
         ? (percentagesMap.get(mechanizationParam.id) ?? mechanizationParam.default_value)
@@ -325,6 +329,10 @@ export const useFinancialCalculations = () => {
 
       const unforeseeableCoeff = unforeseeableParam
         ? (percentagesMap.get(unforeseeableParam.id) ?? unforeseeableParam.default_value)
+        : 0;
+
+      const vatCoeff = vatParam
+        ? (percentagesMap.get(vatParam.id) ?? vatParam.default_value)
         : 0;
 
       console.log('=== DEBUG 0,6к Parameter ===');
@@ -383,7 +391,7 @@ export const useFinancialCalculations = () => {
       const baseForSubcontractProfit = baseForSubcontractOOZ + overheadSubcontractCost;
       const profitSubcontractCost = baseForSubcontractProfit * (profitSubcontractCoeff / 100);
 
-      const grandTotal = directCostsTotal +
+      const grandTotalBeforeVAT = directCostsTotal +
                         mechanizationCost +
                         mvpGsmCost +
                         warrantyCost +
@@ -395,6 +403,9 @@ export const useFinancialCalculations = () => {
                         generalCostsCost +
                         profitOwnForcesCost +
                         profitSubcontractCost;
+
+      const vatCost = grandTotalBeforeVAT * (vatCoeff / 100);
+      const grandTotal = grandTotalBeforeVAT + vatCost;
 
       console.log('=== Financial Indicators Calculation ===');
       console.log('Direct costs (base):', directCostsTotal);
@@ -621,6 +632,19 @@ export const useFinancialCalculations = () => {
         {
           key: '15',
           row_number: 15,
+          indicator_name: 'НДС',
+          coefficient: vatCoeff > 0 ? `${parseFloat(vatCoeff.toFixed(5))}%` : '',
+          sp_cost: areaSp > 0 ? vatCost / areaSp : 0,
+          customer_cost: areaClient > 0 ? vatCost / areaClient : 0,
+          total_cost: vatCost,
+          is_yellow: true,
+          tooltip: `Формула: (Сумма строк 1-14) × ${vatCoeff}%\n` +
+                   `Сумма без НДС: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `Расчёт: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${vatCoeff}% = ${vatCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
+        },
+        {
+          key: '16',
+          row_number: 16,
           indicator_name: 'ИТОГО',
           coefficient: '',
           sp_cost: areaSp > 0 ? grandTotal / areaSp : 0,

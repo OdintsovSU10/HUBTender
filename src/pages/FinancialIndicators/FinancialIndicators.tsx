@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Typography, Spin, Card, Tabs, Select, Button, Row, Col, Tag } from 'antd';
-import { BarChartOutlined, TableOutlined } from '@ant-design/icons';
+import { Typography, Spin, Card, Tabs, Select, Button, Row, Col, Tag, Input, message } from 'antd';
+import { BarChartOutlined, TableOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getVersionColorByTitle } from '../../utils/versionColor';
+import { supabase } from '../../lib/supabase';
 import dayjs from 'dayjs';
 import {
   Chart as ChartJS,
@@ -49,6 +50,9 @@ const FinancialIndicators: React.FC = () => {
   const [selectedTenderTitle, setSelectedTenderTitle] = useState<string>('');
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'table' | 'charts'>('charts');
+  const [editingVolumeTitle, setEditingVolumeTitle] = useState(false);
+  const [volumeTitle, setVolumeTitle] = useState('Полный объём строительства');
+  const [tempVolumeTitle, setTempVolumeTitle] = useState('Полный объём строительства');
 
   useEffect(() => {
     loadTenders();
@@ -57,8 +61,51 @@ const FinancialIndicators: React.FC = () => {
   useEffect(() => {
     if (selectedTenderId) {
       fetchFinancialIndicators(selectedTenderId);
+      loadVolumeTitle(selectedTenderId);
     }
   }, [selectedTenderId, fetchFinancialIndicators]);
+
+  const loadVolumeTitle = async (tenderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tenders')
+        .select('volume_title')
+        .eq('id', tenderId)
+        .single();
+
+      if (error) throw error;
+
+      const title = data?.volume_title || 'Полный объём строительства';
+      setVolumeTitle(title);
+      setTempVolumeTitle(title);
+    } catch (error) {
+      console.error('Ошибка загрузки заголовка:', error);
+    }
+  };
+
+  const handleUpdateVolumeTitle = async () => {
+    if (!selectedTenderId) return;
+
+    try {
+      const { error } = await supabase
+        .from('tenders')
+        .update({ volume_title: tempVolumeTitle })
+        .eq('id', selectedTenderId);
+
+      if (error) throw error;
+
+      setVolumeTitle(tempVolumeTitle);
+      setEditingVolumeTitle(false);
+      message.success('Заголовок обновлен');
+    } catch (error: any) {
+      message.error('Ошибка обновления заголовка: ' + error.message);
+    }
+  };
+
+  const handleCancelVolumeTitle = () => {
+    setTempVolumeTitle(volumeTitle);
+    setEditingVolumeTitle(false);
+  };
 
   const formatNumber = (value: number | undefined) => {
     if (value === undefined) return '';
@@ -237,9 +284,34 @@ const FinancialIndicators: React.FC = () => {
 
       <Card bordered={false}>
         <div style={{ marginBottom: 24 }}>
-          <Title level={3} style={{ margin: 0, textAlign: 'center', color: '#ff4d4f' }}>
-            Полный объём строительства
-          </Title>
+          {editingVolumeTitle ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+              <Input
+                value={tempVolumeTitle}
+                onChange={(e) => setTempVolumeTitle(e.target.value)}
+                style={{ maxWidth: 400, fontSize: 24, fontWeight: 600, color: '#ff4d4f', textAlign: 'center' }}
+                size="large"
+              />
+              <CheckOutlined
+                style={{ fontSize: 20, color: '#52c41a', cursor: 'pointer' }}
+                onClick={handleUpdateVolumeTitle}
+              />
+              <CloseOutlined
+                style={{ fontSize: 20, color: '#ff4d4f', cursor: 'pointer' }}
+                onClick={handleCancelVolumeTitle}
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Title level={3} style={{ margin: 0, textAlign: 'center', color: '#ff4d4f' }}>
+                {volumeTitle}
+              </Title>
+              <EditOutlined
+                style={{ fontSize: 16, cursor: 'pointer', color: '#1890ff' }}
+                onClick={() => setEditingVolumeTitle(true)}
+              />
+            </div>
+          )}
           {selectedTenderTitle && (
             <Title level={4} style={{ margin: '8px 0 0 0', textAlign: 'center', color: '#ff4d4f' }}>
               {selectedTenderTitle}
@@ -289,6 +361,10 @@ const FinancialIndicators: React.FC = () => {
                     customerTotal={customerTotal}
                     formatNumber={formatNumber}
                     currentTheme={currentTheme}
+                    tenderTitle={selectedTenderTitle}
+                    tenderVersion={selectedVersion || 1}
+                    tenderId={selectedTenderId}
+                    onAreaUpdated={() => fetchFinancialIndicators(selectedTenderId)}
                   />
                 ),
               },
