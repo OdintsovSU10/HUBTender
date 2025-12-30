@@ -2,7 +2,7 @@
  * Умное округление цен за единицу до 5 рублей с компенсацией ошибки
  */
 
-import type { ResultRow } from '../components/Results/ResultsTableColumns';
+import type { PositionWithCommercialCost } from '../types';
 
 /**
  * Округляет число до ближайшего кратного 5
@@ -59,21 +59,33 @@ function compensateError(
   return adjustments;
 }
 
+export interface RoundedPosition extends PositionWithCommercialCost {
+  rounded_material_unit_price?: number;
+  rounded_work_unit_price?: number;
+  rounded_material_cost_total?: number;
+  rounded_work_cost_total?: number;
+}
+
 /**
- * Применяет умное округление к результатам перераспределения
+ * Применяет умное округление к позициям с коммерческими стоимостями
  */
-export function smartRoundResults(results: ResultRow[]): ResultRow[] {
+export function smartRoundPositions(positions: PositionWithCommercialCost[]): RoundedPosition[] {
   const materialItems: RoundingItem[] = [];
   const workItems: RoundingItem[] = [];
 
   // Собираем данные для округления
-  results.forEach((row, index) => {
+  positions.forEach((pos, index) => {
+    const quantity = pos.manual_volume || 0;
+
+    if (quantity <= 0) return;
+
     // Материалы
-    if (row.total_materials > 0 && row.quantity > 0) {
-      const originalPrice = row.material_unit_price;
+    const materialTotal = pos.material_cost_total || 0;
+    if (materialTotal > 0) {
+      const originalPrice = materialTotal / quantity;
       const roundedPrice = roundTo5(originalPrice);
       const fractionalPart = originalPrice - Math.floor(originalPrice);
-      const error = (roundedPrice - originalPrice) * row.quantity;
+      const error = (roundedPrice - originalPrice) * quantity;
 
       materialItems.push({
         index,
@@ -81,16 +93,17 @@ export function smartRoundResults(results: ResultRow[]): ResultRow[] {
         roundedPrice,
         error,
         fractionalPart,
-        quantity: row.quantity,
+        quantity,
       });
     }
 
     // Работы
-    if (row.total_works_after > 0 && row.quantity > 0) {
-      const originalPrice = row.work_unit_price_after;
+    const workTotal = pos.work_cost_total || 0;
+    if (workTotal > 0) {
+      const originalPrice = workTotal / quantity;
       const roundedPrice = roundTo5(originalPrice);
       const fractionalPart = originalPrice - Math.floor(originalPrice);
-      const error = (roundedPrice - originalPrice) * row.quantity;
+      const error = (roundedPrice - originalPrice) * quantity;
 
       workItems.push({
         index,
@@ -98,7 +111,7 @@ export function smartRoundResults(results: ResultRow[]): ResultRow[] {
         roundedPrice,
         error,
         fractionalPart,
-        quantity: row.quantity,
+        quantity,
       });
     }
   });
@@ -116,32 +129,36 @@ export function smartRoundResults(results: ResultRow[]): ResultRow[] {
   const workAdjustments = compensateError(workItems, totalWorkError);
 
   // Применяем округление и компенсацию
-  const roundedResults = results.map((row, index) => {
-    const result = { ...row };
+  const roundedPositions = positions.map((pos, index) => {
+    const result: RoundedPosition = { ...pos };
+    const quantity = pos.manual_volume || 0;
+
+    if (quantity <= 0) return result;
 
     // Округляем материалы
-    if (row.total_materials > 0 && row.quantity > 0) {
-      const roundedPrice = materialAdjustments.get(index) ?? roundTo5(row.material_unit_price);
+    const materialTotal = pos.material_cost_total || 0;
+    if (materialTotal > 0) {
+      const roundedPrice = materialAdjustments.get(index) ?? roundTo5(materialTotal / quantity);
       result.rounded_material_unit_price = roundedPrice;
-      result.rounded_total_materials = roundedPrice * row.quantity;
+      result.rounded_material_cost_total = roundedPrice * quantity;
     } else {
       result.rounded_material_unit_price = 0;
-      result.rounded_total_materials = 0;
+      result.rounded_material_cost_total = 0;
     }
 
     // Округляем работы
-    if (row.total_works_after > 0 && row.quantity > 0) {
-      const roundedPrice = workAdjustments.get(index) ?? roundTo5(row.work_unit_price_after);
-      result.rounded_work_unit_price_after = roundedPrice;
-      result.rounded_total_works = roundedPrice * row.quantity;
+    const workTotal = pos.work_cost_total || 0;
+    if (workTotal > 0) {
+      const roundedPrice = workAdjustments.get(index) ?? roundTo5(workTotal / quantity);
+      result.rounded_work_unit_price = roundedPrice;
+      result.rounded_work_cost_total = roundedPrice * quantity;
     } else {
-      result.rounded_work_unit_price_after = 0;
-      result.rounded_total_works = 0;
+      result.rounded_work_unit_price = 0;
+      result.rounded_work_cost_total = 0;
     }
 
     return result;
   });
 
-  return roundedResults;
+  return roundedPositions;
 }
-

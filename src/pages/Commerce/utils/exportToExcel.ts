@@ -6,6 +6,7 @@ import { message } from 'antd';
 import * as XLSX from 'xlsx-js-style';
 import type { Tender } from '../../../lib/supabase';
 import type { PositionWithCommercialCost } from '../types';
+import { smartRoundPositions, type RoundedPosition } from './smartRounding';
 
 export function exportCommerceToExcel(
   positions: PositionWithCommercialCost[],
@@ -16,14 +17,17 @@ export function exportCommerceToExcel(
     return;
   }
 
+  // Применяем умное округление к позициям
+  const roundedPositions = smartRoundPositions(positions);
+
   // Функция определения конечности позиции по hierarchy_level
   const isLeafPosition = (index: number): boolean => {
-    if (index === positions.length - 1) {
+    if (index === roundedPositions.length - 1) {
       return true;
     }
 
-    const currentLevel = positions[index].hierarchy_level || 0;
-    const nextLevel = positions[index + 1]?.hierarchy_level || 0;
+    const currentLevel = roundedPositions[index].hierarchy_level || 0;
+    const nextLevel = roundedPositions[index + 1]?.hierarchy_level || 0;
 
     return currentLevel >= nextLevel;
   };
@@ -32,7 +36,8 @@ export function exportCommerceToExcel(
   const headers = [
     'Номер позиции',
     'Название',
-    'Примечание клиента',
+    'Примечание Заказчика',
+    'Примечание ГП',
     'Единица',
     'Количество (ГП)',
     'Кол-во Заказчика',
@@ -47,7 +52,7 @@ export function exportCommerceToExcel(
   ];
 
   // Подготавливаем данные для экспорта с метаданными
-  const rowsWithMeta = positions.map((pos, index) => {
+  const rowsWithMeta = roundedPositions.map((pos, index) => {
     const isLeaf = isLeafPosition(index);
     const totalCost = pos.commercial_total || 0;
     const isZeroCost = isLeaf && totalCost === 0;
@@ -55,22 +60,33 @@ export function exportCommerceToExcel(
     const clientVolume = pos.volume || 0;
     const volumesMatch = gpVolume === clientVolume && gpVolume > 0;
 
+    // Используем округленные значения если есть, иначе оригинальные
+    const materialCostTotal = pos.rounded_material_cost_total ?? pos.material_cost_total ?? 0;
+    const workCostTotal = pos.rounded_work_cost_total ?? pos.work_cost_total ?? 0;
+    const materialUnitPrice = pos.rounded_material_unit_price ?? (gpVolume > 0 ? (pos.material_cost_total || 0) / gpVolume : 0);
+    const workUnitPrice = pos.rounded_work_unit_price ?? (gpVolume > 0 ? (pos.work_cost_total || 0) / gpVolume : 0);
+
+    // Пересчитываем общую коммерческую стоимость на основе округленных значений
+    const commercialTotal = materialCostTotal + workCostTotal;
+    const commercialUnitPrice = gpVolume > 0 ? commercialTotal / gpVolume : 0;
+
     return {
       data: [
         pos.position_number,
         pos.work_name,
         pos.client_note || '',
+        pos.manual_note || '',
         pos.unit_code || '',
         gpVolume,
         clientVolume,
         pos.base_total || 0,
-        pos.material_cost_total || 0,
-        pos.work_cost_total || 0,
-        pos.commercial_total || 0,
+        materialCostTotal,
+        workCostTotal,
+        commercialTotal,
         gpVolume > 0 ? (pos.base_total || 0) / gpVolume : 0,
-        gpVolume > 0 ? (pos.commercial_total || 0) / gpVolume : 0,
-        gpVolume > 0 ? (pos.material_cost_total || 0) / gpVolume : 0,
-        gpVolume > 0 ? (pos.work_cost_total || 0) / gpVolume : 0,
+        commercialUnitPrice,
+        materialUnitPrice,
+        workUnitPrice,
       ],
       isZeroCost,
       volumesMatch,
@@ -79,11 +95,11 @@ export function exportCommerceToExcel(
 
   const rows = rowsWithMeta.map(r => r.data);
 
-  // Рассчитываем итоги
-  const totalBase = positions.reduce((sum, pos) => sum + (pos.base_total || 0), 0);
-  const totalMaterials = positions.reduce((sum, pos) => sum + (pos.material_cost_total || 0), 0);
-  const totalWorks = positions.reduce((sum, pos) => sum + (pos.work_cost_total || 0), 0);
-  const totalCommercial = positions.reduce((sum, pos) => sum + (pos.commercial_total || 0), 0);
+  // Рассчитываем итоги (используем округленные значения)
+  const totalBase = roundedPositions.reduce((sum, pos) => sum + (pos.base_total || 0), 0);
+  const totalMaterials = roundedPositions.reduce((sum, pos) => sum + (pos.rounded_material_cost_total ?? pos.material_cost_total ?? 0), 0);
+  const totalWorks = roundedPositions.reduce((sum, pos) => sum + (pos.rounded_work_cost_total ?? pos.work_cost_total ?? 0), 0);
+  const totalCommercial = totalMaterials + totalWorks; // Сумма округленных материалов и работ
   const avgMarkup = totalBase > 0 ? ((totalCommercial - totalBase) / totalBase) * 100 : 0;
 
   // Итоговая строка
@@ -92,8 +108,9 @@ export function exportCommerceToExcel(
     'ИТОГО',
     '',
     '',
-    positions.reduce((sum, pos) => sum + (pos.manual_volume || 0), 0),
-    positions.reduce((sum, pos) => sum + (pos.items_count || 0), 0),
+    '',
+    roundedPositions.reduce((sum, pos) => sum + (pos.manual_volume || 0), 0),
+    roundedPositions.reduce((sum, pos) => sum + (pos.items_count || 0), 0),
     totalBase,
     totalMaterials,
     totalWorks,
@@ -153,7 +170,7 @@ export function exportCommerceToExcel(
   };
 
   // Индексы числовых колонок
-  const numericColIndices = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+  const numericColIndices = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
   const nameColIndex = 1; // Колонка "Название"
 
   // Применяем стили к заголовку (строка 0)
@@ -189,8 +206,8 @@ export function exportCommerceToExcel(
         baseStyle.fill = { fgColor: { rgb: 'FFCCCC' } };
       }
 
-      // Красный текст для колонки "Количество (ГП)" (индекс 4) если объёмы совпадают
-      if (col === 4 && rowMeta.volumesMatch) {
+      // Красный текст для колонки "Количество (ГП)" (индекс 5) если объёмы совпадают
+      if (col === 5 && rowMeta.volumesMatch) {
         baseStyle.font = { color: { rgb: 'FF4D4F' }, bold: true };
       }
 
@@ -244,10 +261,11 @@ export function exportCommerceToExcel(
   ws['!cols'] = [
     { wch: 15 }, // Номер позиции
     { wch: 40 }, // Название
-    { wch: 30 }, // Примечание клиента
+    { wch: 30 }, // Примечание Заказчика
+    { wch: 30 }, // Примечание ГП
     { wch: 10 }, // Единица
     { wch: 15 }, // Количество (ГП)
-    { wch: 15 }, // Кол-во элементов
+    { wch: 15 }, // Кол-во Заказчика
     { wch: 18 }, // Базовая стоимость
     { wch: 20 }, // Итого материалов
     { wch: 20 }, // Итого работ
