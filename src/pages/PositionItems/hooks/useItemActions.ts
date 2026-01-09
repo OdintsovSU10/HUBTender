@@ -126,7 +126,8 @@ export const useItemActions = ({
       // base_quantity должно быть > 0 из-за CHECK constraint
       const baseQuantity = gpVolume > 0 ? gpVolume : 1;
       const consumptionCoeff = matLib.consumption_coefficient || 1;
-      const quantity = baseQuantity * consumptionCoeff;
+      // Quantity теперь представляет базовое количество (без коэффициента расхода)
+      const quantity = baseQuantity;
       const unitRate = matLib.unit_rate || 0;
       const rate = getCurrencyRate(matLib.currency_type as CurrencyType);
 
@@ -137,7 +138,8 @@ export const useItemActions = ({
         deliveryPrice = matLib.delivery_amount;
       }
 
-      const totalAmount = quantity * (unitRate * rate + deliveryPrice);
+      // Для непривязанных материалов применяем коэффициент расхода к итоговой сумме
+      const totalAmount = quantity * consumptionCoeff * (unitRate * rate + deliveryPrice);
 
       const newItem: BoqItemInsert = {
         tender_id: position.tender_id,

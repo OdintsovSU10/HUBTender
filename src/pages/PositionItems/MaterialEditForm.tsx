@@ -86,10 +86,10 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
   const [costSearchText, setCostSearchText] = useState<string>(record.detail_cost_category_full || '');
 
   // Флаг для отслеживания ручного ввода количества (только для непривязанных материалов)
-  // Инициализируем как true если материал не привязан И quantity != gpVolume * consumption_coefficient
+  // Инициализируем как true если материал не привязан И quantity != gpVolume
   const [isManualQuantity, setIsManualQuantity] = useState<boolean>(() => {
     if (record.parent_work_item_id) return false;
-    const autoQuantity = gpVolume * (record.consumption_coefficient || 1);
+    const autoQuantity = gpVolume;
     const actualQuantity = record.quantity || 0;
     // Если разница больше 0.0001 - считаем что это ручное количество
     return Math.abs(actualQuantity - autoQuantity) > 0.0001;
@@ -120,8 +120,9 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
       }
       return 0;
     } else {
-      // Материал не привязан к работе - используем количество ГП
-      return gpVolume * formData.consumption_coefficient;
+      // Материал не привязан к работе - используем количество ГП как базовое
+      // Коэффициент расхода применяется только к итоговой сумме, а не к количеству
+      return gpVolume;
     }
   };
 
@@ -147,7 +148,10 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     const qty = formData.quantity || 0;
     const rate = getCurrencyRate(formData.currency_type);
     const deliveryPrice = calculateDeliveryPrice();
-    const total = qty * (formData.unit_rate * rate + deliveryPrice);
+
+    // Для непривязанных материалов всегда применять коэффициент расхода к итоговой сумме
+    const consumptionCoeff = !formData.parent_work_item_id ? (formData.consumption_coefficient || 1) : 1;
+    const total = qty * consumptionCoeff * (formData.unit_rate * rate + deliveryPrice);
     return Math.round(total * 100) / 100;
   };
 
@@ -218,7 +222,8 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
         }
         // Использовать количество ГП как базовое количество
         dataToSave.base_quantity = gpVolume;
-        dataToSave.quantity = gpVolume * formData.consumption_coefficient;
+        // Quantity представляет базовое количество (без коэффициента расхода)
+        dataToSave.quantity = gpVolume;
       }
     } else {
       // Если материал привязан к работе, очистить base_quantity
@@ -230,7 +235,10 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     // Вычислить total_amount на основе финального quantity в dataToSave
     const rate = getCurrencyRate(formData.currency_type);
     const deliveryPrice = calculateDeliveryPrice();
-    const totalAmount = Math.round(dataToSave.quantity * (formData.unit_rate * rate + deliveryPrice) * 100) / 100;
+
+    // Для непривязанных материалов всегда применять коэффициент расхода к итоговой сумме
+    const consumptionCoeff = !dataToSave.parent_work_item_id ? (formData.consumption_coefficient || 1) : 1;
+    const totalAmount = Math.round(dataToSave.quantity * consumptionCoeff * (formData.unit_rate * rate + deliveryPrice) * 100) / 100;
     dataToSave.total_amount = totalAmount;
 
     await onSave(dataToSave);

@@ -288,7 +288,7 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
           } else if (record.base_quantity) {
             const baseQty = record.base_quantity;
             const consCoef = record.consumption_coefficient || 1;
-            tooltipTitle = `Кол-во = ${baseQty.toFixed(5)} (базовое кол-во) × ${consCoef.toFixed(4)} (К расх) = ${displayValue}`;
+            tooltipTitle = `Кол-во = ${baseQty.toFixed(5)} (базовое кол-во)\nК расх ${consCoef.toFixed(4)} применяется к итоговой сумме`;
           }
 
           return (
@@ -382,7 +382,13 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
               deliveryPrice = record.delivery_amount || 0;
             }
 
-            tooltipTitle = `${total.toFixed(2)} = ${qty.toFixed(5)} × (${price.toFixed(2)} * ${rate.toFixed(2)} + ${deliveryPrice.toFixed(2)})`;
+            // Для непривязанных материалов применяем коэффициент расхода к итоговой сумме
+            const consCoef = !record.parent_work_item_id ? (record.consumption_coefficient || 1) : 1;
+            if (consCoef !== 1) {
+              tooltipTitle = `${total.toFixed(2)} = ${qty.toFixed(5)} × ${consCoef.toFixed(4)} (К расх) × (${price.toFixed(2)} * ${rate.toFixed(2)} + ${deliveryPrice.toFixed(2)})`;
+            } else {
+              tooltipTitle = `${total.toFixed(2)} = ${qty.toFixed(5)} × (${price.toFixed(2)} * ${rate.toFixed(2)} + ${deliveryPrice.toFixed(2)})`;
+            }
           } else {
             tooltipTitle = `${total.toFixed(2)} = ${qty.toFixed(5)} × (${price.toFixed(2)} * ${rate.toFixed(2)} + 0)`;
           }
