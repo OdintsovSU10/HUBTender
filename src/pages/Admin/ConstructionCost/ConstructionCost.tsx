@@ -217,7 +217,7 @@ const ConstructionCost: React.FC = () => {
       key: 'actualCost',
       width: 150,
       align: 'right',
-      render: (cost?: number, record) => {
+      render: (cost: number | undefined, record: any) => {
         const diff = (record.actualCost || 0) - (record.estimatedCost || 0);
         const color = diff > 0 ? '#ff4d4f' : diff < 0 ? '#52c41a' : undefined;
         return (

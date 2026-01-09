@@ -333,6 +333,66 @@ function filterSequenceForExclusions(
 }
 
 /**
+ * Фильтрует последовательность, исключая шаги с НДС
+ */
+function filterVATFromSequence(
+  sequence: MarkupStep[],
+  markupParameters: Map<string, number>
+): { filtered: MarkupStep[]; vatCoefficient: number } {
+  // Ищем параметр НДС по ключу nds_22
+  const vatKey = 'nds_22';
+  const vatCoefficient = markupParameters.get(vatKey) || 0;
+
+  // Если НДС не найден, возвращаем исходную последовательность
+  if (!vatCoefficient) {
+    console.log('⚠️ НДС не найден в параметрах наценок');
+    return { filtered: sequence, vatCoefficient: 0 };
+  }
+
+  console.log(`✅ Найден НДС: ${vatCoefficient}%`);
+
+  // Находим индексы шагов с НДС
+  const removedIndices: number[] = [];
+  sequence.forEach((step, index) => {
+    const operandKeys = [
+      step.operand1Key,
+      step.operand2Key,
+      step.operand3Key,
+      step.operand4Key,
+      step.operand5Key
+    ].filter(Boolean);
+
+    if (operandKeys.includes(vatKey)) {
+      removedIndices.push(index);
+    }
+  });
+
+  // Фильтруем последовательность
+  const filtered = sequence.filter((_, index) => !removedIndices.includes(index));
+
+  // Пересчитываем baseIndex для оставшихся шагов
+  const result = filtered.map((step, newIndex) => {
+    let newBaseIndex = step.baseIndex;
+
+    if (newBaseIndex >= 0) {
+      if (removedIndices.includes(newBaseIndex)) {
+        newBaseIndex = -1;
+      } else {
+        const removedBefore = removedIndices.filter(i => i < newBaseIndex).length;
+        newBaseIndex = newBaseIndex - removedBefore;
+      }
+    }
+
+    return {
+      ...step,
+      baseIndex: newBaseIndex
+    };
+  });
+
+  return { filtered: result, vatCoefficient };
+}
+
+/**
  * Выполняет расчет коммерческой стоимости для элемента BOQ
  */
 export function calculateBoqItemCost(
@@ -360,19 +420,22 @@ export function calculateBoqItemCost(
       console.log(`🚫 Элемент ${item.id} (${item.boq_item_type}) исключен из роста субподряда, применяем фильтрованную последовательность`);
     }
 
-    // Создаем контекст и выполняем расчет
+    // Исключаем НДС из последовательности
+    const { filtered: sequenceWithoutVAT, vatCoefficient } = filterVATFromSequence(sequence, markupParameters);
+
+    // Создаем контекст и выполняем расчет БЕЗ НДС
     const context: CalculationContext = {
       baseAmount: item.total_amount || 0,
       itemType: item.boq_item_type,
-      markupSequence: sequence,
+      markupSequence: sequenceWithoutVAT,
       markupParameters,
       baseCost: tactic.base_costs?.[item.boq_item_type]
     };
 
     const result = calculateMarkupResult(context);
 
-    // Применяем распределение ценообразования
-    const { materialCost, workCost } = applyPricingDistribution(
+    // Применяем распределение ценообразования к коммерческой стоимости БЕЗ НДС
+    let { materialCost, workCost } = applyPricingDistribution(
       item.total_amount || 0,
       result.commercialCost,
       item.boq_item_type,
@@ -380,10 +443,23 @@ export function calculateBoqItemCost(
       pricingDistribution
     );
 
+    // Применяем НДС ОТДЕЛЬНО к материалам и работам
+    if (vatCoefficient > 0) {
+      const vatMultiplier = 1 + (vatCoefficient / 100);
+      materialCost = materialCost * vatMultiplier;
+      workCost = workCost * vatMultiplier;
+    }
+
+    // Рассчитываем итоговый коэффициент наценки с учетом НДС
+    const totalCommercialCost = materialCost + workCost;
+    const markupCoefficient = (item.total_amount || 0) > 0
+      ? totalCommercialCost / (item.total_amount || 1)
+      : 1;
+
     return {
       materialCost,
       workCost,
-      markupCoefficient: result.markupCoefficient
+      markupCoefficient
     };
 
   } catch (error) {

@@ -962,6 +962,7 @@ export interface ProjectInsert {
   name: string;
   client_name: string;
   contract_cost: number;
+  contract_date?: string | null;
   area?: number | null;
   construction_end_date?: string | null;
   tender_id?: string | null;
@@ -992,6 +993,7 @@ export interface ProjectCompletion {
   month: number;
   actual_amount: number;
   forecast_amount?: number | null;
+  note?: string | null;
   created_at: string;
 }
 

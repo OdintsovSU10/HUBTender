@@ -53,7 +53,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return null;
       }
 
-      const rolesData = data.roles as { name: string; color: string } | null;
+      const rolesData = (Array.isArray(data.roles) && data.roles.length > 0
+        ? data.roles[0]
+        : data.roles) as { name: string; color: string } | null;
 
       return {
         id: data.id,

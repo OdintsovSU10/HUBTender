@@ -106,7 +106,6 @@ export const MaterialsAddForm: React.FC<MaterialsAddFormProps> = ({
                   option!.value.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1
                 }
                 placeholder="Начните вводить..."
-                autoComplete="off"
               />
             </Form.Item>
           </Col>

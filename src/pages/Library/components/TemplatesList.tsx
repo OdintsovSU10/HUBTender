@@ -149,7 +149,7 @@ export const TemplatesList: React.FC<TemplatesListProps> = ({
                       showSearch
                       allowClear
                       style={{ width: '100%' }}
-                      classNames={currentTheme === 'dark' ? { popup: 'autocomplete-dark' } : undefined}
+                      popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : undefined}
                     />
                     <Form.Item
                       name="detail_cost_category_id"
@@ -271,7 +271,7 @@ export const TemplatesList: React.FC<TemplatesListProps> = ({
                           }}
                           placeholder="Введите работу (2+ символа)..."
                           filterOption={false}
-                          classNames={currentTheme === 'dark' ? { popup: 'autocomplete-dark' } : undefined}
+                          popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : undefined}
                         />
                         <Button
                           type="primary"
@@ -300,7 +300,7 @@ export const TemplatesList: React.FC<TemplatesListProps> = ({
                           }}
                           placeholder="Введите материал (2+ символа)..."
                           filterOption={false}
-                          classNames={currentTheme === 'dark' ? { popup: 'autocomplete-dark' } : undefined}
+                          popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : undefined}
                         />
                         <Button
                           type="primary"

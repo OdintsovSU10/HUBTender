@@ -1,5 +1,5 @@
 -- Database Schema SQL Export
--- Generated: 2025-12-25T11:23:49.377857
+-- Generated: 2025-12-30T13:46:01.534275
 -- Database: postgres
 -- Host: aws-1-eu-west-1.pooler.supabase.com
 
@@ -510,7 +510,8 @@ COMMENT ON COLUMN public.client_positions.created_at IS 'Дата и время 
 COMMENT ON COLUMN public.client_positions.updated_at IS 'Дата и время последнего обновления записи';
 
 -- Table: public.construction_cost_volumes
--- Description: Объемы затрат по тендерам (детальные категории и 
+-- Description: Объемы затрат по тендерам (детальные категории и 
+
   группы)
 CREATE TABLE IF NOT EXISTS public.construction_cost_volumes (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -524,15 +525,19 @@ CREATE TABLE IF NOT EXISTS public.construction_cost_volumes (
     CONSTRAINT construction_cost_volumes_pkey PRIMARY KEY (id),
     CONSTRAINT construction_cost_volumes_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None)
 );
-COMMENT ON TABLE public.construction_cost_volumes IS 'Объемы затрат по тендерам (детальные категории и 
+COMMENT ON TABLE public.construction_cost_volumes IS 'Объемы затрат по тендерам (детальные категории и 
+
   группы)';
-COMMENT ON COLUMN public.construction_cost_volumes.detail_cost_category_id IS 'ID детальной категории 
+COMMENT ON COLUMN public.construction_cost_volumes.detail_cost_category_id IS 'ID детальной категории 
+
   затрат (для деталей)';
-COMMENT ON COLUMN public.construction_cost_volumes.group_key IS 'Ключ группы в формате 
+COMMENT ON COLUMN public.construction_cost_volumes.group_key IS 'Ключ группы в формате 
+
   category-{название} или location-{категория}-{локализация} (для групп)';
 
 -- Table: public.cost_categories
--- Description: Справочник      
+-- Description: Справочник      
+
   категорий затрат
 CREATE TABLE IF NOT EXISTS public.cost_categories (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -543,7 +548,8 @@ CREATE TABLE IF NOT EXISTS public.cost_categories (
     CONSTRAINT cost_categories_pkey PRIMARY KEY (id),
     CONSTRAINT cost_categories_unit_fkey FOREIGN KEY (unit) REFERENCES None.None(None)
 );
-COMMENT ON TABLE public.cost_categories IS 'Справочник      
+COMMENT ON TABLE public.cost_categories IS 'Справочник      
+
   категорий затрат';
 COMMENT ON COLUMN public.cost_categories.id IS 'Уникальный идентификатор категории (UUID)';
 COMMENT ON COLUMN public.cost_categories.name IS 'Наименование категории затрат';
@@ -552,7 +558,8 @@ COMMENT ON COLUMN public.cost_categories.created_at IS 'Дата и время �
 COMMENT ON COLUMN public.cost_categories.updated_at IS 'Дата и время последнего обновления';
 
 -- Table: public.cost_redistribution_results
--- Description: Результаты перераспределения стоимости работ между затратами на строительство.
+-- Description: Результаты перераспределения стоимости работ между затратами на строительство.
+
     Хранит финансовые данные после перераспределения и правила для воспроизводимости расчета.
 CREATE TABLE IF NOT EXISTS public.cost_redistribution_results (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -576,7 +583,8 @@ CREATE TABLE IF NOT EXISTS public.cost_redistribution_results (
     CONSTRAINT uq_cost_redistribution_results_tender_tactic_boq UNIQUE (markup_tactic_id),
     CONSTRAINT uq_cost_redistribution_results_tender_tactic_boq UNIQUE (tender_id)
 );
-COMMENT ON TABLE public.cost_redistribution_results IS 'Результаты перераспределения стоимости работ между затратами на строительство.
+COMMENT ON TABLE public.cost_redistribution_results IS 'Результаты перераспределения стоимости работ между затратами на строительство.
+
     Хранит финансовые данные после перераспределения и правила для воспроизводимости расчета.';
 COMMENT ON COLUMN public.cost_redistribution_results.id IS 'Уникальный идентификатор записи результата';
 COMMENT ON COLUMN public.cost_redistribution_results.tender_id IS 'Ссылка на тендер';
@@ -586,14 +594,22 @@ COMMENT ON COLUMN public.cost_redistribution_results.original_work_cost IS 'Ис
 COMMENT ON COLUMN public.cost_redistribution_results.deducted_amount IS 'Сумма, вычтенная из стоимости работы';
 COMMENT ON COLUMN public.cost_redistribution_results.added_amount IS 'Сумма, добавленная к стоимости работы';
 COMMENT ON COLUMN public.cost_redistribution_results.final_work_cost IS 'Финальная стоимость работы после перераспределения';
-COMMENT ON COLUMN public.cost_redistribution_results.redistribution_rules IS 'JSONB с правилами вычитания и целевыми затратами для воспроизводимости расчета.
-    Формат: {
-        "deductions": [
-            {"detail_cost_category_id": "uuid", "category_name": "...", "percentage": 10}
-        ],
-        "targets": [
-            {"detail_cost_category_id": "uuid", "category_name": "...", "weight": 1.0}
-        ]
+COMMENT ON COLUMN public.cost_redistribution_results.redistribution_rules IS 'JSONB с правилами вычитания и целевыми затратами для воспроизводимости расчета.
+
+    Формат: {
+
+        "deductions": [
+
+            {"detail_cost_category_id": "uuid", "category_name": "...", "percentage": 10}
+
+        ],
+
+        "targets": [
+
+            {"detail_cost_category_id": "uuid", "category_name": "...", "weight": 1.0}
+
+        ]
+
     }';
 COMMENT ON COLUMN public.cost_redistribution_results.created_at IS 'Дата и время создания записи';
 COMMENT ON COLUMN public.cost_redistribution_results.updated_at IS 'Дата и время последнего обновления записи';
@@ -620,11 +636,14 @@ COMMENT ON COLUMN public.detail_cost_categories.cost_category_id IS 'Ссылк�
 COMMENT ON COLUMN public.detail_cost_categories.location IS 'Локация/местоположение';
 COMMENT ON COLUMN public.detail_cost_categories.name IS 'Наименование детальной категории';
 COMMENT ON COLUMN public.detail_cost_categories.unit IS 'Единица измерения';
-COMMENT ON COLUMN public.detail_cost_categories.order_num IS 'Порядковый      
+COMMENT ON COLUMN public.detail_cost_categories.order_num IS 'Порядковый      
+
   номер для сортировки';
-COMMENT ON COLUMN public.detail_cost_categories.created_at IS 'Дата и
+COMMENT ON COLUMN public.detail_cost_categories.created_at IS 'Дата и
+
   время создания записи';
-COMMENT ON COLUMN public.detail_cost_categories.updated_at IS 'Дата и
+COMMENT ON COLUMN public.detail_cost_categories.updated_at IS 'Дата и
+
   время последнего обновления';
 
 -- Table: public.markup_parameters
@@ -759,7 +778,8 @@ COMMENT ON COLUMN public.roles.code IS 'Role code identifier (e.g., administrato
 COMMENT ON COLUMN public.roles.name IS 'Human-readable role name in Russian';
 COMMENT ON COLUMN public.roles.allowed_pages IS 'Array of allowed page paths for this role. Empty array means full access.';
 COMMENT ON COLUMN public.roles.is_system_role IS 'System roles cannot be deleted';
-COMMENT ON COLUMN public.roles.color IS 'Ant Design tag color for the role
+COMMENT ON COLUMN public.roles.color IS 'Ant Design tag color for the role
+
   (e.g., blue, green, purple, etc.)';
 
 -- Table: public.subcontract_growth_exclusions
@@ -862,7 +882,8 @@ COMMENT ON COLUMN public.tender_markup_percentage.created_at IS 'Дата соз
 COMMENT ON COLUMN public.tender_markup_percentage.updated_at IS 'Дата последнего обновления';
 
 -- Table: public.tender_pricing_distribution
--- Description: Правила распределения затрат и наценок между КП (материалы) и работами для каждого        
+-- Description: Правила распределения затрат и наценок между КП (материалы) и работами для каждого        
+
   тендера
 CREATE TABLE IF NOT EXISTS public.tender_pricing_distribution (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -890,12 +911,15 @@ CREATE TABLE IF NOT EXISTS public.tender_pricing_distribution (
     CONSTRAINT tender_pricing_distribution_tender_id_markup_tactic_id_key UNIQUE (markup_tactic_id),
     CONSTRAINT tender_pricing_distribution_tender_id_markup_tactic_id_key UNIQUE (tender_id)
 );
-COMMENT ON TABLE public.tender_pricing_distribution IS 'Правила распределения затрат и наценок между КП (материалы) и работами для каждого        
+COMMENT ON TABLE public.tender_pricing_distribution IS 'Правила распределения затрат и наценок между КП (материалы) и работами для каждого        
+
   тендера';
-COMMENT ON COLUMN public.tender_pricing_distribution.basic_material_base_target IS 'Куда направляется базовая стоимость основных материалов: material = КП, work =
+COMMENT ON COLUMN public.tender_pricing_distribution.basic_material_base_target IS 'Куда направляется базовая стоимость основных материалов: material = КП, work =
+
   работы';
 COMMENT ON COLUMN public.tender_pricing_distribution.basic_material_markup_target IS 'Куда направляется наценка на основные материалы: material = КП, work = работы';
-COMMENT ON COLUMN public.tender_pricing_distribution.auxiliary_material_base_target IS 'Куда направляется базовая стоимость вспомогательных материалов: material = КП, work =     
+COMMENT ON COLUMN public.tender_pricing_distribution.auxiliary_material_base_target IS 'Куда направляется базовая стоимость вспомогательных материалов: material = КП, work =     
+
   работы';
 COMMENT ON COLUMN public.tender_pricing_distribution.auxiliary_material_markup_target IS 'Куда направляется наценка на вспомогательные материалы: material = КП, work = работы';
 COMMENT ON COLUMN public.tender_pricing_distribution.work_base_target IS 'Куда направляется базовая стоимость работ: material = КП, work = работы';
@@ -934,6 +958,7 @@ CREATE TABLE IF NOT EXISTS public.tenders (
     construction_scope USER-DEFINED,
     project_folder_link text,
     is_archived boolean NOT NULL DEFAULT false,
+    volume_title text DEFAULT 'Полный объём строительства'::text,
     CONSTRAINT tenders_created_by_fkey FOREIGN KEY (created_by) REFERENCES None.None(None),
     CONSTRAINT tenders_markup_tactic_id_fkey FOREIGN KEY (markup_tactic_id) REFERENCES None.None(None),
     CONSTRAINT tenders_pkey PRIMARY KEY (id),
@@ -967,6 +992,7 @@ COMMENT ON COLUMN public.tenders.housing_class IS 'Класс жилья (ком
 COMMENT ON COLUMN public.tenders.construction_scope IS 'Объем строительства (генподряд, коробка, монолит)';
 COMMENT ON COLUMN public.tenders.project_folder_link IS 'Ссылка на папку с проектом';
 COMMENT ON COLUMN public.tenders.is_archived IS 'Флаг архивации тендера';
+COMMENT ON COLUMN public.tenders.volume_title IS 'Пользовательский заголовок для объема строительства на странице финансовых показателей';
 
 -- Table: public.units
 CREATE TABLE IF NOT EXISTS public.units (
@@ -980,6 +1006,28 @@ CREATE TABLE IF NOT EXISTS public.units (
     updated_at timestamp with time zone DEFAULT now(),
     CONSTRAINT units_pkey PRIMARY KEY (code)
 );
+
+-- Table: public.user_position_filters
+-- Description: Персональные фильтры позиций заказчика для каждого пользователя. Используется для сохранения выбранных позиций при фильтрации на странице /positions.
+CREATE TABLE IF NOT EXISTS public.user_position_filters (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL,
+    tender_id uuid NOT NULL,
+    position_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT unique_user_tender_position UNIQUE (position_id),
+    CONSTRAINT unique_user_tender_position UNIQUE (tender_id),
+    CONSTRAINT unique_user_tender_position UNIQUE (user_id),
+    CONSTRAINT user_position_filters_pkey PRIMARY KEY (id),
+    CONSTRAINT user_position_filters_position_id_fkey FOREIGN KEY (position_id) REFERENCES None.None(None),
+    CONSTRAINT user_position_filters_tender_id_fkey FOREIGN KEY (tender_id) REFERENCES None.None(None),
+    CONSTRAINT user_position_filters_user_id_fkey FOREIGN KEY (user_id) REFERENCES None.None(None)
+);
+COMMENT ON TABLE public.user_position_filters IS 'Персональные фильтры позиций заказчика для каждого пользователя. Используется для сохранения выбранных позиций при фильтрации на странице /positions.';
+COMMENT ON COLUMN public.user_position_filters.user_id IS 'ID пользователя, которому принадлежит фильтр';
+COMMENT ON COLUMN public.user_position_filters.tender_id IS 'ID тендера, к которому относится фильтр';
+COMMENT ON COLUMN public.user_position_filters.position_id IS 'ID позиции заказчика, включенной в фильтр';
+COMMENT ON COLUMN public.user_position_filters.created_at IS 'Дата и время добавления позиции в фильтр';
 
 -- Table: public.user_tasks
 -- Description: Задачи пользователей по тендерам
@@ -997,7 +1045,8 @@ CREATE TABLE IF NOT EXISTS public.user_tasks (
     CONSTRAINT user_tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES None.None(None)
 );
 COMMENT ON TABLE public.user_tasks IS 'Задачи пользователей по тендерам';
-COMMENT ON COLUMN public.user_tasks.task_status IS 'Статус задачи: running (в работе), paused (остановлена),
+COMMENT ON COLUMN public.user_tasks.task_status IS 'Статус задачи: running (в работе), paused (остановлена),
+
   completed (завершена)';
 
 -- Table: public.users
@@ -1080,76 +1129,6 @@ CREATE TABLE IF NOT EXISTS realtime.messages (
     CONSTRAINT messages_pkey PRIMARY KEY (inserted_at)
 );
 
--- Table: realtime.messages_2025_12_22
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_22 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_22_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_22_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_23
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_23 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_23_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_23_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_24
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_24 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_24_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_24_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_25
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_25 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_25_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_25_pkey PRIMARY KEY (inserted_at)
-);
-
--- Table: realtime.messages_2025_12_26
-CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_26 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone NOT NULL DEFAULT now(),
-    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
-    id uuid NOT NULL DEFAULT gen_random_uuid(),
-    CONSTRAINT messages_2025_12_26_pkey PRIMARY KEY (id),
-    CONSTRAINT messages_2025_12_26_pkey PRIMARY KEY (inserted_at)
-);
-
 -- Table: realtime.messages_2025_12_27
 CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_27 (
     topic text NOT NULL,
@@ -1176,6 +1155,76 @@ CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_28 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     CONSTRAINT messages_2025_12_28_pkey PRIMARY KEY (id),
     CONSTRAINT messages_2025_12_28_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_29
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_29 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_29_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_29_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_30
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_30 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_30_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_30_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2025_12_31
+CREATE TABLE IF NOT EXISTS realtime.messages_2025_12_31 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2025_12_31_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2025_12_31_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2026_01_01
+CREATE TABLE IF NOT EXISTS realtime.messages_2026_01_01 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2026_01_01_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2026_01_01_pkey PRIMARY KEY (inserted_at)
+);
+
+-- Table: realtime.messages_2026_01_02
+CREATE TABLE IF NOT EXISTS realtime.messages_2026_01_02 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone NOT NULL DEFAULT now(),
+    inserted_at timestamp without time zone NOT NULL DEFAULT now(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    CONSTRAINT messages_2026_01_02_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_2026_01_02_pkey PRIMARY KEY (inserted_at)
 );
 
 -- Table: realtime.schema_migrations
@@ -2359,32 +2408,58 @@ CREATE OR REPLACE FUNCTION public.add_subcontract_growth_exclusion(p_tender_id u
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-DECLARE
-  v_id uuid;
-BEGIN
-  -- Проверяем валидность типа
-  IF p_exclusion_type NOT IN ('works', 'materials') THEN
-    RAISE EXCEPTION 'Invalid exclusion_type: must be ''works'' or ''materials''';
-  END IF;
-
-  -- Вставляем запись (или возвращаем существующую)
-  INSERT INTO public.subcontract_growth_exclusions (
-    tender_id,
-    detail_cost_category_id,
-    exclusion_type
-  )
-  VALUES (
-    p_tender_id,
-    p_detail_cost_category_id,
-    p_exclusion_type
-  )
-  ON CONFLICT (tender_id, detail_cost_category_id, exclusion_type)
-  DO UPDATE SET updated_at = now()
-  RETURNING id INTO v_id;
-
-  RETURN v_id;
-END;
+AS $function$
+
+DECLARE
+
+  v_id uuid;
+
+BEGIN
+
+  -- Проверяем валидность типа
+
+  IF p_exclusion_type NOT IN ('works', 'materials') THEN
+
+    RAISE EXCEPTION 'Invalid exclusion_type: must be ''works'' or ''materials''';
+
+  END IF;
+
+
+
+  -- Вставляем запись (или возвращаем существующую)
+
+  INSERT INTO public.subcontract_growth_exclusions (
+
+    tender_id,
+
+    detail_cost_category_id,
+
+    exclusion_type
+
+  )
+
+  VALUES (
+
+    p_tender_id,
+
+    p_detail_cost_category_id,
+
+    p_exclusion_type
+
+  )
+
+  ON CONFLICT (tender_id, detail_cost_category_id, exclusion_type)
+
+  DO UPDATE SET updated_at = now()
+
+  RETURNING id INTO v_id;
+
+
+
+  RETURN v_id;
+
+END;
+
 $function$
 
 
@@ -2394,42 +2469,78 @@ CREATE OR REPLACE FUNCTION public.check_user_page_access(user_id uuid, page_url 
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-  DECLARE
-    user_record RECORD;
-    allowed_page TEXT;
-    pattern TEXT;
-  BEGIN
-    SELECT role, access_status, allowed_pages
-    INTO user_record
-    FROM public.users
-    WHERE id = user_id;
-
-    IF NOT FOUND OR user_record.access_status != 'approved' THEN
-      RETURN FALSE;
-    END IF;
-
-    IF user_record.role IN ('Администратор', 'Руководитель', 'Разработчик') THEN     
-      RETURN TRUE;
-    END IF;
-
-    IF jsonb_array_length(user_record.allowed_pages) = 0 THEN
-      RETURN TRUE;
-    END IF;
-
-    FOR allowed_page IN
-      SELECT jsonb_array_elements_text(user_record.allowed_pages)
-    LOOP
-      pattern := '^' || regexp_replace(allowed_page, ':[^/]+', '[^/]+', 'g') ||      
-  '$';
-
-      IF page_url ~ pattern THEN
-        RETURN TRUE;
-      END IF;
-    END LOOP;
-
-    RETURN FALSE;
-  END;
+AS $function$
+
+  DECLARE
+
+    user_record RECORD;
+
+    allowed_page TEXT;
+
+    pattern TEXT;
+
+  BEGIN
+
+    SELECT role, access_status, allowed_pages
+
+    INTO user_record
+
+    FROM public.users
+
+    WHERE id = user_id;
+
+
+
+    IF NOT FOUND OR user_record.access_status != 'approved' THEN
+
+      RETURN FALSE;
+
+    END IF;
+
+
+
+    IF user_record.role IN ('Администратор', 'Руководитель', 'Разработчик') THEN     
+
+      RETURN TRUE;
+
+    END IF;
+
+
+
+    IF jsonb_array_length(user_record.allowed_pages) = 0 THEN
+
+      RETURN TRUE;
+
+    END IF;
+
+
+
+    FOR allowed_page IN
+
+      SELECT jsonb_array_elements_text(user_record.allowed_pages)
+
+    LOOP
+
+      pattern := '^' || regexp_replace(allowed_page, ':[^/]+', '[^/]+', 'g') ||      
+
+  '$';
+
+
+
+      IF page_url ~ pattern THEN
+
+        RETURN TRUE;
+
+      END IF;
+
+    END LOOP;
+
+
+
+    RETURN FALSE;
+
+  END;
+
   $function$
 
 
@@ -2439,11 +2550,16 @@ CREATE OR REPLACE FUNCTION public.clear_audit_user()
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-    BEGIN
-      -- Очистить значение на уровне сессии
-      PERFORM set_config('app.current_user_id', '', true);
-    END;
+AS $function$
+
+    BEGIN
+
+      -- Очистить значение на уровне сессии
+
+      PERFORM set_config('app.current_user_id', '', true);
+
+    END;
+
     $function$
 
 
@@ -2453,8 +2569,10 @@ CREATE OR REPLACE FUNCTION public.current_user_role()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  SELECT role FROM public.users WHERE id = auth.uid();
+AS $function$
+
+  SELECT role FROM public.users WHERE id = auth.uid();
+
 $function$
 
 
@@ -2464,8 +2582,10 @@ CREATE OR REPLACE FUNCTION public.current_user_status()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  SELECT access_status FROM public.users WHERE id = auth.uid();
+AS $function$
+
+  SELECT access_status FROM public.users WHERE id = auth.uid();
+
 $function$
 
 
@@ -2474,35 +2594,64 @@ CREATE OR REPLACE FUNCTION public.delete_boq_item_with_audit(p_user_id uuid, p_i
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-  DECLARE
-    v_old_item record;
-  BEGIN
-    -- Получаем старое состояние
-    SELECT * INTO v_old_item FROM public.boq_items WHERE id = p_item_id;
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'BOQ item not found: %', p_item_id;
-    END IF;
-
-    -- Вручную вставляем audit запись ПЕРЕД удалением
-    INSERT INTO public.boq_items_audit (
-      boq_item_id,
-      operation_type,
-      changed_by,
-      old_data
-    ) VALUES (
-      p_item_id,
-      'DELETE',
-      p_user_id,
-      to_jsonb(v_old_item)
-    );
-
-    -- Выполняем DELETE
-    DELETE FROM public.boq_items WHERE id = p_item_id;
-
-    RETURN to_jsonb(v_old_item);
-  END;
+AS $function$
+
+  DECLARE
+
+    v_old_item record;
+
+  BEGIN
+
+    -- Получаем старое состояние
+
+    SELECT * INTO v_old_item FROM public.boq_items WHERE id = p_item_id;
+
+
+
+    IF NOT FOUND THEN
+
+      RAISE EXCEPTION 'BOQ item not found: %', p_item_id;
+
+    END IF;
+
+
+
+    -- Вручную вставляем audit запись ПЕРЕД удалением
+
+    INSERT INTO public.boq_items_audit (
+
+      boq_item_id,
+
+      operation_type,
+
+      changed_by,
+
+      old_data
+
+    ) VALUES (
+
+      p_item_id,
+
+      'DELETE',
+
+      p_user_id,
+
+      to_jsonb(v_old_item)
+
+    );
+
+
+
+    -- Выполняем DELETE
+
+    DELETE FROM public.boq_items WHERE id = p_item_id;
+
+
+
+    RETURN to_jsonb(v_old_item);
+
+  END;
+
   $function$
 
 
@@ -2512,15 +2661,24 @@ CREATE OR REPLACE FUNCTION public.get_subcontract_growth_exclusions(p_tender_id 
  RETURNS TABLE(detail_cost_category_id uuid, exclusion_type text)
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-BEGIN
-  RETURN QUERY
-  SELECT
-    e.detail_cost_category_id,
-    e.exclusion_type
-  FROM public.subcontract_growth_exclusions e
-  WHERE e.tender_id = p_tender_id;
-END;
+AS $function$
+
+BEGIN
+
+  RETURN QUERY
+
+  SELECT
+
+    e.detail_cost_category_id,
+
+    e.exclusion_type
+
+  FROM public.subcontract_growth_exclusions e
+
+  WHERE e.tender_id = p_tender_id;
+
+END;
+
 $function$
 
 
@@ -2528,11 +2686,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+  NEW.updated_at = now();
+
+  RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2541,69 +2704,132 @@ CREATE OR REPLACE FUNCTION public.insert_boq_item_with_audit(p_user_id uuid, p_d
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-  DECLARE
-    v_new_item record;
-  BEGIN
-    -- Выполняем INSERT
-    INSERT INTO public.boq_items (
-      tender_id,
-      client_position_id,
-      sort_number,
-      boq_item_type,
-      work_name_id,
-      material_name_id,
-      parent_work_item_id,
-      unit_code,
-      quantity,
-      conversion_coefficient,
-      consumption_coefficient,
-      unit_rate,
-      currency_type,
-      total_amount,
-      delivery_price_type,
-      delivery_amount,
-      quote_link,
-      detail_cost_category_id,
-      material_type
-    )
-    SELECT
-      (p_data->>'tender_id')::uuid,
-      (p_data->>'client_position_id')::uuid,
-      COALESCE((p_data->>'sort_number')::integer, 0),
-      (p_data->>'boq_item_type')::boq_item_type,
-      (p_data->>'work_name_id')::uuid,
-      (p_data->>'material_name_id')::uuid,
-      (p_data->>'parent_work_item_id')::uuid,
-      p_data->>'unit_code',
-      COALESCE((p_data->>'quantity')::numeric, 1),
-      (p_data->>'conversion_coefficient')::numeric,
-      (p_data->>'consumption_coefficient')::numeric,
-      COALESCE((p_data->>'unit_rate')::numeric, 0),
-      COALESCE((p_data->>'currency_type')::currency_type, 'RUB'::currency_type),
-      COALESCE((p_data->>'total_amount')::numeric, 0),
-      (p_data->>'delivery_price_type')::delivery_price_type,
-      (p_data->>'delivery_amount')::numeric,
-      p_data->>'quote_link',
-      (p_data->>'detail_cost_category_id')::uuid,
-      (p_data->>'material_type')::material_type
-    RETURNING * INTO v_new_item;
-
-    -- Вручную вставляем audit запись с user_id
-    INSERT INTO public.boq_items_audit (
-      boq_item_id,
-      operation_type,
-      changed_by,
-      new_data
-    ) VALUES (
-      v_new_item.id,
-      'INSERT',
-      p_user_id,
-      to_jsonb(v_new_item)
-    );
-
-    RETURN to_jsonb(v_new_item);
-  END;
+AS $function$
+
+  DECLARE
+
+    v_new_item record;
+
+  BEGIN
+
+    -- Выполняем INSERT
+
+    INSERT INTO public.boq_items (
+
+      tender_id,
+
+      client_position_id,
+
+      sort_number,
+
+      boq_item_type,
+
+      work_name_id,
+
+      material_name_id,
+
+      parent_work_item_id,
+
+      unit_code,
+
+      quantity,
+
+      conversion_coefficient,
+
+      consumption_coefficient,
+
+      unit_rate,
+
+      currency_type,
+
+      total_amount,
+
+      delivery_price_type,
+
+      delivery_amount,
+
+      quote_link,
+
+      detail_cost_category_id,
+
+      material_type
+
+    )
+
+    SELECT
+
+      (p_data->>'tender_id')::uuid,
+
+      (p_data->>'client_position_id')::uuid,
+
+      COALESCE((p_data->>'sort_number')::integer, 0),
+
+      (p_data->>'boq_item_type')::boq_item_type,
+
+      (p_data->>'work_name_id')::uuid,
+
+      (p_data->>'material_name_id')::uuid,
+
+      (p_data->>'parent_work_item_id')::uuid,
+
+      p_data->>'unit_code',
+
+      COALESCE((p_data->>'quantity')::numeric, 1),
+
+      (p_data->>'conversion_coefficient')::numeric,
+
+      (p_data->>'consumption_coefficient')::numeric,
+
+      COALESCE((p_data->>'unit_rate')::numeric, 0),
+
+      COALESCE((p_data->>'currency_type')::currency_type, 'RUB'::currency_type),
+
+      COALESCE((p_data->>'total_amount')::numeric, 0),
+
+      (p_data->>'delivery_price_type')::delivery_price_type,
+
+      (p_data->>'delivery_amount')::numeric,
+
+      p_data->>'quote_link',
+
+      (p_data->>'detail_cost_category_id')::uuid,
+
+      (p_data->>'material_type')::material_type
+
+    RETURNING * INTO v_new_item;
+
+
+
+    -- Вручную вставляем audit запись с user_id
+
+    INSERT INTO public.boq_items_audit (
+
+      boq_item_id,
+
+      operation_type,
+
+      changed_by,
+
+      new_data
+
+    ) VALUES (
+
+      v_new_item.id,
+
+      'INSERT',
+
+      p_user_id,
+
+      to_jsonb(v_new_item)
+
+    );
+
+
+
+    RETURN to_jsonb(v_new_item);
+
+  END;
+
   $function$
 
 
@@ -2612,61 +2838,116 @@ AS $function$
 CREATE OR REPLACE FUNCTION public.log_boq_items_changes()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-  DECLARE
-    v_user_id uuid;
-    v_changed_fields text[];
-    v_key text;
-    v_old_val jsonb;
-    v_new_val jsonb;
-  BEGIN
-    -- Получаем user_id из app.current_user_id
-    BEGIN
-      v_user_id := NULLIF(current_setting('app.current_user_id', true), '')::uuid;
-    EXCEPTION WHEN OTHERS THEN
-      v_user_id := NULL;
-    END;
-
-    -- Вычисляем измененные поля для UPDATE
-    IF TG_OP = 'UPDATE' THEN
-      v_changed_fields := ARRAY[]::text[];
-
-      FOR v_key IN
-        SELECT jsonb_object_keys(to_jsonb(NEW.*))
-      LOOP
-        v_old_val := to_jsonb(OLD.*) -> v_key;
-        v_new_val := to_jsonb(NEW.*) -> v_key;
-
-        IF v_key NOT IN ('updated_at', 'created_at')
-           AND (v_old_val IS DISTINCT FROM v_new_val) THEN
-          v_changed_fields := array_append(v_changed_fields, v_key);
-        END IF;
-      END LOOP;
-
-      IF array_length(v_changed_fields, 1) IS NULL THEN
-        RETURN NEW;
-      END IF;
-    END IF;
-
-    -- Вставка записи в audit
-    INSERT INTO public.boq_items_audit (
-      boq_item_id,
-      operation_type,
-      changed_by,
-      old_data,
-      new_data,
-      changed_fields
-    ) VALUES (
-      COALESCE(NEW.id, OLD.id),
-      TG_OP,
-      v_user_id,
-      CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD.*) ELSE NULL END,
-      CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW.*) ELSE NULL END,
-      v_changed_fields
-    );
-
-    RETURN COALESCE(NEW, OLD);
-  END;
+AS $function$
+
+  DECLARE
+
+    v_user_id uuid;
+
+    v_changed_fields text[];
+
+    v_key text;
+
+    v_old_val jsonb;
+
+    v_new_val jsonb;
+
+  BEGIN
+
+    -- Получаем user_id из app.current_user_id
+
+    BEGIN
+
+      v_user_id := NULLIF(current_setting('app.current_user_id', true), '')::uuid;
+
+    EXCEPTION WHEN OTHERS THEN
+
+      v_user_id := NULL;
+
+    END;
+
+
+
+    -- Вычисляем измененные поля для UPDATE
+
+    IF TG_OP = 'UPDATE' THEN
+
+      v_changed_fields := ARRAY[]::text[];
+
+
+
+      FOR v_key IN
+
+        SELECT jsonb_object_keys(to_jsonb(NEW.*))
+
+      LOOP
+
+        v_old_val := to_jsonb(OLD.*) -> v_key;
+
+        v_new_val := to_jsonb(NEW.*) -> v_key;
+
+
+
+        IF v_key NOT IN ('updated_at', 'created_at')
+
+           AND (v_old_val IS DISTINCT FROM v_new_val) THEN
+
+          v_changed_fields := array_append(v_changed_fields, v_key);
+
+        END IF;
+
+      END LOOP;
+
+
+
+      IF array_length(v_changed_fields, 1) IS NULL THEN
+
+        RETURN NEW;
+
+      END IF;
+
+    END IF;
+
+
+
+    -- Вставка записи в audit
+
+    INSERT INTO public.boq_items_audit (
+
+      boq_item_id,
+
+      operation_type,
+
+      changed_by,
+
+      old_data,
+
+      new_data,
+
+      changed_fields
+
+    ) VALUES (
+
+      COALESCE(NEW.id, OLD.id),
+
+      TG_OP,
+
+      v_user_id,
+
+      CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD.*) ELSE NULL END,
+
+      CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW.*) ELSE NULL END,
+
+      v_changed_fields
+
+    );
+
+
+
+    RETURN COALESCE(NEW, OLD);
+
+  END;
+
   $function$
 
 
@@ -2676,36 +2957,66 @@ CREATE OR REPLACE FUNCTION public.register_user(p_user_id uuid, p_full_name text
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  DECLARE
-    v_is_first_user BOOLEAN;
-    v_access_status access_status_type;
-  BEGIN
-    -- Проверка первого пользователя
-    SELECT NOT EXISTS (SELECT 1 FROM public.users LIMIT 1) INTO v_is_first_user;
-
-    -- Первый admin/director/developer → auto-approved
-    IF v_is_first_user AND p_role_code IN ('administrator', 'director', 'developer') THEN
-      v_access_status := 'approved';
-
-      INSERT INTO public.users (
-        id, full_name, email, role_code, access_status, allowed_pages,
-        approved_by, approved_at
-      ) VALUES (
-        p_user_id, p_full_name, p_email, p_role_code, v_access_status, p_allowed_pages,
-        p_user_id, NOW()
-      );
-    ELSE
-      -- Остальные → pending (ждут одобрения)
-      v_access_status := 'pending';
-
-      INSERT INTO public.users (
-        id, full_name, email, role_code, access_status, allowed_pages
-      ) VALUES (
-        p_user_id, p_full_name, p_email, p_role_code, v_access_status, p_allowed_pages
-      );
-    END IF;
-  END;
+AS $function$
+
+  DECLARE
+
+    v_is_first_user BOOLEAN;
+
+    v_access_status access_status_type;
+
+  BEGIN
+
+    -- Проверка первого пользователя
+
+    SELECT NOT EXISTS (SELECT 1 FROM public.users LIMIT 1) INTO v_is_first_user;
+
+
+
+    -- Первый admin/director/developer → auto-approved
+
+    IF v_is_first_user AND p_role_code IN ('administrator', 'director', 'developer') THEN
+
+      v_access_status := 'approved';
+
+
+
+      INSERT INTO public.users (
+
+        id, full_name, email, role_code, access_status, allowed_pages,
+
+        approved_by, approved_at
+
+      ) VALUES (
+
+        p_user_id, p_full_name, p_email, p_role_code, v_access_status, p_allowed_pages,
+
+        p_user_id, NOW()
+
+      );
+
+    ELSE
+
+      -- Остальные → pending (ждут одобрения)
+
+      v_access_status := 'pending';
+
+
+
+      INSERT INTO public.users (
+
+        id, full_name, email, role_code, access_status, allowed_pages
+
+      ) VALUES (
+
+        p_user_id, p_full_name, p_email, p_role_code, v_access_status, p_allowed_pages
+
+      );
+
+    END IF;
+
+  END;
+
 $function$
 
 
@@ -2715,18 +3026,30 @@ CREATE OR REPLACE FUNCTION public.remove_subcontract_growth_exclusion(p_tender_i
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-DECLARE
-  v_deleted boolean;
-BEGIN
-  DELETE FROM public.subcontract_growth_exclusions
-  WHERE tender_id = p_tender_id
-    AND detail_cost_category_id = p_detail_cost_category_id
-    AND exclusion_type = p_exclusion_type;
-
-  GET DIAGNOSTICS v_deleted = ROW_COUNT;
-  RETURN v_deleted > 0;
-END;
+AS $function$
+
+DECLARE
+
+  v_deleted boolean;
+
+BEGIN
+
+  DELETE FROM public.subcontract_growth_exclusions
+
+  WHERE tender_id = p_tender_id
+
+    AND detail_cost_category_id = p_detail_cost_category_id
+
+    AND exclusion_type = p_exclusion_type;
+
+
+
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
+  RETURN v_deleted > 0;
+
+END;
+
 $function$
 
 
@@ -2736,11 +3059,16 @@ CREATE OR REPLACE FUNCTION public.set_audit_user(user_id uuid)
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-    BEGIN
-      -- Используем is_local = true для установки на уровне сессии
-      PERFORM set_config('app.current_user_id', user_id::text, true);
-    END;
+AS $function$
+
+    BEGIN
+
+      -- Используем is_local = true для установки на уровне сессии
+
+      PERFORM set_config('app.current_user_id', user_id::text, true);
+
+    END;
+
     $function$
 
 
@@ -2748,11 +3076,16 @@ AS $function$
 CREATE OR REPLACE FUNCTION public.set_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+  NEW.updated_at = now();
+
+  RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2762,29 +3095,52 @@ CREATE OR REPLACE FUNCTION public.toggle_subcontract_growth_exclusion(p_tender_i
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-DECLARE
-  v_exists boolean;
-BEGIN
-  -- Проверяем существование
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.subcontract_growth_exclusions
-    WHERE tender_id = p_tender_id
-      AND detail_cost_category_id = p_detail_cost_category_id
-      AND exclusion_type = p_exclusion_type
-  ) INTO v_exists;
-
-  IF v_exists THEN
-    -- Удаляем если существует
-    PERFORM remove_subcontract_growth_exclusion(p_tender_id, p_detail_cost_category_id, p_exclusion_type);
-    RETURN false;
-  ELSE
-    -- Добавляем если не существует
-    PERFORM add_subcontract_growth_exclusion(p_tender_id, p_detail_cost_category_id, p_exclusion_type);
-    RETURN true;
-  END IF;
-END;
+AS $function$
+
+DECLARE
+
+  v_exists boolean;
+
+BEGIN
+
+  -- Проверяем существование
+
+  SELECT EXISTS (
+
+    SELECT 1
+
+    FROM public.subcontract_growth_exclusions
+
+    WHERE tender_id = p_tender_id
+
+      AND detail_cost_category_id = p_detail_cost_category_id
+
+      AND exclusion_type = p_exclusion_type
+
+  ) INTO v_exists;
+
+
+
+  IF v_exists THEN
+
+    -- Удаляем если существует
+
+    PERFORM remove_subcontract_growth_exclusion(p_tender_id, p_detail_cost_category_id, p_exclusion_type);
+
+    RETURN false;
+
+  ELSE
+
+    -- Добавляем если не существует
+
+    PERFORM add_subcontract_growth_exclusion(p_tender_id, p_detail_cost_category_id, p_exclusion_type);
+
+    RETURN true;
+
+  END IF;
+
+END;
+
 $function$
 
 
@@ -2793,94 +3149,181 @@ CREATE OR REPLACE FUNCTION public.update_boq_item_with_audit(p_user_id uuid, p_i
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
-  DECLARE
-    v_old_item record;
-    v_new_item record;
-    v_changed_fields text[] := ARRAY[]::text[];
-    v_key text;
-    v_old_val jsonb;
-    v_new_val jsonb;
-  BEGIN
-    -- Получаем старое состояние
-    SELECT * INTO v_old_item FROM public.boq_items WHERE id = p_item_id;
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'BOQ item not found: %', p_item_id;
-    END IF;
-
-    -- Выполняем UPDATE только переданных полей
-    UPDATE public.boq_items
-    SET
-      quantity = COALESCE((p_data->>'quantity')::numeric, quantity),
-      unit_rate = COALESCE((p_data->>'unit_rate')::numeric, unit_rate),
-      total_amount = COALESCE((p_data->>'total_amount')::numeric, total_amount),
-      conversion_coefficient = COALESCE((p_data->>'conversion_coefficient')::numeric, conversion_coefficient),
-      consumption_coefficient = COALESCE((p_data->>'consumption_coefficient')::numeric, consumption_coefficient),
-      delivery_price_type = COALESCE((p_data->>'delivery_price_type')::delivery_price_type, delivery_price_type),
-      delivery_amount = COALESCE((p_data->>'delivery_amount')::numeric, delivery_amount),
-      quote_link = COALESCE(p_data->>'quote_link', quote_link),
-      detail_cost_category_id = COALESCE((p_data->>'detail_cost_category_id')::uuid, detail_cost_category_id),
-      material_type = COALESCE((p_data->>'material_type')::material_type, material_type),
-      work_name_id = COALESCE((p_data->>'work_name_id')::uuid, work_name_id),
-      material_name_id = COALESCE((p_data->>'material_name_id')::uuid, material_name_id),
-      unit_code = COALESCE(p_data->>'unit_code', unit_code),
-      parent_work_item_id = COALESCE((p_data->>'parent_work_item_id')::uuid, parent_work_item_id),
-      sort_number = COALESCE((p_data->>'sort_number')::integer, sort_number)
-    WHERE id = p_item_id
-    RETURNING * INTO v_new_item;
-
-    -- Сравниваем old и new, добавляем только реально измененные поля
-    FOR v_key IN SELECT jsonb_object_keys(to_jsonb(v_new_item.*))
-    LOOP
-      v_old_val := to_jsonb(v_old_item.*) -> v_key;
-      v_new_val := to_jsonb(v_new_item.*) -> v_key;
-
-      -- Пропускаем служебные поля
-      IF v_key NOT IN ('updated_at', 'created_at', 'id') THEN
-        -- Добавляем в список только если значение изменилось
-        IF v_old_val IS DISTINCT FROM v_new_val THEN
-          v_changed_fields := array_append(v_changed_fields, v_key);
-        END IF;
-      END IF;
-    END LOOP;
-
-    -- Если ничего не изменилось, не создаем audit запись
-    IF array_length(v_changed_fields, 1) IS NULL THEN
-      RETURN to_jsonb(v_new_item);
-    END IF;
-
-    -- Вручную вставляем audit запись с user_id
-    INSERT INTO public.boq_items_audit (
-      boq_item_id,
-      operation_type,
-      changed_by,
-      old_data,
-      new_data,
-      changed_fields
-    ) VALUES (
-      p_item_id,
-      'UPDATE',
-      p_user_id,
-      to_jsonb(v_old_item),
-      to_jsonb(v_new_item),
-      v_changed_fields
-    );
-
-    RETURN to_jsonb(v_new_item);
-  END;
-  $function$
+AS $function$
+
+    DECLARE
+
+      v_old_item record;
+
+      v_new_item record;
+
+      v_changed_fields text[] := ARRAY[]::text[];
+
+      v_key text;
+
+      v_old_val jsonb;
+
+      v_new_val jsonb;
+
+    BEGIN
+
+      -- Получаем старое состояние
+
+      SELECT * INTO v_old_item FROM public.boq_items WHERE id = p_item_id;
+
+
+
+      IF NOT FOUND THEN
+
+        RAISE EXCEPTION 'BOQ item not found: %', p_item_id;
+
+      END IF;
+
+
+
+      -- Выполняем UPDATE только переданных полей
+
+      UPDATE public.boq_items
+
+      SET
+
+        boq_item_type = COALESCE((p_data->>'boq_item_type')::boq_item_type, boq_item_type),
+
+        quantity = COALESCE((p_data->>'quantity')::numeric, quantity),
+
+        unit_rate = COALESCE((p_data->>'unit_rate')::numeric, unit_rate),
+
+        total_amount = COALESCE((p_data->>'total_amount')::numeric, total_amount),
+
+        conversion_coefficient = COALESCE((p_data->>'conversion_coefficient')::numeric, conversion_coefficient),      
+
+        consumption_coefficient = COALESCE((p_data->>'consumption_coefficient')::numeric, consumption_coefficient),   
+
+        delivery_price_type = COALESCE((p_data->>'delivery_price_type')::delivery_price_type, delivery_price_type),   
+
+        delivery_amount = COALESCE((p_data->>'delivery_amount')::numeric, delivery_amount),
+
+        currency_type = COALESCE((p_data->>'currency_type')::currency_type, currency_type),
+
+        quote_link = COALESCE(p_data->>'quote_link', quote_link),
+
+        description = COALESCE(p_data->>'description', description),
+
+        detail_cost_category_id = COALESCE((p_data->>'detail_cost_category_id')::uuid, detail_cost_category_id),      
+
+        material_type = COALESCE((p_data->>'material_type')::material_type, material_type),
+
+        work_name_id = COALESCE((p_data->>'work_name_id')::uuid, work_name_id),
+
+        material_name_id = COALESCE((p_data->>'material_name_id')::uuid, material_name_id),
+
+        unit_code = COALESCE(p_data->>'unit_code', unit_code),
+
+        parent_work_item_id = COALESCE((p_data->>'parent_work_item_id')::uuid, parent_work_item_id),
+
+        sort_number = COALESCE((p_data->>'sort_number')::integer, sort_number)
+
+      WHERE id = p_item_id
+
+      RETURNING * INTO v_new_item;
+
+
+
+      -- Сравниваем old и new, добавляем только реально измененные поля
+
+      FOR v_key IN SELECT jsonb_object_keys(to_jsonb(v_new_item.*))
+
+      LOOP
+
+        v_old_val := to_jsonb(v_old_item.*) -> v_key;
+
+        v_new_val := to_jsonb(v_new_item.*) -> v_key;
+
+
+
+        -- Пропускаем служебные поля
+
+        IF v_key NOT IN ('updated_at', 'created_at', 'id') THEN
+
+          -- Добавляем в список только если значение изменилось
+
+          IF v_old_val IS DISTINCT FROM v_new_val THEN
+
+            v_changed_fields := array_append(v_changed_fields, v_key);
+
+          END IF;
+
+        END IF;
+
+      END LOOP;
+
+
+
+      -- Если ничего не изменилось, не создаем audit запись
+
+      IF array_length(v_changed_fields, 1) IS NULL THEN
+
+        RETURN to_jsonb(v_new_item);
+
+      END IF;
+
+
+
+      -- Вручную вставляем audit запись с user_id
+
+      INSERT INTO public.boq_items_audit (
+
+        boq_item_id,
+
+        operation_type,
+
+        changed_by,
+
+        old_data,
+
+        new_data,
+
+        changed_fields
+
+      ) VALUES (
+
+        p_item_id,
+
+        'UPDATE',
+
+        p_user_id,
+
+        to_jsonb(v_old_item),
+
+        to_jsonb(v_new_item),
+
+        v_changed_fields
+
+      );
+
+
+
+      RETURN to_jsonb(v_new_item);
+
+    END;
+
+    $function$
 
 
 -- Function: public.update_boq_items_updated_at
 CREATE OR REPLACE FUNCTION public.update_boq_items_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+    NEW.updated_at = now();
+
+    RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2888,11 +3331,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_client_positions_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+    NEW.updated_at = NOW();
+
+    RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2900,11 +3348,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_cost_redistribution_results_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+    NEW.updated_at = NOW();
+
+    RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2912,11 +3365,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_markup_parameters_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+  NEW.updated_at = NOW();
+
+  RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2924,11 +3382,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_markup_tactics_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+  NEW.updated_at = NOW();
+
+  RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2936,11 +3399,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_roles_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+  NEW.updated_at = NOW();
+
+  RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2948,11 +3416,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_tender_documents_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+    NEW.updated_at = NOW();
+
+    RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -2960,11 +3433,16 @@ $function$
 CREATE OR REPLACE FUNCTION public.update_tender_markup_percentage_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
+AS $function$
+
+BEGIN
+
+  NEW.updated_at = NOW();
+
+  RETURN NEW;
+
+END;
+
 $function$
 
 
@@ -4915,10 +5393,19 @@ CREATE INDEX idx_boq_items_client_position_id ON public.boq_items USING btree (c
 CREATE INDEX idx_boq_items_detail_cost_category_id ON public.boq_items USING btree (detail_cost_category_id);
 
 -- Index on public.boq_items
+CREATE INDEX idx_boq_items_material_name ON public.boq_items USING btree (material_name_id) WHERE (material_name_id IS NOT NULL);
+
+-- Index on public.boq_items
 CREATE INDEX idx_boq_items_material_name_id ON public.boq_items USING btree (material_name_id);
 
 -- Index on public.boq_items
 CREATE INDEX idx_boq_items_parent_work_item_id ON public.boq_items USING btree (parent_work_item_id);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_position_sort ON public.boq_items USING btree (client_position_id, sort_number);
+
+-- Index on public.boq_items
+CREATE INDEX idx_boq_items_position_type ON public.boq_items USING btree (client_position_id, boq_item_type);
 
 -- Index on public.boq_items
 CREATE INDEX idx_boq_items_sort_number ON public.boq_items USING btree (client_position_id, sort_number);
@@ -4927,7 +5414,22 @@ CREATE INDEX idx_boq_items_sort_number ON public.boq_items USING btree (client_p
 CREATE INDEX idx_boq_items_tender_id ON public.boq_items USING btree (tender_id);
 
 -- Index on public.boq_items
+CREATE INDEX idx_boq_items_work_name ON public.boq_items USING btree (work_name_id) WHERE (work_name_id IS NOT NULL);
+
+-- Index on public.boq_items
 CREATE INDEX idx_boq_items_work_name_id ON public.boq_items USING btree (work_name_id);
+
+-- Index on public.boq_items_audit
+CREATE INDEX idx_audit_changed_at ON public.boq_items_audit USING btree (changed_at DESC);
+
+-- Index on public.boq_items_audit
+CREATE INDEX idx_audit_changed_by ON public.boq_items_audit USING btree (changed_by);
+
+-- Index on public.boq_items_audit
+CREATE INDEX idx_audit_new_position ON public.boq_items_audit USING btree (((new_data ->> 'client_position_id'::text)));
+
+-- Index on public.boq_items_audit
+CREATE INDEX idx_audit_old_position ON public.boq_items_audit USING btree (((old_data ->> 'client_position_id'::text)));
 
 -- Index on public.boq_items_audit
 CREATE INDEX idx_boq_items_audit_changed_at ON public.boq_items_audit USING btree (changed_at DESC);
@@ -4955,6 +5457,9 @@ CREATE INDEX idx_client_positions_position_number ON public.client_positions USI
 
 -- Index on public.client_positions
 CREATE INDEX idx_client_positions_tender_id ON public.client_positions USING btree (tender_id);
+
+-- Index on public.client_positions
+CREATE INDEX idx_client_positions_tender_num ON public.client_positions USING btree (tender_id, position_number);
 
 -- Index on public.construction_cost_volumes
 CREATE UNIQUE INDEX construction_cost_volumes_tender_detail_key ON public.construction_cost_volumes USING btree (tender_id, detail_cost_category_id) WHERE (detail_cost_category_id IS NOT NULL);
@@ -4985,6 +5490,9 @@ CREATE INDEX idx_redistribution_tender_tactic ON public.cost_redistribution_resu
 
 -- Index on public.cost_redistribution_results
 CREATE UNIQUE INDEX uq_cost_redistribution_results_tender_tactic_boq ON public.cost_redistribution_results USING btree (tender_id, markup_tactic_id, boq_item_id);
+
+-- Index on public.detail_cost_categories
+CREATE INDEX idx_detail_cost_categories_category ON public.detail_cost_categories USING btree (cost_category_id);
 
 -- Index on public.detail_cost_categories
 CREATE INDEX idx_detail_cost_categories_category_id ON public.detail_cost_categories USING btree (cost_category_id);
@@ -5050,6 +5558,9 @@ CREATE INDEX idx_materials_library_material_name_id ON public.materials_library 
 CREATE INDEX idx_materials_library_material_type ON public.materials_library USING btree (material_type);
 
 -- Index on public.materials_library
+CREATE INDEX idx_materials_library_name ON public.materials_library USING btree (material_name_id);
+
+-- Index on public.materials_library
 CREATE INDEX idx_materials_library_type_currency ON public.materials_library USING btree (material_type, currency_type);
 
 -- Index on public.roles
@@ -5059,10 +5570,16 @@ CREATE UNIQUE INDEX roles_name_key ON public.roles USING btree (name);
 CREATE UNIQUE INDEX subcontract_growth_exclusions_unique ON public.subcontract_growth_exclusions USING btree (tender_id, detail_cost_category_id, exclusion_type);
 
 -- Index on public.template_items
+CREATE INDEX idx_template_items_detail_cost ON public.template_items USING btree (detail_cost_category_id) WHERE (detail_cost_category_id IS NOT NULL);
+
+-- Index on public.template_items
 CREATE INDEX idx_template_items_detail_cost_category_id ON public.template_items USING btree (detail_cost_category_id);
 
 -- Index on public.template_items
 CREATE INDEX idx_template_items_kind ON public.template_items USING btree (kind);
+
+-- Index on public.template_items
+CREATE INDEX idx_template_items_material_library ON public.template_items USING btree (material_library_id) WHERE (material_library_id IS NOT NULL);
 
 -- Index on public.template_items
 CREATE INDEX idx_template_items_material_library_id ON public.template_items USING btree (material_library_id);
@@ -5072,6 +5589,12 @@ CREATE INDEX idx_template_items_parent_work_item_id ON public.template_items USI
 
 -- Index on public.template_items
 CREATE INDEX idx_template_items_template_id ON public.template_items USING btree (template_id);
+
+-- Index on public.template_items
+CREATE INDEX idx_template_items_template_position ON public.template_items USING btree (template_id, "position");
+
+-- Index on public.template_items
+CREATE INDEX idx_template_items_work_library ON public.template_items USING btree (work_library_id) WHERE (work_library_id IS NOT NULL);
 
 -- Index on public.template_items
 CREATE INDEX idx_template_items_work_library_id ON public.template_items USING btree (work_library_id);
@@ -5139,6 +5662,15 @@ CREATE INDEX idx_units_is_active ON public.units USING btree (is_active);
 -- Index on public.units
 CREATE INDEX idx_units_sort_order ON public.units USING btree (sort_order);
 
+-- Index on public.user_position_filters
+CREATE INDEX idx_user_position_filters_position ON public.user_position_filters USING btree (position_id);
+
+-- Index on public.user_position_filters
+CREATE INDEX idx_user_position_filters_user_tender ON public.user_position_filters USING btree (user_id, tender_id);
+
+-- Index on public.user_position_filters
+CREATE UNIQUE INDEX unique_user_tender_position ON public.user_position_filters USING btree (user_id, tender_id, position_id);
+
 -- Index on public.user_tasks
 CREATE INDEX idx_user_tasks_status ON public.user_tasks USING btree (task_status);
 
@@ -5182,6 +5714,9 @@ CREATE INDEX idx_works_library_currency_type ON public.works_library USING btree
 CREATE INDEX idx_works_library_item_type ON public.works_library USING btree (item_type);
 
 -- Index on public.works_library
+CREATE INDEX idx_works_library_name ON public.works_library USING btree (work_name_id);
+
+-- Index on public.works_library
 CREATE INDEX idx_works_library_type_currency ON public.works_library USING btree (item_type, currency_type);
 
 -- Index on public.works_library
@@ -5190,26 +5725,26 @@ CREATE INDEX idx_works_library_work_name_id ON public.works_library USING btree 
 -- Index on realtime.messages
 CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
--- Index on realtime.messages_2025_12_22
-CREATE INDEX messages_2025_12_22_inserted_at_topic_idx ON realtime.messages_2025_12_22 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_23
-CREATE INDEX messages_2025_12_23_inserted_at_topic_idx ON realtime.messages_2025_12_23 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_24
-CREATE INDEX messages_2025_12_24_inserted_at_topic_idx ON realtime.messages_2025_12_24 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_25
-CREATE INDEX messages_2025_12_25_inserted_at_topic_idx ON realtime.messages_2025_12_25 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
--- Index on realtime.messages_2025_12_26
-CREATE INDEX messages_2025_12_26_inserted_at_topic_idx ON realtime.messages_2025_12_26 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
-
 -- Index on realtime.messages_2025_12_27
 CREATE INDEX messages_2025_12_27_inserted_at_topic_idx ON realtime.messages_2025_12_27 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
 -- Index on realtime.messages_2025_12_28
 CREATE INDEX messages_2025_12_28_inserted_at_topic_idx ON realtime.messages_2025_12_28 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_29
+CREATE INDEX messages_2025_12_29_inserted_at_topic_idx ON realtime.messages_2025_12_29 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_30
+CREATE INDEX messages_2025_12_30_inserted_at_topic_idx ON realtime.messages_2025_12_30 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2025_12_31
+CREATE INDEX messages_2025_12_31_inserted_at_topic_idx ON realtime.messages_2025_12_31 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2026_01_01
+CREATE INDEX messages_2026_01_01_inserted_at_topic_idx ON realtime.messages_2026_01_01 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+-- Index on realtime.messages_2026_01_02
+CREATE INDEX messages_2026_01_02_inserted_at_topic_idx ON realtime.messages_2026_01_02 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
 
 -- Index on realtime.subscription
 CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btree (entity);
@@ -5379,6 +5914,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_36 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_37 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_38 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_temp_4 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_40 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_41 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_temp_42 TO postgres;
@@ -5435,6 +5971,7 @@ GRANT supabase_realtime_admin TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_36 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_37 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_38 TO postgres;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_4 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_40 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_41 TO postgres;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_42 TO postgres;
@@ -5524,6 +6061,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_36 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_37 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_38 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_temp_4 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_40 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_41 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_temp_42 TO supabase_admin;
@@ -5580,6 +6118,7 @@ CREATE ROLE supabase_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION 
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_36 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_37 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_38 TO supabase_admin;
+-- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_4 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_40 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_41 TO supabase_admin;
 -- GRANT CREATE, USAGE ON SCHEMA pg_toast_temp_42 TO supabase_admin;
@@ -5662,6 +6201,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_36 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_37 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_38 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_temp_4 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_40 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_41 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_temp_42 TO supabase_etl_admin;
@@ -5718,6 +6258,7 @@ GRANT pg_read_all_data TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_36 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_37 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_38 TO supabase_etl_admin;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_4 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_40 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_41 TO supabase_etl_admin;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_42 TO supabase_etl_admin;
@@ -5792,6 +6333,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_36 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_37 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_38 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_temp_4 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_40 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_41 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_temp_42 TO supabase_read_only_user;
@@ -5848,6 +6390,7 @@ GRANT pg_read_all_data TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_36 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_37 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_38 TO supabase_read_only_user;
+-- GRANT USAGE ON SCHEMA pg_toast_temp_4 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_40 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_41 TO supabase_read_only_user;
 -- GRANT USAGE ON SCHEMA pg_toast_temp_42 TO supabase_read_only_user;

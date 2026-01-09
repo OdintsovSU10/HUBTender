@@ -52,7 +52,7 @@ export const TemplateFilters: React.FC<TemplateFiltersProps> = ({
             allowClear
             style={{ width: '100%' }}
             filterOption={false}
-            classNames={currentTheme === 'dark' ? { popup: 'autocomplete-dark' } : undefined}
+            popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : undefined}
           />
         </Col>
         <Col span={8}>
@@ -78,7 +78,7 @@ export const TemplateFilters: React.FC<TemplateFiltersProps> = ({
             allowClear
             style={{ width: '100%' }}
             filterOption={false}
-            classNames={currentTheme === 'dark' ? { popup: 'autocomplete-dark' } : undefined}
+            popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : undefined}
           />
         </Col>
         <Col span={8}>
@@ -104,7 +104,7 @@ export const TemplateFilters: React.FC<TemplateFiltersProps> = ({
             allowClear
             style={{ width: '100%' }}
             filterOption={false}
-            classNames={currentTheme === 'dark' ? { popup: 'autocomplete-dark' } : undefined}
+            popupClassName={currentTheme === 'dark' ? 'autocomplete-dark' : undefined}
           />
         </Col>
       </Row>

@@ -73,6 +73,8 @@ export interface BoqItemFull {
   detail_cost_category_id?: string | null;
   quote_link?: string | null;
   description?: string | null;
+  created_at?: string;
+  updated_at?: string;
   work_names?: { name: string; unit: string } | null;
   material_names?: { name: string; unit: string } | null;
   detail_cost_categories?: {

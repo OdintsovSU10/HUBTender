@@ -251,17 +251,13 @@ export function useCommerceData() {
           baseTotal += itemBase;
           commercialTotal += itemMaterial + itemWork; // ПОЛНАЯ коммерческая
 
-          // Материалы КП = БАЗА основных материалов
-          if (item.material_type !== 'вспомогат.' &&
-              (item.boq_item_type === 'мат' || item.boq_item_type === 'суб-мат' || item.boq_item_type === 'мат-комп.')) {
-            materialCostTotal += itemBase; // только база
-          }
+          // Материалы КП = коммерческая стоимость материалов (с НДС)
+          materialCostTotal += itemMaterial;
+          // Работы КП = коммерческая стоимость работ (с НДС)
+          workCostTotal += itemWork;
 
           itemsCount++;
         }
-
-        // Работы КП = Коммерческая - Материалы КП
-        workCostTotal = commercialTotal - materialCostTotal;
         const commercialTotalFinal = commercialTotal;
 
         // Рассчитываем коэффициент наценки
