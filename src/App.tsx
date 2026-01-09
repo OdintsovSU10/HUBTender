@@ -26,6 +26,8 @@ import Bsm from './pages/Bsm/Bsm';
 import ObjectComparison from './pages/Analytics/ObjectComparison';
 import FinancialIndicators from './pages/FinancialIndicators/FinancialIndicators';
 import Users from './pages/Users/Users';
+import Projects from './pages/Projects';
+import ProjectDetail from './pages/Projects/ProjectDetail';
 import './App.css';
 
 function AppContent() {
@@ -83,6 +85,8 @@ function AppContent() {
             </Route>
             <Route path="costs" element={<ConstructionCostNew />} />
             <Route path="financial-indicators" element={<FinancialIndicators />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="projects/:projectId" element={<ProjectDetail />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<div>Настройки</div>} />
           </Route>

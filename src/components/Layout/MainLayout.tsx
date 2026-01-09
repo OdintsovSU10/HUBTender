@@ -29,6 +29,7 @@ import {
   LineChartOutlined,
   DeleteOutlined,
   SwapOutlined,
+  BuildOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -303,6 +304,11 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       key: '/financial-indicators',
       icon: <BarChartOutlined />,
       label: 'Финансовые показатели',
+    },
+    {
+      key: '/projects',
+      icon: <BuildOutlined />,
+      label: 'Текущие объекты',
     },
     {
       key: 'analytics',
