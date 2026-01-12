@@ -30,17 +30,27 @@ interface AdditionalAgreementsProps {
 }
 
 const formatMoney = (value: number): string => {
-  if (value >= 1_000_000_000) {
-    const billions = value / 1_000_000_000;
-    if (billions % 1 === 0) return `${billions.toFixed(0)} млрд`;
-    return `${billions.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} млрд`;
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+
+  if (absValue >= 1_000_000_000) {
+    const billions = absValue / 1_000_000_000;
+    if (billions % 1 === 0) return `${sign}${billions.toFixed(0)} млрд`;
+    return `${sign}${billions.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} млрд`;
   }
-  if (value >= 1_000_000) {
-    const millions = value / 1_000_000;
-    if (millions % 1 === 0) return `${millions.toFixed(0)} млн`;
-    return `${millions.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} млн`;
+  if (absValue >= 1_000_000) {
+    const millions = absValue / 1_000_000;
+    if (millions % 1 === 0) return `${sign}${millions.toFixed(0)} млн`;
+    return `${sign}${millions.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} млн`;
   }
   return value.toLocaleString('ru-RU');
+};
+
+// Форматирование суммы со знаком для отображения
+const formatMoneyWithSign = (value: number): string => {
+  if (value > 0) return `+${formatMoney(value)}`;
+  if (value < 0) return formatMoney(value);
+  return '0';
 };
 
 // Парсер для InputNumber - поддержка точки и запятой
@@ -231,7 +241,6 @@ export const AdditionalAgreements: React.FC<AdditionalAgreementsProps> = ({
           >
             <InputNumber
               style={{ width: '100%' }}
-              min={0 as number}
               precision={2}
               decimalSeparator=","
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
@@ -240,8 +249,8 @@ export const AdditionalAgreements: React.FC<AdditionalAgreementsProps> = ({
             />
           </Form.Item>
         ) : (
-          <Text strong style={{ color: '#52c41a' }}>
-            +{formatMoney(val)} ₽
+          <Text strong style={{ color: val >= 0 ? '#52c41a' : '#ff4d4f' }}>
+            {formatMoneyWithSign(val)} ₽
           </Text>
         ),
     },
@@ -313,8 +322,11 @@ export const AdditionalAgreements: React.FC<AdditionalAgreementsProps> = ({
             <Statistic
               title="Сумма доп. соглашений"
               value={totalAgreementsSum}
-              formatter={() => (totalAgreementsSum > 0 ? `+${formatMoney(totalAgreementsSum)}` : '0')}
-              valueStyle={{ color: totalAgreementsSum > 0 ? '#52c41a' : undefined, fontSize: 16 }}
+              formatter={() => formatMoneyWithSign(totalAgreementsSum)}
+              valueStyle={{
+                color: totalAgreementsSum > 0 ? '#52c41a' : totalAgreementsSum < 0 ? '#ff4d4f' : undefined,
+                fontSize: 16
+              }}
               suffix="₽"
             />
           </Card>
@@ -384,10 +396,10 @@ export const AdditionalAgreements: React.FC<AdditionalAgreementsProps> = ({
                   name="amount"
                   label="Сумма (₽)"
                   rules={[{ required: true, message: 'Введите сумму' }]}
+                  tooltip="Отрицательная сумма уменьшает стоимость договора"
                 >
                   <InputNumber
                     style={{ width: '100%' }}
-                    min={0 as number}
                     precision={2}
                     decimalSeparator=","
                     formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
@@ -432,8 +444,8 @@ export const AdditionalAgreements: React.FC<AdditionalAgreementsProps> = ({
                     <Text strong>ИТОГО</Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={1} align="right">
-                    <Text strong style={{ color: '#52c41a' }}>
-                      +{formatMoney(totalAgreementsSum)} ₽
+                    <Text strong style={{ color: totalAgreementsSum >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                      {formatMoneyWithSign(totalAgreementsSum)} ₽
                     </Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={2} colSpan={2} />
