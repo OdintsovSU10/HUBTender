@@ -790,6 +790,8 @@ export const ALL_PAGES = [
   '/bsm',
   '/analytics/comparison',
   '/financial-indicators',
+  '/projects',
+  '/projects/:projectId',
   '/settings',
   '/users',
 ] as const;
@@ -840,6 +842,8 @@ export const PAGE_LABELS: Record<string, string> = {
   '/costs': 'Затраты на строительство',
   '/financial-indicators': 'Финансовые показатели',
   '/analytics/comparison': 'Сравнение объектов',
+  '/projects': 'Текущие объекты',
+  '/projects/:projectId': 'Детали объекта',
   '/admin/nomenclatures': 'Номенклатуры',
   '/admin/tenders': 'Тендеры',
   '/admin/construction_cost': 'Справочник затрат',
@@ -871,7 +875,7 @@ export const PAGES_STRUCTURE = [
   },
   {
     title: 'Аналитика',
-    pages: ['/analytics/comparison'],
+    pages: ['/analytics/comparison', '/projects'],
   },
   {
     title: 'Администрирование',
@@ -923,6 +927,15 @@ export const hasPageAccess = (user: AuthUser, pagePath: string): boolean => {
   if (pagePath.match(/^\/positions\/[^/]+\/items$/)) {
     // Проверяем, есть ли доступ к родительской странице /positions
     if (user.allowed_pages.includes('/positions')) {
+      return true;
+    }
+  }
+
+  // Специальная логика: если есть доступ к /projects, автоматически разрешен доступ к /projects/:projectId
+  // Эти страницы являются одним целым - просмотр списка объектов и деталей конкретного объекта
+  if (pagePath.match(/^\/projects\/[^/]+$/)) {
+    // Проверяем, есть ли доступ к родительской странице /projects
+    if (user.allowed_pages.includes('/projects')) {
       return true;
     }
   }
