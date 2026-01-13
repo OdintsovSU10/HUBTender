@@ -30,43 +30,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Загрузка данных пользователя из public.users
   const loadUserData = useCallback(async (authUserId: string): Promise<AuthUser | null> => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          full_name,
-          role_code,
-          access_status,
-          allowed_pages,
-          access_enabled,
-          roles:role_code (
-            name,
-            color
-          )
-        `)
-        .eq('id', authUserId)
-        .single();
+      console.log('[AuthContext] Загрузка пользователя:', authUserId);
 
-      if (error || !data) {
-        console.error('[AuthContext] Ошибка загрузки пользователя:', error?.message);
+      // Загружаем данные пользователя без .single()
+      const { data: userDataArray, error: userError } = await supabase
+        .from('users')
+        .select('id, email, full_name, role_code, access_status, allowed_pages, access_enabled')
+        .eq('id', authUserId);
+
+      console.log('[AuthContext] Результат запроса:', { userDataArray, userError });
+
+      if (userError) {
+        console.error('[AuthContext] Ошибка загрузки пользователя:', userError?.message);
         return null;
       }
 
-      const rolesData = (Array.isArray(data.roles) && data.roles.length > 0
-        ? data.roles[0]
-        : data.roles) as { name: string; color: string } | null;
+      // Проверяем что вернулась ровно одна запись
+      if (!userDataArray || userDataArray.length === 0) {
+        console.error('[AuthContext] Пользователь не найден в таблице users, ID:', authUserId);
+        return null;
+      }
+
+      if (userDataArray.length > 1) {
+        console.error('[AuthContext] Найдено несколько записей пользователя в таблице users');
+        return null;
+      }
+
+      const userData = userDataArray[0];
+
+      // Загружаем данные роли
+      const { data: roleDataArray } = await supabase
+        .from('roles')
+        .select('name, color')
+        .eq('code', userData.role_code);
+
+      const roleData = roleDataArray?.[0];
 
       return {
-        id: data.id,
-        email: data.email,
-        full_name: data.full_name,
-        role: rolesData?.name as any || 'Инженер',
-        role_code: data.role_code,
-        role_color: rolesData?.color,
-        access_status: data.access_status,
-        allowed_pages: data.allowed_pages || [],
-        access_enabled: data.access_enabled,
+        id: userData.id,
+        email: userData.email,
+        full_name: userData.full_name,
+        role: roleData?.name as any || 'Инженер',
+        role_code: userData.role_code,
+        role_color: roleData?.color,
+        access_status: userData.access_status,
+        allowed_pages: userData.allowed_pages || [],
+        access_enabled: userData.access_enabled,
       };
     } catch (err) {
       console.error('[AuthContext] Исключение при загрузке пользователя:', err);

@@ -39,8 +39,8 @@ const Login: React.FC = () => {
       }
       setLoading(false);
 
-      // Если статус pending - останавливаем загрузку и показываем сообщение
-      if (user.access_status === 'pending') {
+      // Если статус pending или blocked - останавливаем загрузку и показываем сообщение
+      if (user.access_status === 'pending' || user.access_status === 'blocked') {
         return;
       }
 
@@ -232,7 +232,7 @@ const Login: React.FC = () => {
   }
 
   // Показываем сообщение если заявка отклонена
-  if (user && user.access_status === 'rejected') {
+  if (user && user.access_status === 'blocked') {
     return (
       <div
         style={{
@@ -260,20 +260,39 @@ const Login: React.FC = () => {
               <div style={{ textAlign: 'center' }}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
                   К сожалению, администратор отклонил вашу заявку на регистрацию.
-                  Для получения дополнительной информации обратитесь к администратору системы.
+                  Вы можете направить заявку повторно или обратиться к администратору для получения дополнительной информации.
                 </Text>
               </div>
             }
             extra={[
               <Button
                 key="logout"
-                type="primary"
                 onClick={async () => {
                   await supabase.auth.signOut();
                   window.location.reload();
                 }}
               >
                 Вернуться к входу
+              </Button>,
+              <Button
+                key="register"
+                type="primary"
+                onClick={async () => {
+                  // Обновляем статус на pending для повторной заявки
+                  const { error } = await supabase
+                    .from('users')
+                    .update({ access_status: 'pending' })
+                    .eq('id', user.id);
+
+                  if (error) {
+                    message.error('Ошибка при отправке заявки');
+                  } else {
+                    message.success('Заявка на регистрацию отправлена повторно');
+                    window.location.reload();
+                  }
+                }}
+              >
+                Отправить заявку повторно
               </Button>,
             ]}
           />
