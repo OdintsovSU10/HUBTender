@@ -251,6 +251,10 @@ export default function CommerceTable({
         const materialPercent = totalCommercial > 0 ? ((totalMaterials / totalCommercial) * 100).toFixed(1) : '0.0';
         const workPercent = totalCommercial > 0 ? ((totalWorks / totalCommercial) * 100).toFixed(1) : '0.0';
 
+        // Расчет итогового коэффициента наценки
+        const totalMarkupCoefficient = totalBase > 0 ? totalCommercial / totalBase : 1;
+        const markupColor = totalMarkupCoefficient > 1 ? 'green' : totalMarkupCoefficient < 1 ? 'red' : 'default';
+
         // Проверка соответствия базовой стоимости эталонной сумме из позиций заказчика
         const baseTotalMatches = Math.abs(totalBase - referenceTotal) < 0.01;
         const baseColor = baseTotalMatches ? '#52c41a' : '#ff4d4f';
@@ -285,7 +289,12 @@ export default function CommerceTable({
                   {formatCommercialCost(totalCommercial)}
                 </Text>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={9} colSpan={2} />
+              <Table.Summary.Cell index={9} align="center">
+                <Tag color={markupColor}>
+                  {totalMarkupCoefficient.toFixed(4)}
+                </Tag>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={10} />
             </Table.Summary.Row>
           </Table.Summary>
         );
