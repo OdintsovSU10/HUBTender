@@ -6,8 +6,11 @@ import { Card, Spin, Empty } from 'antd';
 import { useCommerceData, useCommerceActions } from './hooks';
 import { TenderSelector, CommerceTable, CommerceHeader } from './components';
 import { exportCommerceToExcel } from './utils/exportToExcel';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Commerce() {
+  const { user } = useAuth();
+  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
 
   const {
     loading,
@@ -97,6 +100,7 @@ export default function Commerce() {
         onTenderTitleChange={handleTenderTitleChange}
         onVersionChange={handleVersionChange}
         onTenderSelect={handleTenderSelect}
+        shouldFilterArchived={shouldFilterArchived}
       />
     );
   }
@@ -125,6 +129,7 @@ export default function Commerce() {
           onRecalculate={handleRecalculate}
           onExport={handleExportToExcel}
           onReload={() => selectedTenderId && loadPositions(selectedTenderId)}
+          shouldFilterArchived={shouldFilterArchived}
         />
       }
     >

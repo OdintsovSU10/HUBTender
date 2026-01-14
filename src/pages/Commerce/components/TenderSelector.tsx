@@ -17,6 +17,7 @@ interface TenderSelectorProps {
   onTenderTitleChange: (title: string) => void;
   onVersionChange: (version: number) => void;
   onTenderSelect: (tenderId: string, title: string, version: number) => void;
+  shouldFilterArchived?: boolean;
 }
 
 export default function TenderSelector({
@@ -25,13 +26,18 @@ export default function TenderSelector({
   selectedVersion,
   onTenderTitleChange,
   onVersionChange,
-  onTenderSelect
+  onTenderSelect,
+  shouldFilterArchived = false
 }: TenderSelectorProps) {
   // Получение уникальных наименований тендеров
   const getTenderTitles = (): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
 
-    tenders.forEach(tender => {
+    const filteredTenders = shouldFilterArchived
+      ? tenders.filter(t => !t.is_archived)
+      : tenders;
+
+    filteredTenders.forEach(tender => {
       if (!uniqueTitles.has(tender.title)) {
         uniqueTitles.set(tender.title, {
           value: tender.title,
@@ -46,8 +52,11 @@ export default function TenderSelector({
 
   // Получение версий для выбранного наименования тендера
   const getVersionsForTitle = (title: string): { value: number; label: string }[] => {
-    return tenders
-      .filter(tender => tender.title === title)
+    const filtered = shouldFilterArchived
+      ? tenders.filter(tender => tender.title === title && !tender.is_archived)
+      : tenders.filter(tender => tender.title === title);
+
+    return filtered
       .map(tender => ({
         value: tender.version || 1,
         label: `Версия ${tender.version || 1}`,

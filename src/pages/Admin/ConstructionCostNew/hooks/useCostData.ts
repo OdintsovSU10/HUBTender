@@ -30,7 +30,7 @@ export interface TenderOption {
   clientName: string;
 }
 
-export const useCostData = () => {
+export const useCostData = (userRole?: string) => {
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
   const [selectedTenderTitle, setSelectedTenderTitle] = useState<string | null>(null);
@@ -40,10 +40,17 @@ export const useCostData = () => {
   const [costType, setCostType] = useState<'base' | 'commercial'>('base');
   const [groupVolumes, setGroupVolumes] = useState<Map<string, number>>(new Map());
 
+  // Проверка роли для фильтрации архивных тендеров
+  const shouldFilterArchived = userRole === 'engineer' || userRole === 'moderator';
+
   const getTenderTitles = (): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
 
-    tenders.forEach(tender => {
+    const filteredTenders = shouldFilterArchived
+      ? tenders.filter(t => !t.is_archived)
+      : tenders;
+
+    filteredTenders.forEach(tender => {
       if (!uniqueTitles.has(tender.title)) {
         uniqueTitles.set(tender.title, {
           value: tender.title,
@@ -57,12 +64,14 @@ export const useCostData = () => {
   };
 
   const getVersionsForTitle = (title: string) => {
-    return tenders
-      .filter(t => t.title === title)
-      .map(t => ({
-        value: t.version || 1,
-        label: `Версия ${t.version || 1}`,
-      }));
+    const filtered = shouldFilterArchived
+      ? tenders.filter(t => t.title === title && !t.is_archived)
+      : tenders.filter(t => t.title === title);
+
+    return filtered.map(t => ({
+      value: t.version || 1,
+      label: `Версия ${t.version || 1}`,
+    }));
   };
 
   const handleTenderTitleChange = (title: string) => {

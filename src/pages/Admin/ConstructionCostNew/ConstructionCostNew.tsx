@@ -11,10 +11,12 @@ import CostTable from './components/CostTable';
 import TenderSelection from './components/TenderSelection';
 import { exportConstructionCostToExcel } from './utils/exportConstructionCostToExcel';
 import { filterCostData } from './utils/filterCostData';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const { Title, Text } = Typography;
 
 const ConstructionCostNew: React.FC = () => {
+  const { user } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [viewMode, setViewMode] = useState<'detailed' | 'summary' | 'simplified'>('detailed');
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
@@ -38,7 +40,10 @@ const ConstructionCostNew: React.FC = () => {
     handleVersionChange,
     fetchConstructionCosts,
     handleVolumeChange,
-  } = useCostData();
+  } = useCostData(user?.role_code);
+
+  // Проверка роли для фильтрации архивных тендеров в карточках
+  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
 
   // Обработчик экспорта
   const handleExport = () => {
@@ -87,6 +92,7 @@ const ConstructionCostNew: React.FC = () => {
         onTenderTitleChange={handleTenderTitleChange}
         onVersionChange={handleVersionChange}
         onTenderSelect={handleTenderSelect}
+        shouldFilterArchived={shouldFilterArchived}
       />
     );
   }

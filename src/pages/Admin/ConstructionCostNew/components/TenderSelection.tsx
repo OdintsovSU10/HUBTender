@@ -19,6 +19,7 @@ interface TenderSelectionProps {
   onTenderTitleChange: (title: string) => void;
   onVersionChange: (version: number) => void;
   onTenderSelect: (tenderId: string, title: string, version: number) => void;
+  shouldFilterArchived?: boolean;
 }
 
 const TenderSelection: React.FC<TenderSelectionProps> = ({
@@ -30,6 +31,7 @@ const TenderSelection: React.FC<TenderSelectionProps> = ({
   onTenderTitleChange,
   onVersionChange,
   onTenderSelect,
+  shouldFilterArchived = false,
 }) => {
   return (
     <div style={{ margin: '-16px', padding: '24px' }}>
@@ -73,7 +75,7 @@ const TenderSelection: React.FC<TenderSelectionProps> = ({
                 Или выберите из списка:
               </Text>
               <Row gutter={[16, 16]} justify="center">
-                {tenders.slice(0, 6).map((tender) => (
+                {tenders.filter(t => !t.is_archived).slice(0, 6).map((tender) => (
                   <Col key={tender.id}>
                     <Card
                       hoverable

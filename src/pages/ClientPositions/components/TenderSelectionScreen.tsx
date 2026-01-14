@@ -20,6 +20,7 @@ interface TenderSelectionScreenProps {
   onTenderTitleChange: (title: string) => void;
   onVersionChange: (version: number) => void;
   onTenderCardClick: (tender: Tender) => void;
+  shouldFilterArchived?: boolean;
 }
 
 export const TenderSelectionScreen: React.FC<TenderSelectionScreenProps> = ({
@@ -31,6 +32,7 @@ export const TenderSelectionScreen: React.FC<TenderSelectionScreenProps> = ({
   onTenderTitleChange,
   onVersionChange,
   onTenderCardClick,
+  shouldFilterArchived = false,
 }) => {
   return (
     <Card bordered={false} style={{ height: '100%' }}>

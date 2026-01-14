@@ -33,6 +33,7 @@ interface CommerceHeaderProps {
   onRecalculate: () => void;
   onExport: () => void;
   onReload: () => void;
+  shouldFilterArchived?: boolean;
 }
 
 export default function CommerceHeader({
@@ -52,13 +53,18 @@ export default function CommerceHeader({
   onApplyTactic,
   onRecalculate,
   onExport,
-  onReload
+  onReload,
+  shouldFilterArchived = false
 }: CommerceHeaderProps) {
   // Получение уникальных наименований тендеров
   const getTenderTitles = (): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
 
-    tenders.forEach(tender => {
+    const filteredTenders = shouldFilterArchived
+      ? tenders.filter(t => !t.is_archived)
+      : tenders;
+
+    filteredTenders.forEach(tender => {
       if (!uniqueTitles.has(tender.title)) {
         uniqueTitles.set(tender.title, {
           value: tender.title,
@@ -73,8 +79,11 @@ export default function CommerceHeader({
 
   // Получение версий для выбранного наименования тендера
   const getVersionsForTitle = (title: string): { value: number; label: string }[] => {
-    return tenders
-      .filter(tender => tender.title === title)
+    const filtered = shouldFilterArchived
+      ? tenders.filter(tender => tender.title === title && !tender.is_archived)
+      : tenders.filter(tender => tender.title === title);
+
+    return filtered
       .map(tender => ({
         value: tender.version || 1,
         label: `Версия ${tender.version || 1}`,

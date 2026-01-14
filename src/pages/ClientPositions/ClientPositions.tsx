@@ -67,8 +67,12 @@ const ClientPositions: React.FC = () => {
     handleDeleteAdditionalPosition,
   } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
 
-  // Хук фильтрации позиций
+  // Хук фильтрации позиций и получение информации о пользователе
   const { user } = useAuth();
+
+  // Проверка роли для фильтрации архивных тендеров
+  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+
   const {
     selectedPositionIds,
     isFilterActive,
@@ -85,7 +89,11 @@ const ClientPositions: React.FC = () => {
   const tenderTitles = useMemo((): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
 
-    tenders.forEach(tender => {
+    const filteredTenders = shouldFilterArchived
+      ? tenders.filter(t => !t.is_archived)
+      : tenders;
+
+    filteredTenders.forEach(tender => {
       if (!uniqueTitles.has(tender.title)) {
         uniqueTitles.set(tender.title, {
           value: tender.title,
@@ -96,20 +104,23 @@ const ClientPositions: React.FC = () => {
     });
 
     return Array.from(uniqueTitles.values());
-  }, [tenders]);
+  }, [tenders, shouldFilterArchived]);
 
   // Получение версий для выбранного наименования тендера
   const versions = useMemo((): { value: number; label: string }[] => {
     if (!selectedTenderTitle) return [];
 
-    return tenders
-      .filter(tender => tender.title === selectedTenderTitle)
+    const filtered = shouldFilterArchived
+      ? tenders.filter(tender => tender.title === selectedTenderTitle && !tender.is_archived)
+      : tenders.filter(tender => tender.title === selectedTenderTitle);
+
+    return filtered
       .map(tender => ({
         value: tender.version || 1,
         label: `Версия ${tender.version || 1}`,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [tenders, selectedTenderTitle]);
+  }, [tenders, selectedTenderTitle, shouldFilterArchived]);
 
   // Фильтрация позиций в зависимости от активного фильтра
   const displayedPositions = useMemo(() => {
@@ -239,6 +250,7 @@ const ClientPositions: React.FC = () => {
         onTenderTitleChange={handleTenderTitleChange}
         onVersionChange={handleVersionChange}
         onTenderCardClick={handleTenderCardClick}
+        shouldFilterArchived={shouldFilterArchived}
       />
     );
   }

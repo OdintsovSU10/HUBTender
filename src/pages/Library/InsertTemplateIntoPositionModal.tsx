@@ -9,11 +9,13 @@ import {
 } from 'antd';
 import { supabase } from '../../lib/supabase';
 import { insertTemplateItems } from '../../utils/insertTemplateItems';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Tender {
   id: string;
   title: string;
   version: number;
+  is_archived: boolean;
 }
 
 interface LeafPosition {
@@ -39,6 +41,9 @@ const InsertTemplateIntoPositionModal: React.FC<InsertTemplateIntoPositionModalP
   onCancel,
   onSuccess,
 }) => {
+  const { user } = useAuth();
+  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [tenders, setTenders] = useState<Tender[]>([]);
@@ -80,7 +85,7 @@ const InsertTemplateIntoPositionModal: React.FC<InsertTemplateIntoPositionModalP
     try {
       const { data, error } = await supabase
         .from('tenders')
-        .select('id, title, version')
+        .select('id, title, version, is_archived')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -177,12 +182,18 @@ const InsertTemplateIntoPositionModal: React.FC<InsertTemplateIntoPositionModalP
   };
 
   // Получить уникальные названия тендеров
-  const uniqueTenderTitles = Array.from(new Set(tenders.map(t => t.title)));
+  const uniqueTenderTitles = Array.from(
+    new Set(
+      (shouldFilterArchived ? tenders.filter(t => !t.is_archived) : tenders).map(t => t.title)
+    )
+  );
 
   // Получить версии для выбранного названия тендера
   const availableVersions = selectedTenderTitle
-    ? tenders
-        .filter(t => t.title === selectedTenderTitle)
+    ? (shouldFilterArchived
+        ? tenders.filter(t => t.title === selectedTenderTitle && !t.is_archived)
+        : tenders.filter(t => t.title === selectedTenderTitle)
+      )
         .map(t => t.version)
         .sort((a, b) => b - a) // Сортировка по убыванию
     : [];

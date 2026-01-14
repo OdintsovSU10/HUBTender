@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import type { UnitType, BoqItemType } from '../../lib/supabase';
 import * as XLSX from 'xlsx-js-style';
 import { getVersionColorByTitle } from '../../utils/versionColor';
+import { useAuth } from '../../contexts/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -20,6 +21,7 @@ interface Tender {
   tender_number: string;
   client_name: string;
   version?: number;
+  is_archived?: boolean;
 }
 
 interface BoqItemData {
@@ -38,6 +40,7 @@ interface BoqItemData {
 }
 
 const Bsm: React.FC = () => {
+  const { user } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [selectedTenderId, setSelectedTenderId] = useState<string | null>(null);
@@ -47,12 +50,15 @@ const Bsm: React.FC = () => {
   const [allItems, setAllItems] = useState<BoqItemData[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'materials' | 'works'>('all');
 
+  // Проверка роли для фильтрации архивных тендеров
+  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+
   // Fetch tenders
   const fetchTenders = async () => {
     try {
       const { data, error } = await supabase
         .from('tenders')
-        .select('id, title, tender_number, client_name, version')
+        .select('id, title, tender_number, client_name, version, is_archived')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -67,7 +73,11 @@ const Bsm: React.FC = () => {
   const getTenderTitles = (): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();
 
-    tenders.forEach(tender => {
+    const filteredTenders = shouldFilterArchived
+      ? tenders.filter(t => !t.is_archived)
+      : tenders;
+
+    filteredTenders.forEach(tender => {
       if (!uniqueTitles.has(tender.title)) {
         uniqueTitles.set(tender.title, {
           value: tender.title,
@@ -82,8 +92,11 @@ const Bsm: React.FC = () => {
 
   // Получение версий для выбранного наименования тендера
   const getVersionsForTitle = (title: string): { value: number; label: string }[] => {
-    return tenders
-      .filter(tender => tender.title === title)
+    const filtered = shouldFilterArchived
+      ? tenders.filter(tender => tender.title === title && !tender.is_archived)
+      : tenders.filter(tender => tender.title === title);
+
+    return filtered
       .map(tender => ({
         value: tender.version || 1,
         label: `Версия ${tender.version || 1}`,
@@ -801,7 +814,7 @@ const Bsm: React.FC = () => {
                   Или выберите из списка:
                 </Text>
                 <Row gutter={[16, 16]} justify="center">
-                  {tenders.slice(0, 6).map(tender => (
+                  {tenders.filter(t => !t.is_archived).slice(0, 6).map(tender => (
                     <Col key={tender.id}>
                       <Card
                         hoverable
