@@ -3550,14 +3550,20 @@ const MarkupConstructor: React.FC = () => {
                                       type="text"
                                       size="small"
                                       icon={<SaveOutlined />}
-                                      onClick={() => handleInlineSave(markup.id)}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleInlineSave(markup.id);
+                                      }}
                                       style={{ color: '#52c41a' }}
                                     />
                                     <Button
                                       type="text"
                                       size="small"
                                       icon={<CloseOutlined />}
-                                      onClick={() => handleInlineCancel()}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleInlineCancel();
+                                      }}
                                     />
                                   </Space>
                                 }
