@@ -100,7 +100,7 @@ export const useBoqItems = (positionId: string | undefined) => {
     sortedItems.slice(0, 3).forEach((item, index) => {
       console.log(`  ${index}:`, {
         sort_number: item.sort_number,
-        name: item.work_name || item.material_name,
+        name: (item as any).work_names?.name || (item as any).material_names?.name,
         type: item.boq_item_type,
       });
     });
@@ -129,7 +129,7 @@ export const useBoqItems = (positionId: string | undefined) => {
     result.slice(0, 3).forEach((item, index) => {
       console.log(`  ${index}:`, {
         sort_number: item.sort_number,
-        name: item.work_name || item.material_name,
+        name: (item as any).work_names?.name || (item as any).material_names?.name,
         type: item.boq_item_type,
       });
     });
