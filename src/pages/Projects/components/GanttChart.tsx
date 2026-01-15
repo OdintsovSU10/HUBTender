@@ -218,8 +218,13 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       return null;
     });
 
-    // Build forecast data array (starts from last actual point)
+    // Build forecast data array (starts from last actual point, or from beginning if no actual data)
     const forecastData = sorted.map((c, idx) => {
+      // If there's no actual data at all (lastActualIndex === -1), show all forecast
+      if (lastActualIndex === -1) {
+        return c.forecast_amount && c.forecast_amount > 0 ? c.forecast_amount / 1_000_000 : null;
+      }
+
       // Include last actual point to connect the lines
       if (idx === lastActualIndex && c.actual_amount > 0) {
         return c.actual_amount / 1_000_000;
@@ -232,7 +237,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     });
 
     const hasActual = actualData.some(v => v !== null);
-    const hasForecast = forecastData.some((v, idx) => v !== null && idx > lastActualIndex);
+    const hasForecast = forecastData.some(v => v !== null);
 
     if (!hasActual && !hasForecast) {
       return null;
@@ -332,12 +337,22 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       return completion && completion.actual_amount > 0 ? completion.actual_amount / 1_000_000 : null;
     });
 
-    // Build forecast data array (starts from last actual point)
+    // Build forecast data array (starts from last actual point, or from beginning if no actual data)
     const forecastData = allMonths.map((m) => {
       const monthDate = dayjs(`${m.year}-${m.month}-01`);
 
+      // If there's no actual data at all, show all forecast data
+      if (!lastActualMonth) {
+        const completion = projectCompletion.find(
+          (c) => c.year === m.year && c.month === m.month
+        );
+        return completion && completion.forecast_amount && completion.forecast_amount > 0
+          ? completion.forecast_amount / 1_000_000
+          : null;
+      }
+
       // Include last actual point to connect the lines
-      if (lastActualMonth && monthDate.isSame(lastActualMonth, 'month')) {
+      if (monthDate.isSame(lastActualMonth, 'month')) {
         const completion = projectCompletion.find(
           (c) => c.year === m.year && c.month === m.month
         );
@@ -345,7 +360,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       }
 
       // Show forecast only after last actual
-      if (lastActualMonth && monthDate.isAfter(lastActualMonth, 'month')) {
+      if (monthDate.isAfter(lastActualMonth, 'month')) {
         const completion = projectCompletion.find(
           (c) => c.year === m.year && c.month === m.month
         );
@@ -358,11 +373,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     });
 
     const hasActual = actualData.some(v => v !== null);
-    const hasForecast = forecastData.some((v, idx) => {
-      if (!lastActualMonth || v === null) return false;
-      const monthDate = dayjs(`${allMonths[idx].year}-${allMonths[idx].month}-01`);
-      return monthDate.isAfter(lastActualMonth, 'month');
-    });
+    const hasForecast = forecastData.some(v => v !== null);
 
     const datasets: any[] = [];
 
