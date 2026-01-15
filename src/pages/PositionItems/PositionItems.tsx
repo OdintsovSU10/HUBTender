@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Card, Button, Typography, Tag, Input, InputNumber, Select, Modal, message, AutoComplete, Tabs } from 'antd';
-import { DeleteOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { DeleteOutlined, ThunderboltOutlined, UploadOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import WorkEditForm from './WorkEditForm';
 import MaterialEditForm from './MaterialEditForm';
@@ -10,6 +10,7 @@ import ItemsTable from './components/ItemsTable';
 import AddItemForm from './components/AddItemForm';
 import TemplateSelectModal from './components/TemplateSelectModal';
 import AuditHistoryTab from './components/AuditHistoryTab';
+import { BoqItemsImportModal } from './components/BoqItemsImportModal';
 import { supabase } from '../../lib/supabase';
 import { useDeadlineCheck } from '../../hooks/useDeadlineCheck';
 
@@ -23,6 +24,7 @@ const PositionItems: React.FC = () => {
   const [materialSearchText, setMaterialSearchText] = useState<string>('');
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
   const [templateModalVisible, setTemplateModalVisible] = useState<boolean>(false);
+  const [importModalVisible, setImportModalVisible] = useState<boolean>(false);
   const [selectedCostCategoryId, setSelectedCostCategoryId] = useState<string | null>(null);
   const [costSearchText, setCostSearchText] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('current');
@@ -373,6 +375,15 @@ const PositionItems: React.FC = () => {
                           Распространить затрату на все строки
                         </Button>
                         <Button
+                          type="default"
+                          icon={<UploadOutlined />}
+                          onClick={() => setImportModalVisible(true)}
+                          disabled={!canEditByDeadline || deadlineLoading}
+                          style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: 'white' }}
+                        >
+                          Импорт из Excel
+                        </Button>
+                        <Button
                           danger
                           icon={<DeleteOutlined />}
                           onClick={handleClearAllItems}
@@ -457,6 +468,21 @@ const PositionItems: React.FC = () => {
           setTemplateModalVisible(false);
         }}
       />
+
+      {/* Модалка импорта из Excel */}
+      {positionId && position?.tender_id && (
+        <BoqItemsImportModal
+          open={importModalVisible}
+          positionId={positionId}
+          tenderId={position.tender_id}
+          onClose={(success) => {
+            setImportModalVisible(false);
+            if (success) {
+              fetchItems();
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

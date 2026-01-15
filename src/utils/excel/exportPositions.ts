@@ -114,56 +114,55 @@ async function loadAllBoqItemsForTender(tenderId: string): Promise<Map<string, B
 
 /**
  * Сортирует элементы по иерархии (как на UI)
+ * НОВАЯ ЛОГИКА: всегда сортируем по sort_number, группируя материалы сразу после их родительских работ
  */
 function sortItemsByHierarchy(items: BoqItemFull[], positionName?: string): BoqItemFull[] {
-  const works = items.filter(item => isWorkType(item.boq_item_type));
-  const materials = items.filter(item => isMaterialType(item.boq_item_type));
-
-  const linkedMaterials = materials.filter(m => m.parent_work_item_id);
-  const unlinkedMaterials = materials.filter(m => !m.parent_work_item_id);
+  // ЛОГИРОВАНИЕ: Порядок элементов ДО сортировки
+  console.log(`\n=== ЭКСПОРТ: Сортировка для позиции "${positionName}" ===`);
+  console.log(`Всего элементов: ${items.length}`);
+  console.log('Первые 10 элементов ДО сортировки (по sort_number из БД):');
+  items.slice(0, 10).forEach((item, idx) => {
+    const name = item.work_names?.name || item.material_names?.name || 'N/A';
+    console.log(`  ${idx}: [sort=${item.sort_number}] ${name} (${item.boq_item_type})`);
+  });
 
   const result: BoqItemFull[] = [];
+  const processedIds = new Set<string>();
 
-  // ГРУППА 1: Работы с привязанными материалами
-  const worksWithMaterials: BoqItemFull[] = [];
+  // Сортируем все элементы по sort_number
+  const sortedItems = [...items].sort((a, b) => {
+    const aSortNum = a.sort_number ?? 0;
+    const bSortNum = b.sort_number ?? 0;
+    return aSortNum - bSortNum;
+  });
 
-  works.forEach(work => {
-    const workMaterials = linkedMaterials.filter(m => m.parent_work_item_id === work.id);
-    if (workMaterials.length > 0) {
-      worksWithMaterials.push(work);
+  // Проходим по отсортированным элементам
+  sortedItems.forEach(item => {
+    if (processedIds.has(item.id)) return;
+
+    result.push(item);
+    processedIds.add(item.id);
+
+    // Если это работа с привязанными материалами, добавляем материалы сразу после работы
+    if (isWorkType(item.boq_item_type)) {
+      const linkedMaterials = items
+        .filter(m => m.parent_work_item_id === item.id && !processedIds.has(m.id))
+        .sort((a, b) => (a.sort_number ?? 0) - (b.sort_number ?? 0));
+
+      linkedMaterials.forEach(mat => {
+        result.push(mat);
+        processedIds.add(mat.id);
+      });
     }
   });
 
-  worksWithMaterials.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
-
-  worksWithMaterials.forEach(work => {
-    result.push(work);
-    const workMaterials = linkedMaterials.filter(m => m.parent_work_item_id === work.id);
-    workMaterials.sort((a, b) => (a.sort_number || 0) - (b.sort_number || 0));
-    result.push(...workMaterials);
+  // ЛОГИРОВАНИЕ: Порядок элементов ПОСЛЕ сортировки
+  console.log('Первые 10 элементов ПОСЛЕ сортировки (финальный порядок для Excel):');
+  result.slice(0, 10).forEach((item, idx) => {
+    const name = item.work_names?.name || item.material_names?.name || 'N/A';
+    console.log(`  ${idx}: [sort=${item.sort_number}] ${name} (${item.boq_item_type})`);
   });
-
-  // ГРУППА 2: Непривязанные элементы (работы + материалы вперемешку)
-  const unlinkedWorks = works.filter(w => !worksWithMaterials.includes(w));
-  const unlinkedElements = [...unlinkedWorks, ...unlinkedMaterials];
-
-  // Сортировка: sort_number > 0 → по sort_number, иначе по created_at
-  unlinkedElements.sort((a, b) => {
-    const aSortNum = a.sort_number || 0;
-    const bSortNum = b.sort_number || 0;
-
-    if (aSortNum === 0 && bSortNum === 0) {
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    } else if (aSortNum === 0) {
-      return 1;
-    } else if (bSortNum === 0) {
-      return -1;
-    } else {
-      return aSortNum - bSortNum;
-    }
-  });
-
-  result.push(...unlinkedElements);
+  console.log('=== КОНЕЦ СОРТИРОВКИ ===\n');
 
   return result;
 }
