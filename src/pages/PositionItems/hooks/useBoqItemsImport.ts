@@ -35,7 +35,7 @@ interface ParsedBoqItem {
 
   // Финансовые поля
   currency_type: 'RUB' | 'USD' | 'EUR' | 'CNY';
-  delivery_price_type?: 'в цене' | 'не входит' | 'доп. стоимость';
+  delivery_price_type?: 'в цене' | 'не в цене' | 'суммой';
   delivery_amount?: number;
   unit_rate?: number;
 
@@ -151,6 +151,40 @@ const normalizeMaterialType = (value: string | undefined): 'основн.' | 'в
 
   if (original !== result) {
     console.log(`[MaterialType] Нормализация: "${original}" -> "${result}"`);
+  }
+
+  return result;
+};
+
+// Нормализация типа доставки (поддержка разных вариантов написания)
+const normalizeDeliveryPriceType = (value: string | undefined): 'в цене' | 'не в цене' | 'суммой' | undefined => {
+  if (!value) return undefined;
+
+  const original = String(value).trim();
+  const normalized = original.toLowerCase()
+    .replace(/\s+/g, ' ');  // Нормализуем пробелы
+
+  let result: 'в цене' | 'не в цене' | 'суммой' | undefined = undefined;
+
+  // "в цене"
+  if (normalized === 'в цене' || normalized === 'вцене' || normalized === 'входит') {
+    result = 'в цене';
+  }
+  // "не в цене"
+  else if (normalized === 'не в цене' || normalized === 'невцене' || normalized === 'не входит' || normalized === 'невходит') {
+    result = 'не в цене';
+  }
+  // "суммой"
+  else if (normalized === 'суммой' || normalized === 'доп. стоимость' || normalized === 'доп стоимость' || normalized === 'дополнительно') {
+    result = 'суммой';
+  }
+  // Если уже в нужном формате
+  else if (original === 'в цене' || original === 'не в цене' || original === 'суммой') {
+    result = original as 'в цене' | 'не в цене' | 'суммой';
+  }
+
+  if (original !== result) {
+    console.log(`[DeliveryPriceType] Нормализация: "${original}" -> "${result}"`);
   }
 
   return result;
@@ -353,8 +387,8 @@ export const useBoqItemsImport = () => {
               // Колонка 12: Валюта
               currency_type: cells[12] ? String(cells[12]).trim() as any : 'RUB',
 
-              // Колонка 13: Тип доставки
-              delivery_price_type: cells[13] ? String(cells[13]).trim() as any : undefined,
+              // Колонка 13: Тип доставки (с нормализацией)
+              delivery_price_type: normalizeDeliveryPriceType(cells[13]),
 
               // Колонка 14: Стоимость доставки
               delivery_amount: parseNumber(cells[14]),
@@ -430,7 +464,7 @@ export const useBoqItemsImport = () => {
     const validBoqTypes = ['раб', 'суб-раб', 'раб-комп.', 'мат', 'суб-мат', 'мат-комп.'];
     const validMaterialTypes = ['основн.', 'вспомогат.'];
     const validCurrencies = ['RUB', 'USD', 'EUR', 'CNY'];
-    const validDeliveryTypes = ['в цене', 'не входит', 'доп. стоимость'];
+    const validDeliveryTypes = ['в цене', 'не в цене', 'суммой'];
 
     data.forEach((item) => {
       const row = item.rowIndex;
@@ -685,15 +719,22 @@ export const useBoqItemsImport = () => {
       return Math.round(quantity * unitRate * rate * 100) / 100;
     } else {
       // Для материалов: quantity × (unit_rate × currency_rate + delivery_price)
+      const unitPriceInRub = unitRate * rate;
       let deliveryPrice = 0;
-      if (item.delivery_price_type === 'доп. стоимость') {
+
+      if (item.delivery_price_type === 'не в цене') {
+        // 3% от цены в рублях
+        deliveryPrice = Math.round(unitPriceInRub * 0.03 * 100) / 100;
+      } else if (item.delivery_price_type === 'суммой') {
+        // Конкретная сумма
         deliveryPrice = item.delivery_amount || 0;
       }
+      // Для 'в цене' deliveryPrice остается 0
 
       // Для непривязанных материалов применяем коэффициент расхода
       const consumptionCoeff = !item.parent_work_item_id ? (item.consumption_coefficient || 1) : 1;
 
-      return Math.round(quantity * consumptionCoeff * (unitRate * rate + deliveryPrice) * 100) / 100;
+      return Math.round(quantity * consumptionCoeff * (unitPriceInRub + deliveryPrice) * 100) / 100;
     }
   };
 
