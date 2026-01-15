@@ -1,11 +1,12 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { Typography, Empty, Tooltip, Progress, Button, Modal } from 'antd';
-import { LineChartOutlined } from '@ant-design/icons';
+import { Typography, Empty, Tooltip, Progress, Button, Modal, message } from 'antd';
+import { LineChartOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { Line } from 'react-chartjs-2';
+import * as XLSX from 'xlsx-js-style';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -147,6 +148,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
   }, [projects]);
 
   // Calculate monthly totals (sum across all projects per month)
+  // Use forecast when actual is missing
   const monthlyTotals = useMemo(() => {
     const totalsMap: Record<string, number> = {};
 
@@ -154,7 +156,15 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       const key = `${month.year}-${month.month}`;
       const monthTotal = completionData
         .filter((c) => c.year === month.year && c.month === month.month)
-        .reduce((sum, c) => sum + c.actual_amount, 0);
+        .reduce((sum, c) => {
+          // Use actual if available, otherwise use forecast
+          if (c.actual_amount > 0) {
+            return sum + c.actual_amount;
+          } else if (c.forecast_amount && c.forecast_amount > 0) {
+            return sum + c.forecast_amount;
+          }
+          return sum;
+        }, 0);
       totalsMap[key] = monthTotal;
     });
 
@@ -178,10 +188,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     );
   };
 
-  // Generate mini chart data for a project (only actual data points, no labels)
+  // Generate mini chart data for a project (actual + forecast as continuation)
   const getProjectChartData = (project: ProjectFull, colorIndex: number) => {
     const color = COLORS[colorIndex % COLORS.length];
-    const projectCompletion = completionData.filter((c) => c.project_id === project.id && c.actual_amount > 0);
+    const forecastColor = '#faad14'; // Orange for forecast
+
+    const projectCompletion = completionData.filter((c) => c.project_id === project.id);
 
     if (projectCompletion.length === 0) {
       return null;
@@ -193,26 +205,80 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       return a.month - b.month;
     });
 
+    // Find index of last actual data
+    const lastActualIndex = sorted.reduce((lastIdx, c, idx) => {
+      return c.actual_amount > 0 ? idx : lastIdx;
+    }, -1);
+
+    // Build actual data array
+    const actualData = sorted.map((c, idx) => {
+      if (idx <= lastActualIndex && c.actual_amount > 0) {
+        return c.actual_amount / 1_000_000;
+      }
+      return null;
+    });
+
+    // Build forecast data array (starts from last actual point)
+    const forecastData = sorted.map((c, idx) => {
+      // Include last actual point to connect the lines
+      if (idx === lastActualIndex && c.actual_amount > 0) {
+        return c.actual_amount / 1_000_000;
+      }
+      // Show forecast only after last actual
+      if (idx > lastActualIndex && c.forecast_amount && c.forecast_amount > 0) {
+        return c.forecast_amount / 1_000_000;
+      }
+      return null;
+    });
+
+    const hasActual = actualData.some(v => v !== null);
+    const hasForecast = forecastData.some((v, idx) => v !== null && idx > lastActualIndex);
+
+    if (!hasActual && !hasForecast) {
+      return null;
+    }
+
+    const datasets: any[] = [];
+
+    if (hasActual) {
+      datasets.push({
+        data: actualData,
+        borderColor: color,
+        backgroundColor: `${color}15`,
+        tension: 0.4,
+        fill: true,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        spanGaps: false,
+        datalabels: { display: false },
+      });
+    }
+
+    if (hasForecast) {
+      datasets.push({
+        data: forecastData,
+        borderColor: forecastColor,
+        backgroundColor: `${forecastColor}15`,
+        tension: 0.4,
+        fill: true,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        borderDash: [5, 5], // Dashed line for forecast
+        spanGaps: false,
+        datalabels: { display: false },
+      });
+    }
+
     return {
       labels: sorted.map(() => ''), // Empty labels
-      datasets: [
-        {
-          data: sorted.map((c) => c.actual_amount / 1_000_000),
-          borderColor: color,
-          backgroundColor: `${color}15`,
-          tension: 0.4,
-          fill: true,
-          borderWidth: 1.5,
-          pointRadius: 0,
-          datalabels: { display: false },
-        },
-      ],
+      datasets,
     };
   };
 
   // Generate full chart data for modal (full construction period on X axis)
   const getFullProjectChartData = (project: ProjectFull, colorIndex: number) => {
     const color = COLORS[colorIndex % COLORS.length];
+    const forecastColor = '#faad14'; // Orange for forecast
 
     const startDate = project.contract_date ? dayjs(project.contract_date) : null;
     const endDate = project.construction_end_date ? dayjs(project.construction_end_date) : null;
@@ -222,19 +288,20 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       return getProjectChartData(project, colorIndex);
     }
 
-    // Get project's completion data
+    // Get project's completion data (all data, not just actual)
     const projectCompletion = completionData.filter(
-      (c) => c.project_id === project.id && c.actual_amount > 0
+      (c) => c.project_id === project.id
     );
 
     // Find the last month with actual data
-    let lastDataMonth: dayjs.Dayjs | null = null;
-    if (projectCompletion.length > 0) {
-      const sortedCompletion = [...projectCompletion].sort((a, b) => {
+    let lastActualMonth: dayjs.Dayjs | null = null;
+    const completionWithActual = projectCompletion.filter(c => c.actual_amount > 0);
+    if (completionWithActual.length > 0) {
+      const sortedCompletion = [...completionWithActual].sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year;
         return b.month - a.month;
       });
-      lastDataMonth = dayjs(`${sortedCompletion[0].year}-${sortedCompletion[0].month}-01`);
+      lastActualMonth = dayjs(`${sortedCompletion[0].year}-${sortedCompletion[0].month}-01`);
     }
 
     // Generate ALL months from start to end (full construction period)
@@ -250,36 +317,93 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       current = current.add(1, 'month');
     }
 
-    // Get actual data - null for months without data, but don't include data after last actual month
-    const data = allMonths.map((m) => {
+    // Build actual data array
+    const actualData = allMonths.map((m) => {
       const monthDate = dayjs(`${m.year}-${m.month}-01`);
 
-      // If this month is after the last month with data, return null (line ends)
-      if (lastDataMonth && monthDate.isAfter(lastDataMonth, 'month')) {
+      // If this month is after the last month with actual data, return null (line ends)
+      if (lastActualMonth && monthDate.isAfter(lastActualMonth, 'month')) {
         return null;
       }
 
       const completion = projectCompletion.find(
         (c) => c.year === m.year && c.month === m.month
       );
-      return completion ? completion.actual_amount / 1_000_000 : null;
+      return completion && completion.actual_amount > 0 ? completion.actual_amount / 1_000_000 : null;
     });
+
+    // Build forecast data array (starts from last actual point)
+    const forecastData = allMonths.map((m) => {
+      const monthDate = dayjs(`${m.year}-${m.month}-01`);
+
+      // Include last actual point to connect the lines
+      if (lastActualMonth && monthDate.isSame(lastActualMonth, 'month')) {
+        const completion = projectCompletion.find(
+          (c) => c.year === m.year && c.month === m.month
+        );
+        return completion && completion.actual_amount > 0 ? completion.actual_amount / 1_000_000 : null;
+      }
+
+      // Show forecast only after last actual
+      if (lastActualMonth && monthDate.isAfter(lastActualMonth, 'month')) {
+        const completion = projectCompletion.find(
+          (c) => c.year === m.year && c.month === m.month
+        );
+        return completion && completion.forecast_amount && completion.forecast_amount > 0
+          ? completion.forecast_amount / 1_000_000
+          : null;
+      }
+
+      return null;
+    });
+
+    const hasActual = actualData.some(v => v !== null);
+    const hasForecast = forecastData.some((v, idx) => {
+      if (!lastActualMonth || v === null) return false;
+      const monthDate = dayjs(`${allMonths[idx].year}-${allMonths[idx].month}-01`);
+      return monthDate.isAfter(lastActualMonth, 'month');
+    });
+
+    const datasets: any[] = [];
+
+    if (hasActual) {
+      datasets.push({
+        data: actualData,
+        borderColor: color,
+        backgroundColor: `${color}20`,
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        spanGaps: true,
+        datalabels: { display: false },
+        label: 'Факт',
+      });
+    }
+
+    if (hasForecast) {
+      datasets.push({
+        data: forecastData,
+        borderColor: forecastColor,
+        backgroundColor: `${forecastColor}20`,
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        borderDash: [5, 5], // Dashed line for forecast
+        spanGaps: true,
+        datalabels: { display: false },
+        label: 'Прогноз',
+      });
+    }
+
+    if (!hasActual && !hasForecast) {
+      return null;
+    }
 
     return {
       labels: allMonths.map((m) => m.label),
-      datasets: [
-        {
-          data,
-          borderColor: color,
-          backgroundColor: `${color}20`,
-          tension: 0.3,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 6,
-          spanGaps: true,
-          datalabels: { display: false },
-        },
-      ],
+      datasets,
     };
   };
 
@@ -303,12 +427,18 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     },
   }), []);
 
-  // Full chart options for modal - only tooltips, no data labels
+  // Full chart options for modal - with legend and tooltips
   const fullChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: {
+          color: theme === 'dark' ? '#ffffff85' : '#00000073',
+        },
+      },
       tooltip: {
         enabled: true,
         callbacks: {
@@ -347,7 +477,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     },
   }), [theme]);
 
-  // Summary chart data - monthly totals across all projects
+  // Summary chart data - monthly totals across all projects (actual + forecast)
   const summaryChartData = useMemo(() => {
     const now = dayjs();
 
@@ -362,61 +492,139 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       }
     });
 
-    // End date is current + 6 months
-    const endDate = now.add(6, 'month').endOf('month');
+    // Find the latest month with any completion data (actual or forecast)
+    let latestDataDate = now.add(6, 'month').endOf('month');
+    completionData.forEach((c) => {
+      const hasData = c.actual_amount > 0 || (c.forecast_amount && c.forecast_amount > 0);
+      if (hasData) {
+        const dataDate = dayjs(`${c.year}-${c.month}-01`);
+        if (dataDate.isAfter(latestDataDate)) {
+          latestDataDate = dataDate;
+        }
+      }
+    });
+
+    // End date should be at least 6 months from now, or the latest data month, whichever is later
+    const endDate = latestDataDate.endOf('month');
 
     // Generate all months in range
-    const allMonths: { key: string; label: string }[] = [];
+    const allMonths: { key: string; label: string; year: number; month: number }[] = [];
     let current = earliestDate;
     while (current.isSameOrBefore(endDate, 'month')) {
       const key = `${current.year()}-${String(current.month() + 1).padStart(2, '0')}`;
       allMonths.push({
         key,
         label: `${MONTH_NAMES_SHORT[current.month()]} ${current.year().toString().slice(-2)}`,
+        year: current.year(),
+        month: current.month() + 1,
       });
       current = current.add(1, 'month');
     }
 
-    // Group completion data by month
-    const monthlyTotals: Record<string, number> = {};
+    // Group actual completion data by month
+    const monthlyActualTotals: Record<string, number> = {};
+    const monthlyForecastTotals: Record<string, number> = {};
+
     completionData.forEach((c) => {
+      const key = `${c.year}-${String(c.month).padStart(2, '0')}`;
+
       if (c.actual_amount > 0) {
-        const key = `${c.year}-${String(c.month).padStart(2, '0')}`;
-        monthlyTotals[key] = (monthlyTotals[key] || 0) + c.actual_amount;
+        monthlyActualTotals[key] = (monthlyActualTotals[key] || 0) + c.actual_amount;
+      } else if (c.forecast_amount && c.forecast_amount > 0) {
+        monthlyForecastTotals[key] = (monthlyForecastTotals[key] || 0) + c.forecast_amount;
       }
     });
 
-    // Find last month with data to stop the line there
-    const monthsWithData = allMonths.filter((m) => monthlyTotals[m.key] > 0);
-    const lastMonthWithData = monthsWithData.length > 0
-      ? monthsWithData[monthsWithData.length - 1].key
+    // Find last month with actual data
+    const monthsWithActual = allMonths.filter((m) => monthlyActualTotals[m.key] > 0);
+    const lastMonthWithActual = monthsWithActual.length > 0
+      ? monthsWithActual[monthsWithActual.length - 1]
       : null;
 
-    // Build data array - null for months after last data
-    const data = allMonths.map((m) => {
-      if (lastMonthWithData && m.key > lastMonthWithData) {
+    // Find last month with ANY data (actual or forecast)
+    const monthsWithData = allMonths.filter((m) =>
+      monthlyActualTotals[m.key] > 0 || monthlyForecastTotals[m.key] > 0
+    );
+    const lastMonthWithData = monthsWithData.length > 0
+      ? monthsWithData[monthsWithData.length - 1]
+      : null;
+
+    // Build actual data array
+    const actualData = allMonths.map((m) => {
+      // Stop at last month with actual data
+      if (lastMonthWithActual && m.key > lastMonthWithActual.key) {
         return null;
       }
-      return monthlyTotals[m.key] ? monthlyTotals[m.key] / 1_000_000 : null;
+      // Stop at last month with any data
+      if (lastMonthWithData && m.key > lastMonthWithData.key) {
+        return null;
+      }
+      return monthlyActualTotals[m.key] ? monthlyActualTotals[m.key] / 1_000_000 : null;
     });
 
-    if (allMonths.length === 0) return null;
+    // Build forecast data array (starts from last actual point)
+    const forecastData = allMonths.map((m) => {
+      // Include last actual point to connect the lines
+      if (lastMonthWithActual && m.key === lastMonthWithActual.key) {
+        return monthlyActualTotals[m.key] ? monthlyActualTotals[m.key] / 1_000_000 : null;
+      }
+
+      // Show forecast only after last actual
+      if (lastMonthWithActual && m.key > lastMonthWithActual.key) {
+        // Stop at last month with any data
+        if (lastMonthWithData && m.key > lastMonthWithData.key) {
+          return null;
+        }
+        return monthlyForecastTotals[m.key] ? monthlyForecastTotals[m.key] / 1_000_000 : null;
+      }
+
+      return null;
+    });
+
+    const hasActual = actualData.some(v => v !== null);
+    const hasForecast = forecastData.some((v, idx) => {
+      if (!lastMonthWithActual || v === null) return false;
+      return allMonths[idx].key > lastMonthWithActual.key;
+    });
+
+    if (allMonths.length === 0 || (!hasActual && !hasForecast)) return null;
+
+    const datasets: any[] = [];
+
+    if (hasActual) {
+      datasets.push({
+        data: actualData,
+        borderColor: '#52c41a',
+        backgroundColor: 'rgba(82, 196, 26, 0.15)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        spanGaps: true,
+        datalabels: { display: false },
+        label: 'Факт',
+      });
+    }
+
+    if (hasForecast) {
+      datasets.push({
+        data: forecastData,
+        borderColor: '#faad14',
+        backgroundColor: 'rgba(250, 173, 20, 0.15)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        borderDash: [5, 5], // Dashed line for forecast
+        spanGaps: true,
+        datalabels: { display: false },
+        label: 'Прогноз',
+      });
+    }
 
     return {
       labels: allMonths.map((m) => m.label),
-      datasets: [
-        {
-          data,
-          borderColor: '#52c41a',
-          backgroundColor: 'rgba(82, 196, 26, 0.15)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 6,
-          spanGaps: true,
-          datalabels: { display: false },
-        },
-      ],
+      datasets,
     };
   }, [completionData, projects]);
 
@@ -425,7 +633,13 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: {
+          color: theme === 'dark' ? '#ffffff85' : '#00000073',
+        },
+      },
       tooltip: {
         enabled: true,
         callbacks: {
@@ -464,6 +678,211 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     },
   }), [theme]);
 
+  // Export completion data to Excel
+  const handleExport = () => {
+    try {
+      // Create header row with months
+      const headers = ['Объект', ...months.map(m => m.label), 'ИТОГО'];
+
+      // Create data rows (one row per project)
+      const rows: any[][] = [];
+
+      // Determine which months are after current date (for styling)
+      const now = dayjs();
+      const futureMonthIndices = new Set<number>();
+      months.forEach((month, idx) => {
+        const monthDate = dayjs(`${month.year}-${month.month}-01`);
+        if (monthDate.isAfter(now, 'month')) {
+          futureMonthIndices.add(idx);
+        }
+      });
+
+      projects.forEach((project, projectIdx) => {
+        const row: any[] = [project.name];
+        let projectTotal = 0;
+
+        // Add data for each month
+        months.forEach((month, monthIdx) => {
+          const completion = getCompletionForMonth(project.id, month.year, month.month);
+          let value: number | string = '';
+
+          if (completion && completion.actual_amount > 0) {
+            value = completion.actual_amount;
+            projectTotal += completion.actual_amount;
+          } else if (completion && completion.forecast_amount && completion.forecast_amount > 0) {
+            value = completion.forecast_amount;
+            projectTotal += completion.forecast_amount;
+          }
+          // Если нет данных, оставляем пустую строку ''
+
+          row.push(value);
+        });
+
+        // Add total for this project
+        row.push(projectTotal);
+        rows.push(row);
+      });
+
+      // Add ИТОГО row (sum across all projects)
+      const totalsRow: any[] = ['ИТОГО'];
+      let grandTotal = 0;
+
+      months.forEach(month => {
+        const key = `${month.year}-${month.month}`;
+        const monthTotal = monthlyTotals[key] || 0;
+        // Не выводим нули в строке ИТОГО
+        totalsRow.push(monthTotal > 0 ? monthTotal : '');
+        grandTotal += monthTotal;
+      });
+      totalsRow.push(grandTotal);
+      rows.push(totalsRow);
+
+      // Create worksheet
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+      // Set column widths
+      const colWidths = [{ wch: 30 }, ...months.map(() => ({ wch: 12 })), { wch: 15 }];
+      ws['!cols'] = colWidths;
+
+      // Style header row
+      const headerStyle = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '1890FF' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } },
+        },
+      };
+
+      // Apply header style
+      for (let i = 0; i < headers.length; i++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: i });
+        if (!ws[cellRef]) continue;
+        ws[cellRef].s = headerStyle;
+      }
+
+      // Style for project names (first column)
+      const nameStyle = {
+        alignment: { horizontal: 'left', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } },
+        },
+      };
+
+      // Style for numbers
+      const numberStyle = {
+        numFmt: '#,##0',
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } },
+        },
+      };
+
+      // Style for empty cells
+      const emptyStyle = {
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } },
+        },
+      };
+
+      // Style for forecast numbers (orange background)
+      const forecastStyle = {
+        numFmt: '#,##0',
+        alignment: { horizontal: 'right', vertical: 'center' },
+        fill: { fgColor: { rgb: 'FFE7BA' } }, // Light orange background
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } },
+        },
+      };
+
+      // Style for ИТОГО row
+      const totalRowStyle = {
+        numFmt: '#,##0',
+        font: { bold: true },
+        fill: { fgColor: { rgb: 'F0F0F0' } },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'medium', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } },
+        },
+      };
+
+      const totalNameStyle = {
+        font: { bold: true },
+        fill: { fgColor: { rgb: 'F0F0F0' } },
+        alignment: { horizontal: 'left', vertical: 'center' },
+        border: {
+          top: { style: 'medium', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } },
+        },
+      };
+
+      // Apply styles to all cells
+      for (let r = 1; r <= rows.length; r++) {
+        const isLastRow = r === rows.length;
+
+        for (let c = 0; c < headers.length; c++) {
+          const cellRef = XLSX.utils.encode_cell({ r, c });
+          if (!ws[cellRef]) continue;
+
+          if (c === 0) {
+            // First column (project names)
+            ws[cellRef].s = isLastRow ? totalNameStyle : nameStyle;
+          } else {
+            // Number columns
+            if (isLastRow) {
+              ws[cellRef].s = totalRowStyle;
+            } else {
+              // Check if cell has value
+              const cellValue = ws[cellRef].v;
+              const isEmpty = cellValue === '' || cellValue === null || cellValue === undefined;
+
+              if (isEmpty) {
+                // Empty cell - no fill, just borders
+                ws[cellRef].s = emptyStyle;
+              } else {
+                // Check if this month is in the future (after current date)
+                // Column index: c-1 because first column (c=0) is project name
+                const monthIdx = c - 1;
+                const isFutureMonth = futureMonthIndices.has(monthIdx);
+                ws[cellRef].s = isFutureMonth ? forecastStyle : numberStyle;
+              }
+            }
+          }
+        }
+      }
+
+      // Create workbook and save
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Выполнение объектов');
+      XLSX.writeFile(wb, `Выполнение_объектов_${dayjs().format('YYYY-MM-DD')}.xlsx`);
+
+      message.success('Экспорт завершен успешно');
+    } catch (error: any) {
+      message.error('Ошибка экспорта: ' + error.message);
+    }
+  };
+
   if (projects.length === 0) {
     return <Empty description="Нет объектов для отображения" />;
   }
@@ -476,6 +895,17 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
 
   return (
     <div>
+      {/* Export button */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          type="primary"
+          icon={<DownloadOutlined />}
+          onClick={handleExport}
+        >
+          Экспорт в Excel
+        </Button>
+      </div>
+
       <div
         style={{
           display: 'flex',
@@ -729,6 +1159,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
                 {months.map((month) => {
                   const completion = getCompletionForMonth(project.id, month.year, month.month);
                   const hasActual = completion && completion.actual_amount > 0;
+                  const hasForecast = completion && !hasActual && completion.forecast_amount && completion.forecast_amount > 0;
 
                   // Check if month is within project timeline (from contract_date to construction_end_date)
                   const startDate = project.contract_date
@@ -794,7 +1225,41 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
                           </div>
                         </Tooltip>
                       )}
-                      {!hasActual && isInRange && startDate && endDate && (
+                      {hasForecast && (
+                        <Tooltip
+                          title={
+                            <div>
+                              <div>{month.label}</div>
+                              <div>Прогноз: {formatMoney(completion!.forecast_amount!)} ₽</div>
+                            </div>
+                          }
+                        >
+                          <div
+                            style={{
+                              width: monthWidth - 8,
+                              height: 28,
+                              borderRadius: 4,
+                              background: '#faad14',
+                              border: '2px dashed rgba(255, 255, 255, 0.5)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: '#fff',
+                                fontWeight: 500,
+                              }}
+                            >
+                              {formatMoney(completion!.forecast_amount!)}
+                            </Text>
+                          </div>
+                        </Tooltip>
+                      )}
+                      {!hasActual && !hasForecast && isInRange && startDate && endDate && (
                         <div
                           style={{
                             width: monthWidth - 16,
