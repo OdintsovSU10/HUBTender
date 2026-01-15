@@ -148,7 +148,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
   }, [projects]);
 
   // Calculate monthly totals (sum across all projects per month)
-  // Use forecast when actual is missing
+  // Sum both actual and forecast amounts
   const monthlyTotals = useMemo(() => {
     const totalsMap: Record<string, number> = {};
 
@@ -157,13 +157,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       const monthTotal = completionData
         .filter((c) => c.year === month.year && c.month === month.month)
         .reduce((sum, c) => {
-          // Use actual if available, otherwise use forecast
-          if (c.actual_amount > 0) {
-            return sum + c.actual_amount;
-          } else if (c.forecast_amount && c.forecast_amount > 0) {
-            return sum + c.forecast_amount;
-          }
-          return sum;
+          // Sum both actual and forecast
+          const actual = c.actual_amount > 0 ? c.actual_amount : 0;
+          const forecast = c.forecast_amount && c.forecast_amount > 0 ? c.forecast_amount : 0;
+          return sum + actual + forecast;
         }, 0);
       totalsMap[key] = monthTotal;
     });
@@ -532,22 +529,29 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       current = current.add(1, 'month');
     }
 
-    // Group actual completion data by month
+    // Group actual and forecast completion data by month (independently)
     const monthlyActualTotals: Record<string, number> = {};
     const monthlyForecastTotals: Record<string, number> = {};
 
     completionData.forEach((c) => {
       const key = `${c.year}-${String(c.month).padStart(2, '0')}`;
 
+      // Collect actual amounts
       if (c.actual_amount > 0) {
         monthlyActualTotals[key] = (monthlyActualTotals[key] || 0) + c.actual_amount;
-      } else if (c.forecast_amount && c.forecast_amount > 0) {
+      }
+
+      // Collect forecast amounts (independently from actual)
+      if (c.forecast_amount && c.forecast_amount > 0) {
         monthlyForecastTotals[key] = (monthlyForecastTotals[key] || 0) + c.forecast_amount;
       }
     });
 
-    // Find last month with actual data
+    // Find first and last month with actual data
     const monthsWithActual = allMonths.filter((m) => monthlyActualTotals[m.key] > 0);
+    const firstMonthWithActual = monthsWithActual.length > 0
+      ? monthsWithActual[0]
+      : null;
     const lastMonthWithActual = monthsWithActual.length > 0
       ? monthsWithActual[monthsWithActual.length - 1]
       : null;
@@ -560,43 +564,52 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       ? monthsWithData[monthsWithData.length - 1]
       : null;
 
-    // Build actual data array
+    // Build actual data array (shows actual + forecast sum where actual exists)
     const actualData = allMonths.map((m) => {
       // Stop at last month with actual data
       if (lastMonthWithActual && m.key > lastMonthWithActual.key) {
         return null;
       }
+      // If has actual, show actual + forecast (if forecast also exists in same month)
+      if (monthlyActualTotals[m.key]) {
+        const actual = monthlyActualTotals[m.key];
+        const forecast = monthlyForecastTotals[m.key] || 0;
+        return (actual + forecast) / 1_000_000;
+      }
+      return null;
+    });
+
+    // Build forecast data array (continues line after last actual month)
+    const forecastData = allMonths.map((m) => {
       // Stop at last month with any data
       if (lastMonthWithData && m.key > lastMonthWithData.key) {
         return null;
       }
-      return monthlyActualTotals[m.key] ? monthlyActualTotals[m.key] / 1_000_000 : null;
-    });
 
-    // Build forecast data array (starts from last actual point)
-    const forecastData = allMonths.map((m) => {
-      // Include last actual point to connect the lines
-      if (lastMonthWithActual && m.key === lastMonthWithActual.key) {
-        return monthlyActualTotals[m.key] ? monthlyActualTotals[m.key] / 1_000_000 : null;
+      // If this month has actual data, check if we need it for connection
+      if (monthlyActualTotals[m.key]) {
+        // Include last actual point to connect with forecast line after it
+        if (lastMonthWithActual && m.key === lastMonthWithActual.key) {
+          const actual = monthlyActualTotals[m.key];
+          const forecast = monthlyForecastTotals[m.key] || 0;
+          return (actual + forecast) / 1_000_000;
+        }
+        return null;
       }
 
-      // Show forecast only after last actual
-      if (lastMonthWithActual && m.key > lastMonthWithActual.key) {
-        // Stop at last month with any data
-        if (lastMonthWithData && m.key > lastMonthWithData.key) {
-          return null;
+      // If no actual data but has forecast, show forecast (only after last actual month)
+      if (monthlyForecastTotals[m.key] && monthlyForecastTotals[m.key] > 0) {
+        // Only show forecast if we're after the last actual month (or if there's no actual at all)
+        if (!lastMonthWithActual || m.key > lastMonthWithActual.key) {
+          return monthlyForecastTotals[m.key] / 1_000_000;
         }
-        return monthlyForecastTotals[m.key] ? monthlyForecastTotals[m.key] / 1_000_000 : null;
       }
 
       return null;
     });
 
     const hasActual = actualData.some(v => v !== null);
-    const hasForecast = forecastData.some((v, idx) => {
-      if (!lastMonthWithActual || v === null) return false;
-      return allMonths[idx].key > lastMonthWithActual.key;
-    });
+    const hasForecast = forecastData.some(v => v !== null);
 
     if (allMonths.length === 0 || (!hasActual && !hasForecast)) return null;
 
