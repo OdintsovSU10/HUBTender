@@ -58,7 +58,7 @@ export const FileUploadStep: React.FC<FileUploadStepProps> = ({ onFileUpload, up
               <Text>Колонка 13: <Text code>Валюта</Text> (RUB, USD, EUR, CNY)</Text>
             </List.Item>
             <List.Item>
-              <Text>Колонка 14: <Text code>Тип доставки</Text> (в цене, не входит, доп. стоимость)</Text>
+              <Text>Колонка 14: <Text code>Тип доставки</Text> (в цене, не в цене, суммой)</Text>
             </List.Item>
             <List.Item>
               <Text>Колонка 15: <Text code>Стоимость доставки</Text> (число)</Text>
