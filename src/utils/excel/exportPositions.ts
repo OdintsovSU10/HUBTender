@@ -122,7 +122,7 @@ function sortItemsByHierarchy(items: BoqItemFull[], positionName?: string): BoqI
   console.log(`Всего элементов: ${items.length}`);
   console.log('Первые 10 элементов ДО сортировки (по sort_number из БД):');
   items.slice(0, 10).forEach((item, idx) => {
-    const name = item.work_names?.name || item.material_names?.name || 'N/A';
+    const name = item.work_name || item.material_name || 'N/A';
     console.log(`  ${idx}: [sort=${item.sort_number}] ${name} (${item.boq_item_type})`);
   });
 
@@ -159,7 +159,7 @@ function sortItemsByHierarchy(items: BoqItemFull[], positionName?: string): BoqI
   // ЛОГИРОВАНИЕ: Порядок элементов ПОСЛЕ сортировки
   console.log('Первые 10 элементов ПОСЛЕ сортировки (финальный порядок для Excel):');
   result.slice(0, 10).forEach((item, idx) => {
-    const name = item.work_names?.name || item.material_names?.name || 'N/A';
+    const name = item.work_name || item.material_name || 'N/A';
     console.log(`  ${idx}: [sort=${item.sort_number}] ${name} (${item.boq_item_type})`);
   });
   console.log('=== КОНЕЦ СОРТИРОВКИ ===\n');

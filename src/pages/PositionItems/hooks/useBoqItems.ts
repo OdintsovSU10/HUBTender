@@ -100,7 +100,7 @@ export const useBoqItems = (positionId: string | undefined) => {
     sortedItems.slice(0, 3).forEach((item, index) => {
       console.log(`  ${index}:`, {
         sort_number: item.sort_number,
-        name: item.work_names?.name || item.material_names?.name,
+        name: item.work_name || item.material_name,
         type: item.boq_item_type,
       });
     });
