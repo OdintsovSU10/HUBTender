@@ -109,8 +109,8 @@ const isMaterial = (type: string): boolean => {
 
 const normalizeString = (str: string): string => {
   return str.trim()
-    .replace(/\s+/g, ' ')  // Множественные пробелы -> один пробел
-    .replace(/\s*\/\s*/g, '/');  // Пробелы вокруг слэша -> убрать
+    .replace(/\s+/g, ' ');  // Множественные пробелы -> один пробел
+  // НЕ убираем пробелы вокруг слэша, т.к. в БД категории хранятся как "ВИС / Электрические системы"
 };
 
 const parseNumber = (value: any): number | undefined => {
@@ -157,15 +157,38 @@ const normalizeMaterialType = (value: string | undefined): 'основн.' | 'в
 };
 
 // Парсинг затраты на строительство: "Категория / Детальная категория / Локация"
+// ВАЖНО: Категория может содержать слэш (например, "ВИС / Электрические системы")
+// Поэтому разбиваем справа налево: последний слэш - location, предпоследний - detail
 const parseCostCategory = (text: string): { category?: string; detail?: string; location?: string } => {
   if (!text) return {};
-  // Разбиваем только по разделителю " / " (пробел-слэш-пробел), чтобы сохранить внутренние слэши
+
+  // Разбиваем по разделителю " / " (пробел-слэш-пробел)
   const parts = text.split(' / ').map(p => p.trim());
-  return {
-    category: parts[0] || undefined,
-    detail: parts[1] || undefined,
-    location: parts[2] || undefined,
-  };
+
+  if (parts.length === 1) {
+    // Только одна часть - возможно ошибка
+    return { category: parts[0] };
+  } else if (parts.length === 2) {
+    // Две части: category / detail (без location)
+    return {
+      category: parts[0],
+      detail: parts[1],
+    };
+  } else {
+    // Три или более частей: разбираем справа налево
+    // location = последняя часть
+    // detail = предпоследняя часть
+    // category = все остальное, объединенное через " / "
+    const location = parts[parts.length - 1];
+    const detail = parts[parts.length - 2];
+    const category = parts.slice(0, parts.length - 2).join(' / ');
+
+    return {
+      category: category || undefined,
+      detail: detail || undefined,
+      location: location || undefined,
+    };
+  }
 };
 
 // ===========================
