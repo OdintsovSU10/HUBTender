@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { Typography, Empty, Tooltip, Progress, Button, Modal, message } from 'antd';
-import { LineChartOutlined, DownloadOutlined } from '@ant-design/icons';
+import { LineChartOutlined, DownloadOutlined, EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
@@ -87,16 +87,36 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
   const [chartModalProject, setChartModalProject] = useState<{ project: ProjectFull; colorIndex: number } | null>(null);
   const [summaryChartOpen, setSummaryChartOpen] = useState(false);
+  const [hiddenProjects, setHiddenProjects] = useState<Set<string>>(new Set());
+
+  // Filter visible projects based on hidden state
+  const visibleProjects = useMemo(() => {
+    return projects.filter(p => !hiddenProjects.has(p.id));
+  }, [projects, hiddenProjects]);
+
+  // Hide a project
+  const hideProject = useCallback((projectId: string) => {
+    setHiddenProjects(prev => {
+      const next = new Set(prev);
+      next.add(projectId);
+      return next;
+    });
+  }, []);
+
+  // Show all hidden projects by clearing the hidden projects set
+  const showAllHiddenProjects = useCallback(() => {
+    setHiddenProjects(new Set());
+  }, []);
 
   // Generate months timeline - from earliest project date to current + 4 years
   const { months, monthWidth } = useMemo(() => {
-    if (projects.length === 0) return { months: [], monthWidth: 80 };
+    if (visibleProjects.length === 0) return { months: [], monthWidth: 80 };
 
     const now = dayjs();
 
     // Find earliest project start date
     let minDate = now.startOf('month');
-    projects.forEach((p) => {
+    visibleProjects.forEach((p) => {
       if (p.contract_date) {
         const start = dayjs(p.contract_date).startOf('month');
         if (start.isBefore(minDate)) {
@@ -136,26 +156,27 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     }
 
     return { months: monthsList, monthWidth: 80 };
-  }, [projects, completionData]);
+  }, [visibleProjects, completionData]);
 
-  // Calculate totals across all projects
+  // Calculate totals across all visible projects
   const totals = useMemo(() => {
-    const totalContract = projects.reduce((sum, p) => sum + p.final_contract_cost, 0);
-    const totalCompletion = projects.reduce((sum, p) => sum + p.total_completion, 0);
+    const totalContract = visibleProjects.reduce((sum, p) => sum + p.final_contract_cost, 0);
+    const totalCompletion = visibleProjects.reduce((sum, p) => sum + p.total_completion, 0);
     const totalRemaining = totalContract - totalCompletion;
     const completionPercent = totalContract > 0 ? (totalCompletion / totalContract) * 100 : 0;
     return { totalContract, totalCompletion, totalRemaining, completionPercent };
-  }, [projects]);
+  }, [visibleProjects]);
 
-  // Calculate monthly totals (sum across all projects per month)
+  // Calculate monthly totals (sum across all visible projects per month)
   // Sum both actual and forecast amounts
   const monthlyTotals = useMemo(() => {
     const totalsMap: Record<string, number> = {};
+    const visibleProjectIds = new Set(visibleProjects.map(p => p.id));
 
     months.forEach((month) => {
       const key = `${month.year}-${month.month}`;
       const monthTotal = completionData
-        .filter((c) => c.year === month.year && c.month === month.month)
+        .filter((c) => c.year === month.year && c.month === month.month && visibleProjectIds.has(c.project_id))
         .reduce((sum, c) => {
           // Sum both actual and forecast
           const actual = c.actual_amount > 0 ? c.actual_amount : 0;
@@ -166,7 +187,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     });
 
     return totalsMap;
-  }, [months, completionData]);
+  }, [months, completionData, visibleProjects]);
 
   // Scroll to current month on mount
   useEffect(() => {
@@ -485,13 +506,14 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     },
   }), [theme]);
 
-  // Summary chart data - monthly totals across all projects (actual + forecast)
+  // Summary chart data - monthly totals across all visible projects (actual + forecast)
   const summaryChartData = useMemo(() => {
     const now = dayjs();
+    const visibleProjectIds = new Set(visibleProjects.map(p => p.id));
 
     // Find earliest project start date
     let earliestDate = now.subtract(12, 'month').startOf('month');
-    projects.forEach((p) => {
+    visibleProjects.forEach((p) => {
       if (p.contract_date) {
         const projectStart = dayjs(p.contract_date).startOf('month');
         if (projectStart.isBefore(earliestDate)) {
@@ -503,6 +525,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     // Find the latest month with any completion data (actual or forecast)
     let latestDataDate = now.add(6, 'month').endOf('month');
     completionData.forEach((c) => {
+      if (!visibleProjectIds.has(c.project_id)) return; // Skip hidden projects
       const hasData = c.actual_amount > 0 || (c.forecast_amount && c.forecast_amount > 0);
       if (hasData) {
         const dataDate = dayjs(`${c.year}-${c.month}-01`);
@@ -529,11 +552,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       current = current.add(1, 'month');
     }
 
-    // Group actual and forecast completion data by month (independently)
+    // Group actual and forecast completion data by month (independently, only visible projects)
     const monthlyActualTotals: Record<string, number> = {};
     const monthlyForecastTotals: Record<string, number> = {};
 
     completionData.forEach((c) => {
+      if (!visibleProjectIds.has(c.project_id)) return; // Skip hidden projects
       const key = `${c.year}-${String(c.month).padStart(2, '0')}`;
 
       // Collect actual amounts
@@ -650,7 +674,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
       labels: allMonths.map((m) => m.label),
       datasets,
     };
-  }, [completionData, projects]);
+  }, [completionData, visibleProjects]);
 
   // Summary chart options
   const summaryChartOptions = useMemo(() => ({
@@ -702,13 +726,13 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     },
   }), [theme]);
 
-  // Export completion data to Excel
+  // Export completion data to Excel (only visible projects)
   const handleExport = () => {
     try {
       // Create header row with months
       const headers = ['Объект', ...months.map(m => m.label), 'ИТОГО'];
 
-      // Create data rows (one row per project)
+      // Create data rows (one row per visible project)
       const rows: any[][] = [];
 
       // Determine which months are after current date (for styling)
@@ -721,7 +745,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
         }
       });
 
-      projects.forEach((project, projectIdx) => {
+      visibleProjects.forEach((project, projectIdx) => {
         const row: any[] = [project.name];
         let projectTotal = 0;
 
@@ -911,6 +935,22 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
     return <Empty description="Нет объектов для отображения" />;
   }
 
+  if (visibleProjects.length === 0 && hiddenProjects.size > 0) {
+    return (
+      <div>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            icon={<EyeOutlined />}
+            onClick={showAllHiddenProjects}
+          >
+            Показать скрытые объекты ({hiddenProjects.size})
+          </Button>
+        </div>
+        <Empty description="Все объекты скрыты. Нажмите кнопку выше для их отображения." />
+      </div>
+    );
+  }
+
   const rowHeight = 70;
   const headerHeight = 60;
   const projectNameWidth = 200;
@@ -919,8 +959,16 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
 
   return (
     <div>
-      {/* Export button */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+      {/* Export and show hidden buttons */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        {hiddenProjects.size > 0 && (
+          <Button
+            icon={<EyeOutlined />}
+            onClick={showAllHiddenProjects}
+          >
+            Показать скрытые объекты ({hiddenProjects.size})
+          </Button>
+        )}
         <Button
           type="primary"
           icon={<DownloadOutlined />}
@@ -962,38 +1010,54 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
         </div>
 
         {/* Project rows */}
-        {projects.map((project, index) => (
-          <div
-            key={project.id}
-            style={{
-              height: rowHeight,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              padding: '0 16px',
-              borderBottom: `1px solid ${theme === 'dark' ? '#303030' : '#f0f0f0'}`,
-              background:
-                hoveredProject === project.id
-                  ? theme === 'dark'
-                    ? '#262626'
-                    : '#f5f5f5'
-                  : 'transparent',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={() => setHoveredProject(project.id)}
-            onMouseLeave={() => setHoveredProject(null)}
-          >
-            <Text
-              strong
-              ellipsis
+        {visibleProjects.map((project, index) => {
+          const isHidden = hiddenProjects.has(project.id);
+          return (
+            <div
+              key={project.id}
               style={{
-                color: COLORS[index % COLORS.length],
-                maxWidth: projectNameWidth - 32,
+                height: rowHeight,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                padding: '0 16px',
+                borderBottom: `1px solid ${theme === 'dark' ? '#303030' : '#f0f0f0'}`,
+                background:
+                  hoveredProject === project.id
+                    ? theme === 'dark'
+                      ? '#262626'
+                      : '#f5f5f5'
+                    : 'transparent',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
               }}
+              onMouseEnter={() => setHoveredProject(project.id)}
+              onMouseLeave={() => setHoveredProject(null)}
             >
-              {project.name}
-            </Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EyeInvisibleOutlined />}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideProject(project.id);
+                  }}
+                  style={{ padding: '0 4px', minWidth: 'auto' }}
+                  title="Скрыть объект"
+                />
+                <Text
+                  strong
+                  ellipsis
+                  style={{
+                    color: COLORS[index % COLORS.length],
+                    maxWidth: projectNameWidth - 64,
+                  }}
+                >
+                  {project.name}
+                </Text>
+              </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <Progress
                 percent={Math.min(Math.round(project.completion_percentage), 100)}
@@ -1007,7 +1071,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
               </Text>
             </div>
           </div>
-        ))}
+        );
+        })}
 
         {/* Totals row label */}
         <div
@@ -1047,7 +1112,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
         </div>
 
         {/* Mini chart rows */}
-        {projects.map((project, index) => {
+        {visibleProjects.map((project, index) => {
           const chartData = getProjectChartData(project, index);
           return (
             <div
@@ -1159,7 +1224,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ projects, completionData
           </div>
 
           {/* Project rows with bars */}
-          {projects.map((project, projectIndex) => {
+          {visibleProjects.map((project, projectIndex) => {
             const color = COLORS[projectIndex % COLORS.length];
 
             return (
