@@ -695,36 +695,54 @@ export const useBoqItemsImport = () => {
   // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАСЧЕТА
   // ===========================
 
-  const getCurrencyRate = (currency: string): number => {
+  const getCurrencyRate = (currency: string, rates?: { usd: number; eur: number; cny: number }): number => {
+    const actualRates = rates || currencyRates;
     switch (currency) {
       case 'USD':
-        return currencyRates.usd;
+        return actualRates.usd;
       case 'EUR':
-        return currencyRates.eur;
+        return actualRates.eur;
       case 'CNY':
-        return currencyRates.cny;
+        return actualRates.cny;
       case 'RUB':
       default:
         return 1;
     }
   };
 
-  const calculateTotalAmount = (item: ParsedBoqItem): number => {
-    const rate = getCurrencyRate(item.currency_type || 'RUB');
+  const calculateTotalAmount = (item: ParsedBoqItem, rates?: { usd: number; eur: number; cny: number }): number => {
+    const rate = getCurrencyRate(item.currency_type || 'RUB', rates);
     const unitRate = item.unit_rate || 0;
     const quantity = item.quantity || 0;
 
+    // Логирование для валютных позиций
+    if (item.currency_type && item.currency_type !== 'RUB') {
+      console.log(`[TotalAmount] Расчёт для валютной позиции "${item.nameText.substring(0, 50)}...":`, {
+        currency: item.currency_type,
+        rate,
+        unitRate,
+        quantity,
+        unitRateInRub: unitRate * rate,
+      });
+    }
+
     if (isWork(item.boq_item_type)) {
-      // Для работ: quantity × unit_rate × currency_rate
-      return Math.round(quantity * unitRate * rate * 100) / 100;
+      // Для работ: quantity × unit_rate × currency_rate (полная точность)
+      const total = quantity * unitRate * rate;
+
+      if (item.currency_type && item.currency_type !== 'RUB') {
+        console.log(`[TotalAmount] Работа - итого: ${total} ₽`);
+      }
+
+      return total;
     } else {
       // Для материалов: quantity × (unit_rate × currency_rate + delivery_price)
       const unitPriceInRub = unitRate * rate;
       let deliveryPrice = 0;
 
       if (item.delivery_price_type === 'не в цене') {
-        // 3% от цены в рублях
-        deliveryPrice = Math.round(unitPriceInRub * 0.03 * 100) / 100;
+        // 3% от цены в рублях (полная точность)
+        deliveryPrice = unitPriceInRub * 0.03;
       } else if (item.delivery_price_type === 'суммой') {
         // Конкретная сумма
         deliveryPrice = item.delivery_amount || 0;
@@ -734,27 +752,48 @@ export const useBoqItemsImport = () => {
       // Для непривязанных материалов применяем коэффициент расхода
       const consumptionCoeff = !item.parent_work_item_id ? (item.consumption_coefficient || 1) : 1;
 
-      return Math.round(quantity * consumptionCoeff * (unitPriceInRub + deliveryPrice) * 100) / 100;
+      const total = quantity * consumptionCoeff * (unitPriceInRub + deliveryPrice);
+
+      if (item.currency_type && item.currency_type !== 'RUB') {
+        console.log(`[TotalAmount] Материал - итого: ${total} ₽ (доставка: ${deliveryPrice} ₽, коэфф.расхода: ${consumptionCoeff})`);
+      }
+
+      return total;
     }
   };
 
-  const loadCurrencyRates = async (tenderId: string) => {
+  const loadCurrencyRates = async (tenderId: string): Promise<{ usd: number; eur: number; cny: number }> => {
     try {
-      const { data: tender } = await supabase
+      const { data: tender, error } = await supabase
         .from('tenders')
         .select('usd_rate, eur_rate, cny_rate')
         .eq('id', tenderId)
         .single();
 
-      if (tender) {
-        setCurrencyRates({
-          usd: tender.usd_rate || 1,
-          eur: tender.eur_rate || 1,
-          cny: tender.cny_rate || 1,
-        });
+      if (error) {
+        console.error('[BoqImport] Ошибка загрузки курсов валют:', error);
+        throw new Error(`Не удалось загрузить курсы валют из тендера: ${error.message}`);
       }
-    } catch (error) {
-      console.error('Ошибка загрузки курсов валют:', error);
+
+      if (!tender) {
+        console.error('[BoqImport] Тендер не найден:', tenderId);
+        throw new Error('Тендер не найден');
+      }
+
+      const rates = {
+        usd: tender.usd_rate || 1,
+        eur: tender.eur_rate || 1,
+        cny: tender.cny_rate || 1,
+      };
+
+      setCurrencyRates(rates);
+
+      console.log('[BoqImport] Курсы валют загружены:', rates);
+
+      return rates;
+    } catch (error: any) {
+      console.error('[BoqImport] Критическая ошибка загрузки курсов валют:', error);
+      throw error;
     }
   };
 
@@ -772,7 +811,7 @@ export const useBoqItemsImport = () => {
       setUploadProgress(0);
 
       // Загружаем курсы валют из tender
-      await loadCurrencyRates(tenderId);
+      const rates = await loadCurrencyRates(tenderId);
 
       // Получаем максимальный sort_number из существующих записей
       const { data: existingItems } = await supabase
@@ -811,8 +850,8 @@ export const useBoqItemsImport = () => {
           ? workIdMap.get(item.parent_work_item_id) || null
           : null;
 
-        // Рассчитываем итоговую сумму
-        const totalAmount = calculateTotalAmount(item);
+        // Рассчитываем итоговую сумму с передачей курсов валют
+        const totalAmount = calculateTotalAmount(item, rates);
 
         // Формируем данные для вставки
         const insertData: any = {

@@ -126,13 +126,13 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     }
   };
 
-  // Вычисление цены доставки
+  // Вычисление цены доставки (полная точность без округления)
   const calculateDeliveryPrice = (): number => {
     const rate = getCurrencyRate(formData.currency_type);
     const unitPriceInRub = formData.unit_rate * rate;
 
     if (formData.delivery_price_type === 'не в цене') {
-      return Math.round(unitPriceInRub * 0.03 * 100) / 100;
+      return unitPriceInRub * 0.03; // Используем все 5 знаков после запятой
     } else if (formData.delivery_price_type === 'суммой') {
       return formData.delivery_amount || 0;
     } else {
@@ -141,7 +141,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     }
   };
 
-  // Вычисление суммы
+  // Вычисление суммы (полная точность без округления)
   const calculateTotal = (): number => {
     // Использовать formData.quantity напрямую, т.к. оно уже содержит правильное значение
     // (либо автоматически рассчитанное, либо введенное вручную)
@@ -152,7 +152,7 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
     // Для непривязанных материалов всегда применять коэффициент расхода к итоговой сумме
     const consumptionCoeff = !formData.parent_work_item_id ? (formData.consumption_coefficient || 1) : 1;
     const total = qty * consumptionCoeff * (formData.unit_rate * rate + deliveryPrice);
-    return Math.round(total * 100) / 100;
+    return total; // Используем все 5 знаков после запятой, округление только для отображения
   };
 
   // Обновление количества при изменении зависимых полей
@@ -232,14 +232,14 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
       dataToSave.quantity = calculateQuantity();
     }
 
-    // Вычислить total_amount на основе финального quantity в dataToSave
+    // Вычислить total_amount на основе финального quantity в dataToSave (полная точность)
     const rate = getCurrencyRate(formData.currency_type);
     const deliveryPrice = calculateDeliveryPrice();
 
     // Для непривязанных материалов всегда применять коэффициент расхода к итоговой сумме
     const consumptionCoeff = !dataToSave.parent_work_item_id ? (formData.consumption_coefficient || 1) : 1;
-    const totalAmount = Math.round(dataToSave.quantity * consumptionCoeff * (formData.unit_rate * rate + deliveryPrice) * 100) / 100;
-    dataToSave.total_amount = totalAmount;
+    const totalAmount = dataToSave.quantity * consumptionCoeff * (formData.unit_rate * rate + deliveryPrice);
+    dataToSave.total_amount = totalAmount; // Сохраняем в БД с полной точностью (5 знаков)
 
     await onSave(dataToSave);
   };

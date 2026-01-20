@@ -133,7 +133,7 @@ export const useItemActions = ({
 
       let deliveryPrice = 0;
       if (matLib.delivery_price_type === 'не в цене') {
-        deliveryPrice = Math.round(unitRate * rate * 0.03 * 100) / 100;
+        deliveryPrice = unitRate * rate * 0.03; // Полная точность (5 знаков)
       } else if (matLib.delivery_price_type === 'суммой' && matLib.delivery_amount) {
         deliveryPrice = matLib.delivery_amount;
       }
@@ -234,7 +234,7 @@ export const useItemActions = ({
         let deliveryPrice = 0;
 
         if (material.delivery_price_type === 'не в цене') {
-          deliveryPrice = Math.round(unitRate * rate * 0.03 * 100) / 100;
+          deliveryPrice = unitRate * rate * 0.03; // Полная точность (5 знаков)
         } else if (material.delivery_price_type === 'суммой' && material.delivery_amount) {
           deliveryPrice = material.delivery_amount;
         }

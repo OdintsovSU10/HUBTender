@@ -338,15 +338,14 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
           const unitRate = record.unit_rate || 0;
           const rate = getCurrencyRate(record.currency_type as CurrencyType);
           const unitPriceInRub = unitRate * rate;
-          const deliveryAmount = unitPriceInRub * 0.03;
+          const deliveryAmount = unitPriceInRub * 0.03; // Полная точность для расчета
 
-          const deliveryRounded = Math.round(deliveryAmount * 100) / 100;
-          const tooltipTitle = `${deliveryRounded.toFixed(2)} = ${unitPriceInRub.toFixed(2)} × 3%`;
+          const tooltipTitle = `${deliveryAmount.toFixed(2)} = ${unitPriceInRub.toFixed(2)} × 3%`;
 
           return (
             <Tooltip title={tooltipTitle}>
               <span style={{ cursor: 'help', borderBottom: '1px dotted' }}>
-                {deliveryRounded.toFixed(2)}
+                {deliveryAmount.toFixed(2)}
               </span>
             </Tooltip>
           );
@@ -377,7 +376,7 @@ const ItemsTable: React.FC<ItemsTableProps> = ({
           if (isMaterial) {
             let deliveryPrice = 0;
             if (record.delivery_price_type === 'не в цене') {
-              deliveryPrice = Math.round(price * rate * 0.03 * 100) / 100;
+              deliveryPrice = price * rate * 0.03; // Полная точность для расчета
             } else if (record.delivery_price_type === 'суммой') {
               deliveryPrice = record.delivery_amount || 0;
             }

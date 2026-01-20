@@ -74,11 +74,11 @@ const WorkEditForm: React.FC<WorkEditFormProps> = ({
     }
   };
 
-  // Вычисление суммы
+  // Вычисление суммы (полная точность без округления)
   const calculateTotal = (): number => {
     const rate = getCurrencyRate(formData.currency_type);
     const total = formData.quantity * formData.unit_rate * rate;
-    return Math.round(total * 100) / 100;
+    return total; // Используем все 5 знаков после запятой, округление только для отображения
   };
 
   // Обработчик сохранения
