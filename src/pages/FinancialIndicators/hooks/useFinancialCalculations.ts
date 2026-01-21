@@ -77,11 +77,25 @@ export const useFinancialCalculations = () => {
         );
       }
 
-      // Загрузка последовательности наценок для проверки наличия НДС в конструкторе
-      const { data: markupSequences } = await supabase
-        .from('markup_sequences')
-        .select('markup_parameter_id')
-        .eq('markup_tactic_id', tender.markup_tactic_id);
+      // Извлечение ID параметров из JSONB поля sequences тактики наценок
+      const sequenceParameterIds = new Set<string>();
+      if (tactic?.sequences) {
+        console.log('Загружена тактика наценок:', tactic.name);
+        console.log('Sequences:', tactic.sequences);
+
+        // sequences - это объект с ключами типов позиций: {"мат": [...], "раб": [...], ...}
+        Object.values(tactic.sequences).forEach((sequenceArray: any) => {
+          if (Array.isArray(sequenceArray)) {
+            sequenceArray.forEach((item: any) => {
+              if (item.markup_parameter_id) {
+                sequenceParameterIds.add(item.markup_parameter_id);
+              }
+            });
+          }
+        });
+
+        console.log('Извлечено ID параметров из sequences:', Array.from(sequenceParameterIds));
+      }
 
       const { data: tenderMarkupPercentages, error: percentagesError } = await supabase
         .from('tender_markup_percentage')
@@ -281,7 +295,6 @@ export const useFinancialCalculations = () => {
       );
 
       // Проверка, входит ли НДС в конструктор тактики наценок
-      const sequenceParameterIds = new Set(markupSequences?.map(s => s.markup_parameter_id) || []);
       const isVatInConstructor = vatParam ? sequenceParameterIds.has(vatParam.id) : false;
 
       // Получение коэффициентов
