@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Typography, Spin, Card, Tabs, Select, Button, Row, Col, Tag, Input, message } from 'antd';
 import { BarChartOutlined, TableOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -63,9 +63,36 @@ const FinancialIndicators: React.FC = () => {
       fetchFinancialIndicators(selectedTenderId);
       loadVolumeTitle(selectedTenderId);
     }
-  }, [selectedTenderId, fetchFinancialIndicators]);
+  }, [selectedTenderId, fetchFinancialIndicators, loadVolumeTitle]);
 
-  const loadVolumeTitle = async (tenderId: string) => {
+  // Автоматическое обновление данных при изменении тендера (например, конструктора наценок)
+  useEffect(() => {
+    if (!selectedTenderId) return;
+
+    const channel = supabase
+      .channel(`tender_changes_${selectedTenderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tenders',
+          filter: `id=eq.${selectedTenderId}`,
+        },
+        (payload) => {
+          console.log('Tender updated, refreshing financial indicators:', payload);
+          fetchFinancialIndicators(selectedTenderId);
+          loadVolumeTitle(selectedTenderId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedTenderId, fetchFinancialIndicators, loadVolumeTitle]);
+
+  const loadVolumeTitle = useCallback(async (tenderId: string) => {
     try {
       const { data, error } = await supabase
         .from('tenders')
@@ -81,7 +108,7 @@ const FinancialIndicators: React.FC = () => {
     } catch (error) {
       console.error('Ошибка загрузки заголовка:', error);
     }
-  };
+  }, []);
 
   const handleUpdateVolumeTitle = async () => {
     if (!selectedTenderId) return;
