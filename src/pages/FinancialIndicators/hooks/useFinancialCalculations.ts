@@ -670,7 +670,7 @@ export const useFinancialCalculations = () => {
         {
           key: '16',
           row_number: 16,
-          indicator_name: vatCoeff > 0 ? `В том числе НДС (${parseFloat(vatCoeff.toFixed(5))}%)` : 'В том числе НДС',
+          indicator_name: vatCoeff > 0 ? `В том числе НДС ${parseFloat(vatCoeff.toFixed(5))}%` : 'В том числе НДС',
           coefficient: vatCoeff > 0 ? `${parseFloat(vatCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? vatCost / areaSp : 0,
           customer_cost: areaClient > 0 ? vatCost / areaClient : 0,
