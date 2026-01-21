@@ -160,6 +160,23 @@ export function exportFinancialIndicatorsToExcel(
       // Определяем стиль в зависимости от типа строки
       if (rowData.is_header) {
         cellStyle = dataHeaderStyle;
+      } else if (rowData.is_total && rowData.is_yellow) {
+        // ИТОГО с желтой подсветкой - объединяем стили
+        cellStyle = {
+          font: { bold: true },
+          fill: { fgColor: { rgb: 'FFF9E6' } },
+          alignment: {
+            horizontal: 'center',
+            vertical: 'center',
+            wrapText: true,
+          },
+          border: {
+            top: { style: 'medium', color: { rgb: '000000' } },
+            bottom: { style: 'medium', color: { rgb: '000000' } },
+            left: { style: 'thin', color: { rgb: 'D3D3D3' } },
+            right: { style: 'thin', color: { rgb: 'D3D3D3' } },
+          },
+        };
       } else if (rowData.is_total) {
         cellStyle = totalStyle;
       } else if (rowData.is_yellow) {
