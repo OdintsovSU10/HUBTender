@@ -404,8 +404,21 @@ export const useFinancialCalculations = () => {
                         profitOwnForcesCost +
                         profitSubcontractCost;
 
-      const vatCost = grandTotalBeforeVAT * (vatCoeff / 100);
-      const grandTotal = grandTotalBeforeVAT + vatCost;
+      // Условный расчет НДС в зависимости от наличия НДС в конструкторе наценок
+      let vatCost: number;
+      let grandTotal: number;
+
+      if (vatParam) {
+        // НДС есть в конструкторе - используем текущий расчет
+        vatCost = grandTotalBeforeVAT * (vatCoeff / 100);
+        grandTotal = grandTotalBeforeVAT + vatCost;
+      } else {
+        // НДС нет в конструкторе - рассчитываем из итоговой суммы
+        // Сначала вычисляем итоговую сумму (которая уже включает НДС)
+        grandTotal = grandTotalBeforeVAT; // В этом случае это уже полная сумма
+        // Вычисляем НДС из итоговой суммы: grandTotal / (1 + vatCoeff/100) * (vatCoeff/100)
+        vatCost = grandTotal / (1 + vatCoeff / 100) * (vatCoeff / 100);
+      }
 
       console.log('=== Financial Indicators Calculation ===');
       console.log('Direct costs (base):', directCostsTotal);
@@ -632,25 +645,30 @@ export const useFinancialCalculations = () => {
         {
           key: '15',
           row_number: 15,
-          indicator_name: 'НДС',
-          coefficient: vatCoeff > 0 ? `${parseFloat(vatCoeff.toFixed(5))}%` : '',
-          sp_cost: areaSp > 0 ? vatCost / areaSp : 0,
-          customer_cost: areaClient > 0 ? vatCost / areaClient : 0,
-          total_cost: vatCost,
-          is_yellow: true,
-          tooltip: `Формула: (Сумма строк 1-14) × ${vatCoeff}%\n` +
-                   `Сумма без НДС: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
-                   `Расчёт: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${vatCoeff}% = ${vatCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
-        },
-        {
-          key: '16',
-          row_number: 16,
           indicator_name: 'ИТОГО',
           coefficient: '',
           sp_cost: areaSp > 0 ? grandTotal / areaSp : 0,
           customer_cost: areaClient > 0 ? grandTotal / areaClient : 0,
           total_cost: grandTotal,
           is_total: true
+        },
+        {
+          key: '16',
+          row_number: 16,
+          indicator_name: 'В том числе НДС',
+          coefficient: vatCoeff > 0 ? `${parseFloat(vatCoeff.toFixed(5))}%` : '',
+          sp_cost: areaSp > 0 ? vatCost / areaSp : 0,
+          customer_cost: areaClient > 0 ? vatCost / areaClient : 0,
+          total_cost: vatCost,
+          is_yellow: true,
+          tooltip: vatParam
+            ? `Формула: (Сумма строк 1-14) × ${vatCoeff}%\n` +
+              `Сумма без НДС: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+              `Расчёт: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${vatCoeff}% = ${vatCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
+            : `Формула: ИТОГО / (1 + ${vatCoeff}%) × ${vatCoeff}%\n` +
+              `ИТОГО: ${grandTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+              `Расчёт: ${grandTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} / (1 + ${vatCoeff}%) × ${vatCoeff}% = ${vatCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.\n` +
+              `(НДС не указан в конструкторе наценок)`
         },
       ];
 
