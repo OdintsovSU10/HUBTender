@@ -63,7 +63,7 @@ export const useFinancialCalculations = () => {
         throw tenderError;
       }
 
-      const { error: tacticError } = await supabase
+      const { data: tactic, error: tacticError } = await supabase
         .from('markup_tactics')
         .select('*')
         .eq('id', tender.markup_tactic_id)
@@ -76,6 +76,12 @@ export const useFinancialCalculations = () => {
           'warning'
         );
       }
+
+      // Загрузка последовательности наценок для проверки наличия НДС в конструкторе
+      const { data: markupSequences } = await supabase
+        .from('markup_sequences')
+        .select('markup_parameter_id')
+        .eq('markup_tactic_id', tender.markup_tactic_id);
 
       const { data: tenderMarkupPercentages, error: percentagesError } = await supabase
         .from('tender_markup_percentage')
@@ -274,6 +280,10 @@ export const useFinancialCalculations = () => {
         p.label.toLowerCase().includes('ндс')
       );
 
+      // Проверка, входит ли НДС в конструктор тактики наценок
+      const sequenceParameterIds = new Set(markupSequences?.map(s => s.markup_parameter_id) || []);
+      const isVatInConstructor = vatParam ? sequenceParameterIds.has(vatParam.id) : false;
+
       // Получение коэффициентов
       const mechanizationCoeff = mechanizationParam
         ? (percentagesMap.get(mechanizationParam.id) ?? mechanizationParam.default_value)
@@ -408,15 +418,15 @@ export const useFinancialCalculations = () => {
       let vatCost: number;
       let grandTotal: number;
 
-      if (vatParam) {
-        // НДС есть в конструкторе - используем текущий расчет
+      if (isVatInConstructor) {
+        // НДС есть в конструкторе - добавляем НДС сверху к сумме строк 1-14
         vatCost = grandTotalBeforeVAT * (vatCoeff / 100);
         grandTotal = grandTotalBeforeVAT + vatCost;
       } else {
-        // НДС нет в конструкторе - рассчитываем из итоговой суммы
-        // Сначала вычисляем итоговую сумму (которая уже включает НДС)
-        grandTotal = grandTotalBeforeVAT; // В этом случае это уже полная сумма
-        // Вычисляем НДС из итоговой суммы: grandTotal / (1 + vatCoeff/100) * (vatCoeff/100)
+        // НДС нет в конструкторе - сумма строк 1-14 уже включает НДС
+        // ИТОГО = сумма строк 1-14 (НДС уже внутри)
+        grandTotal = grandTotalBeforeVAT;
+        // Вычисляем НДС справочно: ИТОГО / (1 + vatCoeff/100) * (vatCoeff/100)
         vatCost = grandTotal / (1 + vatCoeff / 100) * (vatCoeff / 100);
       }
 
@@ -435,7 +445,11 @@ export const useFinancialCalculations = () => {
       console.log('General costs (OFZ):', generalCostsCost);
       console.log('Profit own forces:', profitOwnForcesCost);
       console.log('Profit subcontract:', profitSubcontractCost);
-      console.log('GRAND TOTAL (sum of all rows):', grandTotal);
+      console.log('VAT in constructor:', isVatInConstructor);
+      console.log('VAT coefficient:', vatCoeff);
+      console.log('Sum before VAT (rows 1-14):', grandTotalBeforeVAT);
+      console.log('VAT cost:', vatCost);
+      console.log('GRAND TOTAL:', grandTotal);
       console.log('=======================================');
 
       const tableData: IndicatorRow[] = [
@@ -661,14 +675,14 @@ export const useFinancialCalculations = () => {
           customer_cost: areaClient > 0 ? vatCost / areaClient : 0,
           total_cost: vatCost,
           is_yellow: true,
-          tooltip: vatParam
+          tooltip: isVatInConstructor
             ? `Формула: (Сумма строк 1-14) × ${vatCoeff}%\n` +
               `Сумма без НДС: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
               `Расчёт: ${grandTotalBeforeVAT.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${vatCoeff}% = ${vatCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
             : `Формула: ИТОГО / (1 + ${vatCoeff}%) × ${vatCoeff}%\n` +
               `ИТОГО: ${grandTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
               `Расчёт: ${grandTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} / (1 + ${vatCoeff}%) × ${vatCoeff}% = ${vatCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.\n` +
-              `(НДС не указан в конструкторе наценок)`
+              `(НДС не указан в конструкторе наценок, рассчитывается справочно)`
         },
       ];
 
