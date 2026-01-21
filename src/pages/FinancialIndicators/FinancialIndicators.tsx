@@ -54,6 +54,24 @@ const FinancialIndicators: React.FC = () => {
   const [volumeTitle, setVolumeTitle] = useState('Полный объём строительства');
   const [tempVolumeTitle, setTempVolumeTitle] = useState('Полный объём строительства');
 
+  const loadVolumeTitle = useCallback(async (tenderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tenders')
+        .select('volume_title')
+        .eq('id', tenderId)
+        .single();
+
+      if (error) throw error;
+
+      const title = data?.volume_title || 'Полный объём строительства';
+      setVolumeTitle(title);
+      setTempVolumeTitle(title);
+    } catch (error) {
+      console.error('Ошибка загрузки заголовка:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadTenders();
   }, [loadTenders]);
@@ -91,24 +109,6 @@ const FinancialIndicators: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, [selectedTenderId, fetchFinancialIndicators, loadVolumeTitle]);
-
-  const loadVolumeTitle = useCallback(async (tenderId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('tenders')
-        .select('volume_title')
-        .eq('id', tenderId)
-        .single();
-
-      if (error) throw error;
-
-      const title = data?.volume_title || 'Полный объём строительства';
-      setVolumeTitle(title);
-      setTempVolumeTitle(title);
-    } catch (error) {
-      console.error('Ошибка загрузки заголовка:', error);
-    }
-  }, []);
 
   const handleUpdateVolumeTitle = async () => {
     if (!selectedTenderId) return;
