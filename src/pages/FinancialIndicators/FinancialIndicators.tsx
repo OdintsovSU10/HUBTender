@@ -21,6 +21,7 @@ import { IndicatorsCharts } from './components/IndicatorsCharts';
 import { IndicatorsTable } from './components/IndicatorsTable';
 import { IndicatorsFilters } from './components/IndicatorsFilters';
 
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -42,6 +43,7 @@ const FinancialIndicators: React.FC = () => {
     data,
     spTotal,
     customerTotal,
+    isVatInConstructor,
     loadTenders,
     fetchFinancialIndicators,
   } = useFinancialData();
@@ -370,6 +372,7 @@ const FinancialIndicators: React.FC = () => {
                     spTotal={spTotal}
                     formatNumber={formatNumber}
                     selectedTenderId={selectedTenderId}
+                    isVatInConstructor={isVatInConstructor}
                   />
                 ),
               },

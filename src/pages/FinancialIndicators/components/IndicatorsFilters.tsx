@@ -1,5 +1,5 @@
 import { Select, Button, Space, Typography } from 'antd';
-import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 import type { Tender } from '../../../lib/supabase';
@@ -77,9 +77,6 @@ export const IndicatorsFilters: React.FC<IndicatorsFiltersProps> = ({
       )}
       <Button icon={<ReloadOutlined />} onClick={onRefresh}>
         Обновить
-      </Button>
-      <Button icon={<DownloadOutlined />} type="primary">
-        Экспорт
       </Button>
     </div>
   );

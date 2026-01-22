@@ -12,6 +12,7 @@ interface IndicatorsChartsProps {
   spTotal: number;
   formatNumber: (value: number | undefined) => string;
   selectedTenderId: string | null;
+  isVatInConstructor: boolean;
 }
 
 interface CategoryBreakdown {
@@ -34,6 +35,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
   spTotal,
   formatNumber,
   selectedTenderId,
+  isVatInConstructor,
 }) => {
   const { theme: currentTheme } = useTheme();
   const [selectedIndicator, setSelectedIndicator] = useState<number | null>(null);
@@ -72,9 +74,16 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       );
 
       // Прямые затраты: строки 2-6
-      const directCosts = baseData
+      let directCosts = baseData
         .filter(d => d.row_number >= 2 && d.row_number <= 6)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
+
+      // Если НДС в конструкторе, добавляем НДС к прямым затратам
+      const vatRow = data.find(d => d.row_number === 16);
+      const vatCost = vatRow?.total_cost || 0;
+      if (isVatInConstructor && vatCost > 0) {
+        directCosts += vatCost;
+      }
 
       // Наценки: строки 7-14
       const markups = baseData
@@ -117,15 +126,30 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         '#52c41a', // Служба механизации
         '#faad14', // МБП+ГСМ
         '#722ed1', // Гарантийный период
+        '#fa8c16', // НДС (оранжевый)
       ];
 
-      // Создаем массив с цветами и сортируем по убыванию стоимости
+      // Создаем массив с цветами
       const items = directCostsData.map((d, idx) => ({
         label: d.indicator_name,
         value: d.total_cost || 0,
         color: colors[idx] || '#1890ff',
         originalIndex: idx,
-      })).sort((a, b) => b.value - a.value);
+      }));
+
+      // Если НДС в конструкторе, добавляем его как отдельный элемент
+      const vatRow = data.find(d => d.row_number === 16);
+      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
+        items.push({
+          label: 'НДС',
+          value: vatRow.total_cost || 0,
+          color: colors[5],
+          originalIndex: -1, // Специальное значение для НДС
+        });
+      }
+
+      // Сортируем по убыванию стоимости
+      items.sort((a, b) => b.value - a.value);
 
       return {
         labels: items.map(item => item.label),
@@ -550,7 +574,36 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         d.row_number <= 6
       );
 
-      const clickedRow = directCostsData[index];
+      // Строим массив элементов точно так же, как в getCategoriesData
+      const items = directCostsData.map((row, idx) => ({
+        label: row.indicator_name,
+        value: row.total_cost || 0,
+        originalIndex: idx,
+      }));
+
+      // Если НДС в конструкторе, добавляем его как отдельный элемент
+      const vatRow = data.find(d => d.row_number === 16);
+      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
+        items.push({
+          label: 'НДС',
+          value: vatRow.total_cost || 0,
+          originalIndex: -1, // Специальное значение для НДС
+        });
+      }
+
+      // Сортируем по убыванию стоимости (как в getCategoriesData)
+      items.sort((a, b) => b.value - a.value);
+
+      // Получаем нажатый элемент из отсортированного массива
+      const clickedItem = items[index];
+
+      // Если нажали на НДС (originalIndex === -1), не делаем ничего
+      if (clickedItem && clickedItem.originalIndex === -1) {
+        return;
+      }
+
+      // Получаем соответствующую строку данных по originalIndex
+      const clickedRow = clickedItem ? directCostsData[clickedItem.originalIndex] : null;
 
       if (clickedRow) {
         setSelectedIndicator(clickedRow.row_number);
@@ -717,8 +770,16 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     if (currentLevel.type === 'root') {
       // Корневой уровень: Прямые затраты и Наценки
-      const directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
+      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
+
+      // Если НДС в конструкторе, добавляем его к прямым затратам
+      const vatRow = data.find(d => d.row_number === 16);
+      const vatCost = vatRow?.total_cost || 0;
+      if (isVatInConstructor && vatCost > 0) {
+        directCosts += vatCost;
+      }
+
       const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 7 && d.row_number <= 14)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
@@ -741,13 +802,26 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         'rgba(82, 196, 26, 0.6)',   // Служба механизации
         'rgba(250, 173, 20, 0.6)',  // МБП+ГСМ
         'rgba(114, 46, 209, 0.6)',  // Гарантийный период
+        'rgba(250, 140, 22, 0.6)',  // НДС (оранжевый)
       ];
 
       barItems = directCostsData.map((d, idx) => ({
         label: d.indicator_name,
         cost: d.total_cost || 0,
         color: colors[idx] || 'rgba(24, 144, 255, 0.6)',
-      })).sort((a, b) => b.cost - a.cost); // Сортируем по убыванию стоимости
+      }));
+
+      // Если НДС в конструкторе, добавляем его как отдельный элемент
+      const vatRow = data.find(d => d.row_number === 16);
+      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
+        barItems.push({
+          label: 'НДС',
+          cost: vatRow.total_cost || 0,
+          color: colors[5],
+        });
+      }
+
+      barItems.sort((a, b) => b.cost - a.cost); // Сортируем по убыванию стоимости
     } else if (currentLevel.type === 'markups') {
       // Детализация наценок
       const markupsData = data.filter(d =>
@@ -963,8 +1037,16 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     if (currentLevel.type === 'root') {
       // Корневой уровень: показываем Прямые затраты и Наценки
-      const directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
+      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
+
+      // Если НДС в конструкторе, добавляем его к прямым затратам
+      const vatRow = data.find(d => d.row_number === 16);
+      const vatCost = vatRow?.total_cost || 0;
+      if (isVatInConstructor && vatCost > 0) {
+        directCosts += vatCost;
+      }
+
       const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 7 && d.row_number <= 14)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
@@ -984,15 +1066,27 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       ].sort((a, b) => b.amount - a.amount);
     } else if (currentLevel.type === 'direct_costs') {
       // Детализация прямых затрат
-      return data
+      const items = data
         .filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
         .map((d, idx) => ({
           key: idx,
           indicator_name: d.indicator_name,
           amount: d.total_cost || 0,
           price_per_m2: totalAreaM2 > 0 ? (d.total_cost || 0) / totalAreaM2 : 0,
-        }))
-        .sort((a, b) => b.amount - a.amount);
+        }));
+
+      // Если НДС в конструкторе, добавляем его как отдельный элемент
+      const vatRow = data.find(d => d.row_number === 16);
+      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
+        items.push({
+          key: items.length,
+          indicator_name: 'НДС',
+          amount: vatRow.total_cost || 0,
+          price_per_m2: totalAreaM2 > 0 ? (vatRow.total_cost || 0) / totalAreaM2 : 0,
+        });
+      }
+
+      return items.sort((a, b) => b.amount - a.amount);
     } else if (currentLevel.type === 'markups') {
       // Детализация наценок
       const markupsData = data.filter(d =>

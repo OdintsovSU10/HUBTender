@@ -15,6 +15,7 @@ export const useFinancialData = () => {
     spTotal,
     customerTotal,
     loading: calculationsLoading,
+    isVatInConstructor,
     fetchFinancialIndicators,
   } = useFinancialCalculations();
 
@@ -24,6 +25,7 @@ export const useFinancialData = () => {
     data,
     spTotal,
     customerTotal,
+    isVatInConstructor,
     loadTenders,
     fetchFinancialIndicators,
   };

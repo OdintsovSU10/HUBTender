@@ -42,6 +42,7 @@ export const useFinancialCalculations = () => {
   const [data, setData] = useState<IndicatorRow[]>([]);
   const [spTotal, setSpTotal] = useState<number>(0);
   const [customerTotal, setCustomerTotal] = useState<number>(0);
+  const [isVatInConstructor, setIsVatInConstructor] = useState<boolean>(false);
 
   const fetchFinancialIndicators = useCallback(async (selectedTenderId: string | null) => {
     if (!selectedTenderId) return;
@@ -201,10 +202,6 @@ export const useFinancialCalculations = () => {
         }
       });
 
-      const subcontractTotal = subcontractWorks + subcontractMaterials;
-      const su10Total = works + materials + materialsComp + worksComp;
-      const directCostsTotal = subcontractTotal + su10Total;
-
       const areaSp = tender?.area_sp || 0;
       const areaClient = tender?.area_client || 0;
 
@@ -318,6 +315,7 @@ export const useFinancialCalculations = () => {
 
       // Проверка, входит ли НДС в конструктор тактики наценок
       const isVatInConstructor = vatParam ? sequenceParameterIds.has(vatParam.id) : false;
+      setIsVatInConstructor(isVatInConstructor);
 
       // Получение коэффициентов
       const mechanizationCoeff = mechanizationParam
@@ -379,6 +377,55 @@ export const useFinancialCalculations = () => {
       const vatCoeff = vatParam
         ? (percentagesMap.get(vatParam.id) ?? vatParam.default_value)
         : 0;
+
+      // Коррекция прямых затрат при наличии НДС в конструкторе наценок
+      // Если НДС есть в конструкторе, прямые затраты из BOQ включают НДС
+      // Необходимо разделить на (1 + НДС%) чтобы получить базу без НДС
+      if (isVatInConstructor && vatCoeff > 0) {
+        const vatDivisor = 1 + (vatCoeff / 100);
+
+        console.log('=== Коррекция прямых затрат (вычет НДС из ПЗ) ===');
+        console.log('НДС в конструкторе:', isVatInConstructor);
+        console.log('НДС коэффициент:', vatCoeff);
+        console.log('Делитель (1 + НДС%):', vatDivisor);
+        console.log('Прямые затраты ДО коррекции:');
+        console.log('  Субподряд работы:', subcontractWorks);
+        console.log('  Субподряд материалы:', subcontractMaterials);
+        console.log('  Работы СУ-10:', works);
+        console.log('  Материалы СУ-10:', materials);
+        console.log('  Работы комп.:', worksComp);
+        console.log('  Материалы комп.:', materialsComp);
+        console.log('  Субподряд работы для роста:', subcontractWorksForGrowth);
+        console.log('  Субподряд материалы для роста:', subcontractMaterialsForGrowth);
+
+        // Корректируем все компоненты прямых затрат
+        subcontractWorks = subcontractWorks / vatDivisor;
+        subcontractMaterials = subcontractMaterials / vatDivisor;
+        subcontractWorksForGrowth = subcontractWorksForGrowth / vatDivisor;
+        subcontractMaterialsForGrowth = subcontractMaterialsForGrowth / vatDivisor;
+        works = works / vatDivisor;
+        materials = materials / vatDivisor;
+        materialsComp = materialsComp / vatDivisor;
+        worksComp = worksComp / vatDivisor;
+
+        console.log('Прямые затраты ПОСЛЕ коррекции:');
+        console.log('  Субподряд работы:', subcontractWorks);
+        console.log('  Субподряд материалы:', subcontractMaterials);
+        console.log('  Работы СУ-10:', works);
+        console.log('  Материалы СУ-10:', materials);
+        console.log('  Работы комп.:', worksComp);
+        console.log('  Материалы комп.:', materialsComp);
+        console.log('  Субподряд работы для роста:', subcontractWorksForGrowth);
+        console.log('  Субподряд материалы для роста:', subcontractMaterialsForGrowth);
+        console.log('=================================================');
+      }
+
+      // Итоговые значения прямых затрат после возможной коррекции НДС
+      const subcontractTotal = subcontractWorks + subcontractMaterials;
+      const su10Total = works + materials + materialsComp + worksComp;
+      const directCostsTotal = subcontractTotal + su10Total;
+
+      console.log('Итоговые ПЗ после коррекции:', { subcontractTotal, su10Total, directCostsTotal });
 
       console.log('=== DEBUG 0,6к Parameter ===');
       console.log('All markup parameters:', markupParams.map(p => ({
@@ -740,6 +787,7 @@ export const useFinancialCalculations = () => {
     spTotal,
     customerTotal,
     loading,
+    isVatInConstructor,
     fetchFinancialIndicators,
   };
 };
