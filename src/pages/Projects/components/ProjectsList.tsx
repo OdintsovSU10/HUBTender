@@ -60,7 +60,12 @@ export const ProjectsList: React.FC<ProjectsListProps> = ({ data, loading, agree
             <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
               {a.agreement_number || `ДС ${idx + 1}`}:
             </Text>
-            <Text strong style={{ color: '#52c41a' }}>+{formatMoneyDetailed(a.amount)}</Text>
+            <Text
+              strong
+              style={{ color: a.amount >= 0 ? '#52c41a' : '#ff4d4f' }}
+            >
+              {a.amount >= 0 ? '+' : ''}{formatMoneyDetailed(a.amount)}
+            </Text>
           </div>
         ))}
         {agreements.length > 0 && (

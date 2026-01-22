@@ -241,8 +241,10 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({ project, onSav
                 style={{ width: '100%' }}
                 placeholder="0"
                 min={0 as number}
+                step={0.01}
+                precision={2}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-                parser={(value) => Number(value!.replace(/\s/g, ''))}
+                parser={(value) => Number(value!.replace(/\s/g, '').replace(',', '.'))}
               />
             </Form.Item>
           </Col>
@@ -252,8 +254,10 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({ project, onSav
                 style={{ width: '100%' }}
                 placeholder="0"
                 min={0 as number}
+                step={0.01}
+                precision={2}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-                parser={(value) => Number(value!.replace(/\s/g, ''))}
+                parser={(value) => Number(value!.replace(/\s/g, '').replace(',', '.'))}
               />
             </Form.Item>
           </Col>

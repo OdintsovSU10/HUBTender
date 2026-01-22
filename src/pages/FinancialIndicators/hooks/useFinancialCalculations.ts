@@ -77,24 +77,32 @@ export const useFinancialCalculations = () => {
         );
       }
 
-      // Извлечение ID параметров из JSONB поля sequences тактики наценок
-      const sequenceParameterIds = new Set<string>();
+      // Извлечение ключей параметров из JSONB поля sequences тактики наценок
+      const sequenceParameterKeys = new Set<string>();
       if (tactic?.sequences) {
+        console.log('=== Извлечение параметров из sequences ===');
         console.log('Загружена тактика наценок:', tactic.name);
-        console.log('Sequences:', tactic.sequences);
 
-        // sequences - это объект с ключами типов позиций: {"мат": [...], "раб": [...], ...}
+        // sequences имеет структуру: { "мат": [MarkupStep], "раб": [MarkupStep], ... }
+        // MarkupStep содержит operand1Key, operand2Key и т.д. с КЛЮЧАМИ параметров (не ID!)
         Object.values(tactic.sequences).forEach((sequenceArray: any) => {
           if (Array.isArray(sequenceArray)) {
-            sequenceArray.forEach((item: any) => {
-              if (item.markup_parameter_id) {
-                sequenceParameterIds.add(item.markup_parameter_id);
+            sequenceArray.forEach((step: any) => {
+              // Проверяем все возможные operandXKey (от 1 до 5)
+              for (let i = 1; i <= 5; i++) {
+                const keyField = `operand${i}Key`;
+                const typeField = `operand${i}Type`;
+
+                // Добавляем ключ только если это параметр наценки (не 'step' и не 'number')
+                if (step[typeField] === 'markup' && step[keyField]) {
+                  sequenceParameterKeys.add(step[keyField]);
+                }
               }
             });
           }
         });
 
-        console.log('Извлечено ID параметров из sequences:', Array.from(sequenceParameterIds));
+        console.log('Извлечено ключей параметров из sequences:', Array.from(sequenceParameterKeys));
       }
 
       const { data: tenderMarkupPercentages, error: percentagesError } = await supabase
@@ -208,6 +216,20 @@ export const useFinancialCalculations = () => {
       tenderMarkupPercentages?.forEach(tmp => {
         percentagesMap.set(tmp.markup_parameter_id, tmp.value);
       });
+
+      // Извлечение ID параметров по ключам из sequences
+      const sequenceParameterIds = new Set<string>();
+      if (sequenceParameterKeys.size > 0) {
+        const matchingParams = markupParams.filter(p =>
+          sequenceParameterKeys.has(p.key)
+        );
+
+        matchingParams.forEach(p => sequenceParameterIds.add(p.id));
+
+        console.log('Найдено параметров по ключам:', matchingParams.map(p => ({ key: p.key, label: p.label, id: p.id })));
+        console.log('Извлечено ID параметров:', Array.from(sequenceParameterIds));
+        console.log('===========================================');
+      }
 
       // Получение параметров наценок
       const mechanizationParam = markupParams.find(p =>

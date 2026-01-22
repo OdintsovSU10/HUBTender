@@ -4,9 +4,24 @@
       "Bash(*)",
       "Read(*)",
       "Write(*)",
-      "Edit(*)"
+      "Edit(*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx supabase db execute:*)",
+      "Bash(node scripts/check-material-sums.cjs:*)",
+      "Bash(node scripts/fix-material-sums.cjs:*)",
+      "Bash(node scripts/check-currency.cjs:*)",
+      "Bash(node scripts/check-current-values.cjs:*)",
+      "Bash(node scripts/restore-correct-values.cjs:*)",
+      "Bash(node scripts/investigate-original-values.cjs:*)",
+      "Bash(node:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "c:\\Users\\nekrasov.l.m\\WebstormProjects\\HUBTender"
+    ]
   }
 }
