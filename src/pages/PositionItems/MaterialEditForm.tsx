@@ -491,10 +491,10 @@ const MaterialEditForm: React.FC<MaterialEditFormProps> = ({
             value={formData.delivery_price_type}
             onChange={(value) => {
               // При смене типа доставки устанавливаем значение по умолчанию
-              // Для 'не в цене' используется фиксированный 3%, поэтому delivery_amount = null
+              // Для 'не в цене' используется фиксированный 3%, поэтому delivery_amount = 0
               // Для 'суммой' нужна сумма, по умолчанию 100
-              // Для 'в цене' доставка включена, поэтому delivery_amount = null
-              const newDeliveryAmount = value === 'суммой' ? 100 : null;
+              // Для 'в цене' доставка включена, поэтому delivery_amount = 0
+              const newDeliveryAmount = value === 'суммой' ? 100 : 0;
               setFormData({ ...formData, delivery_price_type: value, delivery_amount: newDeliveryAmount });
             }}
             style={{ width: '100%' }}
