@@ -40,6 +40,7 @@ interface PositionTableProps {
   onBulkPaste: () => void;
   onCopyNote: (positionId: string, noteValue: string | null, event: React.MouseEvent) => void;
   onPasteNote: (positionId: string, event: React.MouseEvent) => void;
+  onBulkPasteNote: () => void;
   onDeleteBoqItems: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onDeleteAdditionalPosition: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onExportToExcel: () => void;
@@ -69,6 +70,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onBulkPaste,
   onCopyNote,
   onPasteNote,
+  onBulkPasteNote,
   onDeleteBoqItems,
   onDeleteAdditionalPosition,
   onExportToExcel,
@@ -297,20 +299,26 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                 </Tooltip>
               )}
 
-              {/* Кнопка "Вставить примечание ГП" */}
+              {/* Кнопка "Выбрать для вставки примечания ГП" */}
               {copiedNotePositionId && copiedNotePositionId !== record.id && (
-                <Tooltip title="Вставить примечание ГП" {...tooltipColor}>
+                <Tooltip
+                  title={selectedTargetIds.has(record.id) ? "Отменить выбор для вставки примечания" : "Выбрать для вставки примечания"}
+                  {...tooltipColor}
+                >
                   <Tag
-                    color="lime"
+                    color={selectedTargetIds.has(record.id) ? 'warning' : 'lime'}
                     style={{
                       cursor: readOnly ? 'not-allowed' : 'pointer',
                       margin: 0,
                       opacity: readOnly ? 0.5 : 1,
-                      pointerEvents: readOnly ? 'none' : 'auto'
+                      pointerEvents: readOnly ? 'none' : 'auto',
+                      backgroundColor: selectedTargetIds.has(record.id) ? '#faad14' : undefined,
+                      borderColor: selectedTargetIds.has(record.id) ? '#faad14' : undefined,
+                      color: selectedTargetIds.has(record.id) ? '#fff' : undefined,
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onPasteNote(record.id, e);
+                      onToggleSelection(record.id, e);
                     }}
                   >
                     <FileAddOutlined />
@@ -437,6 +445,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
     leafPositionIndices,
     copiedPositionId,
     copiedNotePositionId,
+    selectedTargetIds,
     currentTheme,
     expandedPositionId,
     readOnly,
@@ -446,6 +455,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
     onDeleteAdditionalPosition,
     onCopyPosition,
     onPastePosition,
+    onToggleSelection,
     onCopyNote,
     onPasteNote,
     onDeleteBoqItems,
@@ -503,7 +513,19 @@ export const PositionTable: React.FC<PositionTableProps> = ({
               loading={isBulkPasting}
               disabled={loading}
             >
-              Вставить ({selectedTargetIds.size})
+              Вставить работы и материалы ({selectedTargetIds.size})
+            </Button>
+          )}
+
+          {copiedNotePositionId && selectedTargetIds.size > 0 && (
+            <Button
+              type="primary"
+              icon={<FileAddOutlined />}
+              onClick={onBulkPasteNote}
+              loading={isBulkPasting}
+              disabled={loading}
+            >
+              Вставить примечание ({selectedTargetIds.size})
             </Button>
           )}
 

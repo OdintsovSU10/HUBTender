@@ -192,6 +192,7 @@ export const usePositionActions = (
 
     setCopiedNoteValue(noteValue);
     setCopiedNotePositionId(positionId);
+    setSelectedTargetIds(new Set()); // Очистить выбранные строки
     message.success('Примечание ГП скопировано в буфер обмена');
   };
 
@@ -225,6 +226,55 @@ export const usePositionActions = (
       message.error('Ошибка вставки примечания: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Массовая вставка примечания ГП в выбранные позиции
+  const handleBulkPasteNote = async (selectedTenderId: string | null) => {
+    if (!copiedNoteValue || !copiedNotePositionId || selectedTargetIds.size === 0) return;
+
+    setIsBulkPasting(true);
+    const results = { success: 0, failed: 0 };
+
+    try {
+      for (const targetId of selectedTargetIds) {
+        try {
+          const { error } = await supabase
+            .from('client_positions')
+            .update({ manual_note: copiedNoteValue })
+            .eq('id', targetId);
+
+          if (error) throw error;
+          results.success++;
+        } catch (error) {
+          console.error(`Failed to paste note to ${targetId}:`, error);
+          results.failed++;
+        }
+      }
+
+      const total = selectedTargetIds.size;
+      if (results.failed === 0) {
+        message.success(
+          `Успешно вставлено примечание в ${total} ${pluralize(total, 'позицию', 'позиции', 'позиций')}`
+        );
+      } else {
+        message.warning(
+          `Вставлено примечание в ${results.success} из ${total} ${pluralize(total, 'позиции', 'позиций', 'позиций')}`
+        );
+      }
+
+      setSelectedTargetIds(new Set());
+      setCopiedNoteValue(null);
+      setCopiedNotePositionId(null);
+
+      if (selectedTenderId) {
+        await fetchClientPositions(selectedTenderId);
+      }
+    } catch (error: any) {
+      console.error('Ошибка массовой вставки примечания:', error);
+      message.error('Ошибка массовой вставки примечания: ' + error.message);
+    } finally {
+      setIsBulkPasting(false);
     }
   };
 
@@ -345,6 +395,7 @@ export const usePositionActions = (
     handleBulkPaste,
     handleCopyNote,
     handlePasteNote,
+    handleBulkPasteNote,
     handleDeleteBoqItems,
     handleExportToExcel,
     handleDeleteAdditionalPosition,

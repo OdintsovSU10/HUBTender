@@ -62,6 +62,7 @@ const ClientPositions: React.FC = () => {
     handleBulkPaste,
     handleCopyNote,
     handlePasteNote,
+    handleBulkPasteNote,
     handleDeleteBoqItems,
     handleExportToExcel,
     handleDeleteAdditionalPosition,
@@ -304,6 +305,7 @@ const ClientPositions: React.FC = () => {
           onBulkPaste={() => handleBulkPaste(selectedTenderId)}
           onCopyNote={handleCopyNote}
           onPasteNote={(positionId, event) => handlePasteNote(positionId, event, selectedTenderId)}
+          onBulkPasteNote={() => handleBulkPasteNote(selectedTenderId)}
           onDeleteBoqItems={(positionId, positionName, event) =>
             handleDeleteBoqItems(positionId, positionName, selectedTenderId, event)
           }
