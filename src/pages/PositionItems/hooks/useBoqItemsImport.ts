@@ -191,8 +191,8 @@ const normalizeDeliveryPriceType = (value: string | undefined): 'в цене' | 
 };
 
 // Парсинг затраты на строительство: "Категория / Детальная категория / Локация"
-// ВАЖНО: Категория может содержать слэш (например, "ВИС / Электрические системы")
-// Поэтому разбиваем справа налево: последний слэш - location, предпоследний - detail
+// ВАЖНО: Детальная категория может содержать слэши (например, "Плиты перекрытия / покрытия / разгрузочные")
+// Формат: первая часть - категория, последняя часть - локация, всё между ними - детализация
 const parseCostCategory = (text: string): { category?: string; detail?: string; location?: string } => {
   if (!text) return {};
 
@@ -209,13 +209,13 @@ const parseCostCategory = (text: string): { category?: string; detail?: string; 
       detail: parts[1],
     };
   } else {
-    // Три или более частей: разбираем справа налево
+    // Три или более частей:
+    // category = первая часть
     // location = последняя часть
-    // detail = предпоследняя часть
-    // category = все остальное, объединенное через " / "
+    // detail = всё между ними, объединенное через " / "
+    const category = parts[0];
     const location = parts[parts.length - 1];
-    const detail = parts[parts.length - 2];
-    const category = parts.slice(0, parts.length - 2).join(' / ');
+    const detail = parts.slice(1, parts.length - 1).join(' / ');
 
     return {
       category: category || undefined,

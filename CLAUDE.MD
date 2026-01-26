@@ -42,7 +42,7 @@ supabase/schemas/prod.sql
 - ALWAYS verify schema in prod.sql before ANY database work
 - NEVER trust TypeScript types over prod.sql definitions
 - prod.sql contains ALL Supabase system tables and extensions
-- Business tables defined in migrations (001, 002, 003)
+- Business tables defined in migrations (supabase/migrations/)
 ```
 
 **Core Tables** (see `supabase/schemas/prod.sql` and recent migrations):
@@ -175,11 +175,11 @@ App.tsx
   - Types file for interfaces/types
 
 ### TypeScript Configuration
-- Target: ES2020, strict mode enabled
-- No unused locals/parameters
-- No implicit any
+- Target: ES2020, strict mode disabled (for development speed)
 - React JSX transform (no React import needed)
-- Types centralized in `src/lib/supabase/types.ts`
+- Types centralized in `src/lib/supabase/` (index.ts barrel export)
+  - `types.ts` - Core entity types (Tender, Material, Work, etc.)
+  - `types/tasks.ts` - Task-related types
 
 ### ESLint Rules
 - Zero warnings enforced (`max-warnings: 0`)
@@ -213,8 +213,8 @@ Each card has:
 
 ### Supabase Client Usage
 ```typescript
-// Import from centralized client
-import { supabase } from '@/lib/supabase';
+// Import from centralized client (use relative paths)
+import { supabase } from '../lib/supabase';
 
 // Standard CRUD operations
 const { data, error } = await supabase
@@ -223,7 +223,7 @@ const { data, error } = await supabase
   .eq('column', value);
 
 // With TypeScript types
-import type { Tender, TenderInsert } from '@/lib/supabase/types';
+import type { Tender, TenderInsert } from '../lib/supabase/types';
 const { data } = await supabase
   .from('tenders')
   .select('*')
@@ -305,7 +305,7 @@ build: {
 }
 ```
 
-## Important Technical Details
+## UI & Theme Details
 
 ### Theme Toggle Implementation
 Uses Ant Design's theme algorithms:
