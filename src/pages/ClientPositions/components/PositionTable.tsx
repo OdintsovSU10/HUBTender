@@ -11,6 +11,7 @@ import {
   FileTextOutlined,
   FileAddOutlined,
   FilterOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { ClientPosition, Tender } from '../../../lib/supabase';
@@ -44,6 +45,7 @@ interface PositionTableProps {
   onDeleteBoqItems: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onDeleteAdditionalPosition: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onExportToExcel: () => void;
+  onMassImport?: () => void;
   tempSelectedPositionIds?: Set<string>;
   onToggleFilterCheckbox?: (positionId: string) => void;
   onApplyFilter?: () => void;
@@ -74,6 +76,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onDeleteBoqItems,
   onDeleteAdditionalPosition,
   onExportToExcel,
+  onMassImport,
   isFilterActive = false,
   filterSelectedCount = 0,
   totalPositionsCount = 0,
@@ -529,6 +532,13 @@ export const PositionTable: React.FC<PositionTableProps> = ({
             </Button>
           )}
 
+          <Button
+            icon={<UploadOutlined />}
+            onClick={onMassImport}
+            disabled={!selectedTender || loading}
+          >
+            Импорт из Excel
+          </Button>
           <Button
             icon={<DownloadOutlined />}
             onClick={onExportToExcel}

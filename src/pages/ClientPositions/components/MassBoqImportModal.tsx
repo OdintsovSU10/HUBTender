@@ -1,0 +1,429 @@
+import React, { useState, useEffect } from 'react';
+import { Modal, Steps, Button, Space, Progress, Alert, Upload, Table, Tag, Typography, Collapse, List } from 'antd';
+import { FileExcelOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { useMassBoqImport } from '../hooks/useMassBoqImport';
+
+const { Dragger } = Upload;
+const { Text } = Typography;
+const { Panel } = Collapse;
+
+interface MassBoqImportModalProps {
+  open: boolean;
+  tenderId: string;
+  tenderTitle: string;
+  onClose: (success: boolean) => void;
+}
+
+export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
+  open,
+  tenderId,
+  tenderTitle,
+  onClose,
+}) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [nomenclatureLoaded, setNomenclatureLoaded] = useState(false);
+
+  const {
+    parsedData,
+    validationResult,
+    uploading,
+    uploadProgress,
+    loadNomenclature,
+    parseExcelFile,
+    validateParsedData,
+    processWorkBindings,
+    insertBoqItems,
+    reset,
+    getPositionStats,
+  } = useMassBoqImport();
+
+  // Загрузка справочников при открытии
+  useEffect(() => {
+    if (open && tenderId && !nomenclatureLoaded) {
+      loadNomenclature(tenderId).then((success) => {
+        setNomenclatureLoaded(success);
+        if (!success) {
+          Modal.error({
+            title: 'Ошибка загрузки',
+            content: 'Не удалось загрузить справочники. Попробуйте закрыть и открыть модал заново.',
+          });
+        }
+      });
+    }
+  }, [open, tenderId, nomenclatureLoaded]);
+
+  // Сброс при закрытии
+  useEffect(() => {
+    if (!open) {
+      setNomenclatureLoaded(false);
+      setCurrentStep(0);
+      reset();
+    }
+  }, [open]);
+
+  // Обработка загрузки файла
+  const handleFileUpload = async (file: File) => {
+    const success = await parseExcelFile(file);
+    if (success) {
+      setCurrentStep(1);
+    }
+    return false;
+  };
+
+  // Валидация
+  const handleValidate = () => {
+    const validation = validateParsedData(parsedData);
+    const bindingErrors = processWorkBindings(parsedData);
+
+    if (bindingErrors.length > 0) {
+      validation.errors.push(...bindingErrors);
+      validation.isValid = false;
+    }
+
+    if (validation.isValid) {
+      handleImport();
+    }
+  };
+
+  // Импорт
+  const handleImport = async () => {
+    setCurrentStep(2);
+    const success = await insertBoqItems(parsedData, tenderId);
+    if (success) {
+      setTimeout(() => handleClose(true), 500);
+    }
+  };
+
+  // Закрытие
+  const handleClose = (success: boolean = false) => {
+    reset();
+    setCurrentStep(0);
+    setNomenclatureLoaded(false);
+    onClose(success);
+  };
+
+  // Статистика по позициям
+  const positionStats = getPositionStats();
+  const matchedCount = positionStats.filter(p => p.matched).length;
+  const unmatchedCount = positionStats.filter(p => !p.matched).length;
+
+  // Кнопки футера
+  const getFooterButtons = () => {
+    if (currentStep === 0) {
+      return [
+        <Button key="cancel" onClick={() => handleClose(false)} disabled={uploading}>
+          Отмена
+        </Button>,
+      ];
+    }
+
+    if (currentStep === 1) {
+      const hasErrors = validationResult && !validationResult.isValid;
+      return [
+        <Button key="back" onClick={() => setCurrentStep(0)} disabled={uploading}>
+          Назад
+        </Button>,
+        <Button
+          key="import"
+          type="primary"
+          onClick={handleValidate}
+          disabled={hasErrors || parsedData.length === 0}
+          loading={uploading}
+        >
+          {hasErrors ? 'Исправьте ошибки' : `Импортировать ${parsedData.length} элементов`}
+        </Button>,
+      ];
+    }
+
+    if (currentStep === 2) {
+      return [
+        <Button key="close" onClick={() => handleClose(true)} disabled={uploading}>
+          Закрыть
+        </Button>,
+      ];
+    }
+
+    return [];
+  };
+
+  return (
+    <Modal
+      title={`Массовый импорт BOQ — ${tenderTitle}`}
+      open={open}
+      onCancel={() => handleClose(false)}
+      width={1000}
+      footer={getFooterButtons()}
+      maskClosable={!uploading}
+      keyboard={!uploading}
+    >
+      <Space direction="vertical" style={{ width: '100%' }} size="large">
+        {/* Шаги */}
+        <Steps current={currentStep} size="small">
+          <Steps.Step title="Загрузка файла" />
+          <Steps.Step title="Проверка и сопоставление" />
+          <Steps.Step title="Импорт" />
+        </Steps>
+
+        {/* Шаг 0: Загрузка файла */}
+        {currentStep === 0 && (
+          <div>
+            <Alert
+              message="Формат файла для массового импорта"
+              description={
+                <div style={{ marginTop: 8 }}>
+                  <Text strong>Обязательные колонки:</Text>
+                  <List size="small" style={{ marginTop: 4 }}>
+                    <List.Item>
+                      <Text>Колонка 2: <Text code>Номер позиции</Text> — для сопоставления с позициями тендера</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Колонка 3: <Text code>Затрата на строительство</Text></Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Колонка 5: <Text code>Тип элемента</Text> (раб, суб-раб, мат, суб-мат...)</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Колонка 7: <Text code>Наименование</Text></Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Колонка 8: <Text code>Ед. изм.</Text></Text>
+                    </List.Item>
+                  </List>
+                  <Text strong style={{ marginTop: 8, display: 'block' }}>Дополнительные данные для позиций:</Text>
+                  <List size="small" style={{ marginTop: 4 }}>
+                    <List.Item>
+                      <Text>Колонка 9: <Text code>Количество ГП</Text> — обновит manual_volume в позиции</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text>Колонка 20: <Text code>Примечание ГП</Text> — обновит manual_note в позиции</Text>
+                    </List.Item>
+                  </List>
+                </div>
+              }
+              type="info"
+              style={{ marginBottom: 16 }}
+            />
+
+            <Alert
+              message="Сопоставление по номеру позиции"
+              description="Номер позиции из Excel будет сопоставлен с полем position_number в базе данных. Убедитесь, что номера совпадают (5 = 5.0 = 5.00)."
+              type="warning"
+              style={{ marginBottom: 16 }}
+            />
+
+            <Dragger
+              beforeUpload={(file) => {
+                handleFileUpload(file as File);
+                return false;
+              }}
+              accept=".xlsx,.xls"
+              maxCount={1}
+              disabled={uploading || !nomenclatureLoaded}
+              showUploadList={false}
+            >
+              <p className="ant-upload-drag-icon">
+                <FileExcelOutlined style={{ color: '#10b981', fontSize: 48 }} />
+              </p>
+              <p className="ant-upload-text">
+                {nomenclatureLoaded
+                  ? 'Нажмите или перетащите Excel файл'
+                  : 'Загрузка справочников...'
+                }
+              </p>
+              <p className="ant-upload-hint">Поддерживаются форматы: .xlsx, .xls</p>
+            </Dragger>
+          </div>
+        )}
+
+        {/* Шаг 1: Проверка и сопоставление */}
+        {currentStep === 1 && (
+          <div>
+            {/* Статистика сопоставления */}
+            <Alert
+              message={
+                <Space>
+                  <span>Найдено позиций: {positionStats.length}</span>
+                  <Tag color="green">{matchedCount} сопоставлено</Tag>
+                  {unmatchedCount > 0 && <Tag color="red">{unmatchedCount} не найдено</Tag>}
+                </Space>
+              }
+              type={unmatchedCount > 0 ? 'warning' : 'success'}
+              style={{ marginBottom: 16 }}
+            />
+
+            {/* Таблица позиций */}
+            <Table
+              dataSource={positionStats}
+              rowKey="positionNumber"
+              size="small"
+              pagination={{ pageSize: 10 }}
+              style={{ marginBottom: 16 }}
+              columns={[
+                {
+                  title: '№ позиции',
+                  dataIndex: 'positionNumber',
+                  width: 100,
+                },
+                {
+                  title: 'Статус',
+                  dataIndex: 'matched',
+                  width: 120,
+                  render: (matched: boolean) => matched
+                    ? <Tag icon={<CheckCircleOutlined />} color="success">Найдена</Tag>
+                    : <Tag icon={<CloseCircleOutlined />} color="error">Не найдена</Tag>,
+                },
+                {
+                  title: 'Название позиции',
+                  dataIndex: 'positionName',
+                  ellipsis: true,
+                },
+                {
+                  title: 'Элементов',
+                  dataIndex: 'itemsCount',
+                  width: 100,
+                  align: 'center',
+                },
+                {
+                  title: 'Кол-во ГП',
+                  dataIndex: 'manualVolume',
+                  width: 100,
+                  render: (v: number | undefined) => v !== undefined ? v.toLocaleString('ru-RU') : '—',
+                },
+                {
+                  title: 'Примечание ГП',
+                  dataIndex: 'manualNote',
+                  width: 150,
+                  ellipsis: true,
+                  render: (v: string | undefined) => v || '—',
+                },
+              ]}
+            />
+
+            {/* Ошибки валидации */}
+            {validationResult && !validationResult.isValid && (
+              <Collapse defaultActiveKey={['errors']} style={{ marginBottom: 16 }}>
+                <Panel
+                  header={
+                    <Space>
+                      <WarningOutlined style={{ color: '#ff4d4f' }} />
+                      <span>Ошибки валидации ({validationResult.errors.length})</span>
+                    </Space>
+                  }
+                  key="errors"
+                >
+                  {/* Несопоставленные позиции */}
+                  {validationResult.unmatchedPositions.length > 0 && (
+                    <Alert
+                      message="Позиции не найдены в тендере"
+                      description={
+                        <List
+                          size="small"
+                          dataSource={validationResult.unmatchedPositions}
+                          renderItem={item => (
+                            <List.Item>
+                              <Text type="danger">
+                                Позиция "{item.positionNumber}" — строки: {item.rows.join(', ')}
+                              </Text>
+                            </List.Item>
+                          )}
+                        />
+                      }
+                      type="error"
+                      style={{ marginBottom: 8 }}
+                    />
+                  )}
+
+                  {/* Отсутствующая номенклатура */}
+                  {validationResult.missingNomenclature.works.length > 0 && (
+                    <Alert
+                      message="Работы отсутствуют в номенклатуре"
+                      description={
+                        <List
+                          size="small"
+                          dataSource={validationResult.missingNomenclature.works}
+                          renderItem={item => (
+                            <List.Item>
+                              <Text type="danger">
+                                {item.name} [{item.unit}] — строки: {item.rows.join(', ')}
+                              </Text>
+                            </List.Item>
+                          )}
+                        />
+                      }
+                      type="error"
+                      style={{ marginBottom: 8 }}
+                    />
+                  )}
+
+                  {validationResult.missingNomenclature.materials.length > 0 && (
+                    <Alert
+                      message="Материалы отсутствуют в номенклатуре"
+                      description={
+                        <List
+                          size="small"
+                          dataSource={validationResult.missingNomenclature.materials}
+                          renderItem={item => (
+                            <List.Item>
+                              <Text type="danger">
+                                {item.name} [{item.unit}] — строки: {item.rows.join(', ')}
+                              </Text>
+                            </List.Item>
+                          )}
+                        />
+                      }
+                      type="error"
+                      style={{ marginBottom: 8 }}
+                    />
+                  )}
+
+                  {/* Неизвестные затраты */}
+                  {validationResult.unknownCosts.length > 0 && (
+                    <Alert
+                      message="Затраты не найдены в БД"
+                      description={
+                        <List
+                          size="small"
+                          dataSource={validationResult.unknownCosts}
+                          renderItem={item => (
+                            <List.Item>
+                              <Text type="danger">
+                                {item.text} — строки: {item.rows.join(', ')}
+                              </Text>
+                            </List.Item>
+                          )}
+                        />
+                      }
+                      type="error"
+                    />
+                  )}
+                </Panel>
+              </Collapse>
+            )}
+          </div>
+        )}
+
+        {/* Шаг 2: Импорт */}
+        {currentStep === 2 && (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Alert
+              type="info"
+              message="Импорт данных"
+              description={`Импортируется ${parsedData.length} элементов в ${matchedCount} позиций`}
+              showIcon
+            />
+            {uploading && (
+              <Progress
+                percent={uploadProgress}
+                status="active"
+                strokeColor={{ from: '#10b981', to: '#059669' }}
+              />
+            )}
+            {!uploading && uploadProgress === 0 && (
+              <Alert type="success" message="Импорт завершён успешно!" showIcon />
+            )}
+          </Space>
+        )}
+      </Space>
+    </Modal>
+  );
+};

@@ -11,6 +11,7 @@ import { PositionToolbar } from './components/PositionToolbar';
 import { DeadlineBar } from './components/DeadlineBar';
 import { PositionTable } from './components/PositionTable';
 import AddAdditionalPositionModal from './AddAdditionalPositionModal';
+import { MassBoqImportModal } from './components/MassBoqImportModal';
 import type { Tender } from '../../lib/supabase';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
@@ -35,6 +36,7 @@ const ClientPositions: React.FC = () => {
   const [additionalModalOpen, setAdditionalModalOpen] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [tempSelectedPositionIds, setTempSelectedPositionIds] = useState<Set<string>>(new Set());
+  const [massImportModalOpen, setMassImportModalOpen] = useState(false);
 
   // Hooks
   const {
@@ -313,6 +315,7 @@ const ClientPositions: React.FC = () => {
             handleDeleteAdditionalPosition(positionId, positionName, selectedTenderId, event)
           }
           onExportToExcel={() => handleExportToExcel(selectedTender)}
+          onMassImport={() => setMassImportModalOpen(true)}
           tempSelectedPositionIds={tempSelectedPositionIds}
           onToggleFilterCheckbox={handleToggleFilterCheckbox}
           onApplyFilter={handleApplyFilter}
@@ -330,6 +333,19 @@ const ClientPositions: React.FC = () => {
           setSelectedParentId(null);
         }}
         onSuccess={handleAdditionalSuccess}
+      />
+
+      {/* Модальное окно массового импорта BOQ */}
+      <MassBoqImportModal
+        open={massImportModalOpen}
+        tenderId={selectedTenderId || ''}
+        tenderTitle={selectedTender?.title || ''}
+        onClose={(success) => {
+          setMassImportModalOpen(false);
+          if (success && selectedTenderId) {
+            fetchClientPositions(selectedTenderId);
+          }
+        }}
       />
     </div>
   );
