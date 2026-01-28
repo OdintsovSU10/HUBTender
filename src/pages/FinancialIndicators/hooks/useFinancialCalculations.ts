@@ -169,12 +169,20 @@ export const useFinancialCalculations = () => {
       let materialsComp = 0;
       let worksComp = 0;
 
+      // Суммы коммерческих стоимостей из boq_items (для сравнения с Commerce страницей)
+      let totalCommercialMaterial = 0;
+      let totalCommercialWork = 0;
+
       boqItems?.forEach(item => {
         const baseCost = item.total_amount || 0;
+        // Добавляем коммерческие стоимости
+        totalCommercialMaterial += item.total_commercial_material_cost || 0;
+        totalCommercialWork += item.total_commercial_work_cost || 0;
         const categoryId = item.detail_cost_category_id;
         const isExcludedFromGrowth = categoryId && excludedCategoryIds.has(categoryId);
+        const itemType = item.boq_item_type?.trim();
 
-        switch (item.boq_item_type) {
+        switch (itemType) {
           case 'суб-раб':
             subcontractWorks += baseCost; // Всегда включаем в общую сумму
             if (!isExcludedFromGrowth) {
@@ -194,13 +202,35 @@ export const useFinancialCalculations = () => {
             materials += baseCost;
             break;
           case 'мат-комп.':
+          case 'мат-комп':
             materialsComp += baseCost;
             break;
           case 'раб-комп.':
+          case 'раб-комп':
             worksComp += baseCost;
             break;
+          default:
+            if (itemType && baseCost > 0) {
+              console.warn(`[FinancialIndicators] Неизвестный тип BOQ: "${itemType}", сумма: ${baseCost}`);
+            }
         }
       });
+
+      console.log('=== BOQ Items Stats (FINANCIAL INDICATORS) ===');
+      console.log('Total BOQ items:', boqItems?.length || 0);
+      console.log('--- БАЗОВЫЕ СУММЫ ПО ТИПАМ (total_amount) ---');
+      console.log('  суб-раб (subcontractWorks):', subcontractWorks.toLocaleString('ru-RU'));
+      console.log('  суб-мат (subcontractMaterials):', subcontractMaterials.toLocaleString('ru-RU'));
+      console.log('  раб (works):', works.toLocaleString('ru-RU'));
+      console.log('  мат (materials):', materials.toLocaleString('ru-RU'));
+      console.log('  мат-комп. (materialsComp):', materialsComp.toLocaleString('ru-RU'));
+      console.log('  раб-комп. (worksComp):', worksComp.toLocaleString('ru-RU'));
+      console.log('  ИТОГО база:', (subcontractWorks + subcontractMaterials + works + materials + materialsComp + worksComp).toLocaleString('ru-RU'));
+      console.log('--- КОММЕРЧЕСКИЕ СТОИМОСТИ ИЗ boq_items ---');
+      console.log('  Commercial Material (sum of total_commercial_material_cost):', totalCommercialMaterial.toLocaleString('ru-RU'));
+      console.log('  Commercial Work (sum of total_commercial_work_cost):', totalCommercialWork.toLocaleString('ru-RU'));
+      console.log('  Commercial TOTAL (из boq_items):', (totalCommercialMaterial + totalCommercialWork).toLocaleString('ru-RU'));
+      console.log('=======================');
 
       const areaSp = tender?.area_sp || 0;
       const areaClient = tender?.area_client || 0;
@@ -422,10 +452,11 @@ export const useFinancialCalculations = () => {
 
       // Итоговые значения прямых затрат после возможной коррекции НДС
       const subcontractTotal = subcontractWorks + subcontractMaterials;
-      const su10Total = works + materials + materialsComp + worksComp;
-      const directCostsTotal = subcontractTotal + su10Total;
+      const su10Total = works + materials; // Без comp-элементов
+      const reserveForDeliveryTotal = materialsComp + worksComp; // Запас на сдачу объекта
+      const directCostsTotal = subcontractTotal + su10Total + reserveForDeliveryTotal;
 
-      console.log('Итоговые ПЗ после коррекции:', { subcontractTotal, su10Total, directCostsTotal });
+      console.log('Итоговые ПЗ после коррекции:', { subcontractTotal, su10Total, reserveForDeliveryTotal, directCostsTotal });
 
       console.log('=== DEBUG 0,6к Parameter ===');
       console.log('All markup parameters:', markupParams.map(p => ({
@@ -512,27 +543,44 @@ export const useFinancialCalculations = () => {
         vatCost = grandTotal / (1 + vatCoeff / 100) * (vatCoeff / 100);
       }
 
-      console.log('=== Financial Indicators Calculation ===');
-      console.log('Direct costs (base):', directCostsTotal);
-      console.log('  - Subcontract:', subcontractTotal);
-      console.log('  - SU-10:', su10Total);
-      console.log('Mechanization:', mechanizationCost);
-      console.log('MVP+GSM:', mvpGsmCost);
-      console.log('Warranty:', warrantyCost);
-      console.log('0.6k coefficient:', coefficient06Cost);
-      console.log('Cost growth (inflation):', totalCostGrowth);
-      console.log('Unforeseeable:', unforeseeableCost);
-      console.log('Overhead own forces:', overheadOwnForcesCost);
-      console.log('Overhead subcontract:', overheadSubcontractCost);
-      console.log('General costs (OFZ):', generalCostsCost);
-      console.log('Profit own forces:', profitOwnForcesCost);
-      console.log('Profit subcontract:', profitSubcontractCost);
-      console.log('VAT in constructor:', isVatInConstructor);
-      console.log('VAT coefficient:', vatCoeff);
-      console.log('Sum before VAT (rows 1-14):', grandTotalBeforeVAT);
-      console.log('VAT cost:', vatCost);
-      console.log('GRAND TOTAL:', grandTotal);
-      console.log('=======================================');
+      console.log('=== Financial Indicators Calculation (ФОРМУЛЫ) ===');
+      console.log('--- ПРЯМЫЕ ЗАТРАТЫ ---');
+      console.log('  Direct costs (base):', directCostsTotal.toLocaleString('ru-RU'));
+      console.log('    - Subcontract:', subcontractTotal.toLocaleString('ru-RU'));
+      console.log('    - SU-10:', su10Total.toLocaleString('ru-RU'));
+      console.log('    - Reserve (comp):', reserveForDeliveryTotal.toLocaleString('ru-RU'));
+      console.log('--- НАЦЕНКИ (формульный расчёт) ---');
+      console.log('  Mechanization:', mechanizationCost.toLocaleString('ru-RU'), `(${mechanizationCoeff}%)`);
+      console.log('  MVP+GSM:', mvpGsmCost.toLocaleString('ru-RU'), `(${mvpGsmCoeff}%)`);
+      console.log('  Warranty:', warrantyCost.toLocaleString('ru-RU'), `(${warrantyCoeff}%)`);
+      console.log('  0.6k coefficient:', coefficient06Cost.toLocaleString('ru-RU'), `(${coefficient06}%)`);
+      console.log('  Cost growth total:', totalCostGrowth.toLocaleString('ru-RU'));
+      console.log('    - works growth:', worksCostGrowthAmount.toLocaleString('ru-RU'), `(${worksCostGrowth}%)`);
+      console.log('    - materials growth:', materialCostGrowthAmount.toLocaleString('ru-RU'), `(${materialCostGrowth}%)`);
+      console.log('    - subcontract works growth:', subcontractWorksCostGrowthAmount.toLocaleString('ru-RU'), `(${subcontractWorksCostGrowth}%)`);
+      console.log('    - subcontract materials growth:', subcontractMaterialsCostGrowthAmount.toLocaleString('ru-RU'), `(${subcontractMaterialsCostGrowth}%)`);
+      console.log('  Unforeseeable:', unforeseeableCost.toLocaleString('ru-RU'), `(${unforeseeableCoeff}%)`);
+      console.log('  Overhead own forces (ООЗ):', overheadOwnForcesCost.toLocaleString('ru-RU'), `(${overheadOwnForcesCoeff}%)`);
+      console.log('  Overhead subcontract (ООЗ суб):', overheadSubcontractCost.toLocaleString('ru-RU'), `(${overheadSubcontractCoeff}%)`);
+      console.log('  General costs (ОФЗ):', generalCostsCost.toLocaleString('ru-RU'), `(${generalCostsCoeff}%)`);
+      console.log('  Profit own forces:', profitOwnForcesCost.toLocaleString('ru-RU'), `(${profitOwnForcesCoeff}%)`);
+      console.log('  Profit subcontract:', profitSubcontractCost.toLocaleString('ru-RU'), `(${profitSubcontractCoeff}%)`);
+      console.log('--- НДС ---');
+      console.log('  VAT in constructor:', isVatInConstructor);
+      console.log('  VAT coefficient:', vatCoeff);
+      console.log('  Sum before VAT (rows 1-14):', grandTotalBeforeVAT.toLocaleString('ru-RU'));
+      console.log('  VAT cost:', vatCost.toLocaleString('ru-RU'));
+      console.log('--- ИТОГО ---');
+      console.log('  GRAND TOTAL (по формулам FI):', grandTotal.toLocaleString('ru-RU'));
+
+      console.log('');
+      console.log('======= СРАВНЕНИЕ COMMERCE vs FINANCIAL INDICATORS =======');
+      const commercialGrandTotal = totalCommercialMaterial + totalCommercialWork;
+      console.log('  COMMERCE (boq_items total_commercial_*):', commercialGrandTotal.toLocaleString('ru-RU'));
+      console.log('  FINANCIAL INDICATORS (формулы):', grandTotal.toLocaleString('ru-RU'));
+      console.log('  РАЗНИЦА:', (commercialGrandTotal - grandTotal).toLocaleString('ru-RU'));
+      console.log('  РАЗНИЦА %:', ((commercialGrandTotal - grandTotal) / grandTotal * 100).toFixed(4) + '%');
+      console.log('=============================================================');
 
       const tableData: IndicatorRow[] = [
         {
@@ -544,12 +592,12 @@ export const useFinancialCalculations = () => {
           customer_cost: areaClient > 0 ? directCostsTotal / areaClient : 0,
           total_cost: directCostsTotal,
           tooltip: `Состав прямых затрат:\n` +
-                   `Субподряд работы: ${subcontractWorks.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
-                   `+ Субподряд материалы: ${subcontractMaterials.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
-                   `+ Работы СУ-10: ${works.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
-                   `+ Материалы СУ-10: ${materials.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
-                   `+ Работы комп.: ${worksComp.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
-                   `+ Материалы комп.: ${materialsComp.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `1. Субподряд: ${subcontractTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `   (работы: ${subcontractWorks.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} + материалы: ${subcontractMaterials.toLocaleString('ru-RU', { maximumFractionDigits: 2 })})\n` +
+                   `2. Работы + Материалы СУ-10: ${su10Total.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `   (работы: ${works.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} + материалы: ${materials.toLocaleString('ru-RU', { maximumFractionDigits: 2 })})\n` +
+                   `3. Запас на сдачу объекта: ${reserveForDeliveryTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `   (раб-комп.: ${worksComp.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} + мат-комп.: ${materialsComp.toLocaleString('ru-RU', { maximumFractionDigits: 2 })})\n` +
                    `= ${directCostsTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
@@ -571,6 +619,18 @@ export const useFinancialCalculations = () => {
         {
           key: '4',
           row_number: 4,
+          indicator_name: 'Запас материалов и работ на сдачу объекта',
+          sp_cost: areaSp > 0 ? reserveForDeliveryTotal / areaSp : 0,
+          customer_cost: areaClient > 0 ? reserveForDeliveryTotal / areaClient : 0,
+          total_cost: reserveForDeliveryTotal,
+          tooltip: `Состав запаса на сдачу объекта:\n` +
+                   `Работы комп.: ${worksComp.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `+ Материалы комп.: ${materialsComp.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}\n` +
+                   `= ${reserveForDeliveryTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
+        },
+        {
+          key: '5',
+          row_number: 5,
           indicator_name: 'Служба механизации',
           coefficient: mechanizationCoeff > 0 ? `${parseFloat(mechanizationCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? mechanizationCost / areaSp : 0,
@@ -580,8 +640,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${worksSu10Only.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${mechanizationCoeff}% = ${mechanizationCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '5',
-          row_number: 5,
+          key: '6',
+          row_number: 6,
           indicator_name: 'МБП+ГСМ',
           coefficient: mvpGsmCoeff > 0 ? `${parseFloat(mvpGsmCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? mvpGsmCost / areaSp : 0,
@@ -591,8 +651,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${worksSu10Only.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${mvpGsmCoeff}% = ${mvpGsmCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '6',
-          row_number: 6,
+          key: '7',
+          row_number: 7,
           indicator_name: 'Гарантийный период',
           coefficient: warrantyCoeff > 0 ? `${parseFloat(warrantyCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? warrantyCost / areaSp : 0,
@@ -602,8 +662,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${worksSu10Only.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${warrantyCoeff}% = ${warrantyCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '7',
-          row_number: 7,
+          key: '8',
+          row_number: 8,
           indicator_name: '1,6',
           coefficient: coefficient06 > 0 ? `${parseFloat(coefficient06.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? coefficient06Cost / areaSp : 0,
@@ -616,8 +676,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${(worksSu10Only + mechanizationCost).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${coefficient06}% = ${coefficient06Cost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '8',
-          row_number: 8,
+          key: '9',
+          row_number: 9,
           indicator_name: 'Рост стоимости',
           coefficient: [
             worksCostGrowth > 0 ? `Раб:${parseFloat(worksCostGrowth.toFixed(5))}%` : '',
@@ -649,8 +709,8 @@ export const useFinancialCalculations = () => {
                    `Итого: ${totalCostGrowth.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '9',
-          row_number: 9,
+          key: '10',
+          row_number: 10,
           indicator_name: 'Непредвиденные',
           coefficient: unforeseeableCoeff > 0 ? `${parseFloat(unforeseeableCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? unforeseeableCost / areaSp : 0,
@@ -666,8 +726,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${baseForUnforeseeable.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${unforeseeableCoeff}% = ${unforeseeableCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '10',
-          row_number: 10,
+          key: '11',
+          row_number: 11,
           indicator_name: 'ООЗ',
           coefficient: overheadOwnForcesCoeff > 0 ? `${parseFloat(overheadOwnForcesCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? overheadOwnForcesCost / areaSp : 0,
@@ -682,8 +742,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${baseForOOZ.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${overheadOwnForcesCoeff}% = ${overheadOwnForcesCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '11',
-          row_number: 11,
+          key: '12',
+          row_number: 12,
           indicator_name: 'ООЗ Субподряд',
           coefficient: overheadSubcontractCoeff > 0 ? `${parseFloat(overheadSubcontractCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? overheadSubcontractCost / areaSp : 0,
@@ -697,8 +757,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${baseForSubcontractOOZ.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${overheadSubcontractCoeff}% = ${overheadSubcontractCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '12',
-          row_number: 12,
+          key: '13',
+          row_number: 13,
           indicator_name: 'ОФЗ',
           coefficient: generalCostsCoeff > 0 ? `${parseFloat(generalCostsCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? generalCostsCost / areaSp : 0,
@@ -711,8 +771,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${baseForOFZ.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${generalCostsCoeff}% = ${generalCostsCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '13',
-          row_number: 13,
+          key: '14',
+          row_number: 14,
           indicator_name: 'Прибыль',
           coefficient: profitOwnForcesCoeff > 0 ? `${parseFloat(profitOwnForcesCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? profitOwnForcesCost / areaSp : 0,
@@ -725,8 +785,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${baseForProfit.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${profitOwnForcesCoeff}% = ${profitOwnForcesCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '14',
-          row_number: 14,
+          key: '15',
+          row_number: 15,
           indicator_name: 'Прибыль субподряд',
           coefficient: profitSubcontractCoeff > 0 ? `${parseFloat(profitSubcontractCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? profitSubcontractCost / areaSp : 0,
@@ -739,8 +799,8 @@ export const useFinancialCalculations = () => {
                    `Расчёт: ${baseForSubcontractProfit.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} × ${profitSubcontractCoeff}% = ${profitSubcontractCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} руб.`
         },
         {
-          key: '15',
-          row_number: 15,
+          key: '16',
+          row_number: 16,
           indicator_name: 'ИТОГО',
           coefficient: '',
           sp_cost: areaSp > 0 ? grandTotal / areaSp : 0,
@@ -750,8 +810,8 @@ export const useFinancialCalculations = () => {
           is_yellow: true
         },
         {
-          key: '16',
-          row_number: 16,
+          key: '17',
+          row_number: 17,
           indicator_name: vatCoeff > 0 ? `В том числе НДС ${parseFloat(vatCoeff.toFixed(5))}%` : 'В том числе НДС',
           coefficient: vatCoeff > 0 ? `${parseFloat(vatCoeff.toFixed(5))}%` : '',
           sp_cost: areaSp > 0 ? vatCost / areaSp : 0,

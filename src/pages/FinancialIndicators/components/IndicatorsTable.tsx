@@ -81,7 +81,7 @@ export const IndicatorsTable: React.FC<IndicatorsTableProps> = ({
       key: 'indicator_name',
       width: 400,
       render: (text, record) => {
-        const isIndented = record.row_number >= 2 && record.row_number <= 3;
+        const isIndented = record.row_number >= 2 && record.row_number <= 4;
         const content = (
           <Text
             strong={record.is_header || record.is_total}

@@ -41,19 +41,8 @@ export function calculateMarkupResult(context: CalculationContext): CalculationR
   const errors: string[] = [];
   const stepResults: number[] = [];
 
-  // DEBUG: Логирование входных данных
-  console.log('calculateMarkupResult входные данные:', {
-    baseAmount,
-    baseCost,
-    sequenceLength: markupSequence?.length,
-    sequence: markupSequence,
-    markupParametersSize: markupParameters?.size,
-    markupParametersEntries: markupParameters ? Array.from(markupParameters.entries()) : []
-  });
-
   // Проверяем наличие последовательности
   if (!markupSequence || !Array.isArray(markupSequence)) {
-    console.error('markupSequence не является массивом:', markupSequence);
     return {
       commercialCost: baseAmount,
       markupCoefficient: 1,
@@ -63,7 +52,6 @@ export function calculateMarkupResult(context: CalculationContext): CalculationR
   }
 
   if (markupSequence.length === 0) {
-    console.log('markupSequence пустой массив');
     return {
       commercialCost: baseAmount,
       markupCoefficient: 1,
@@ -74,11 +62,9 @@ export function calculateMarkupResult(context: CalculationContext): CalculationR
 
   // Используем базовую стоимость из тактики или из элемента
   let currentAmount = baseCost ?? baseAmount;
-  console.log('Начальная стоимость для расчета:', currentAmount);
 
   // Если базовая стоимость 0 или отрицательная, возвращаем ее без изменений
   if (currentAmount <= 0) {
-    console.log('Базовая стоимость <= 0, возвращаем без расчета');
     return {
       commercialCost: currentAmount,
       markupCoefficient: 1,
@@ -88,27 +74,17 @@ export function calculateMarkupResult(context: CalculationContext): CalculationR
   }
 
   // Обрабатываем каждый шаг последовательности
-  console.log(`Начинаем обработку ${markupSequence.length} шагов`);
   for (let i = 0; i < markupSequence.length; i++) {
     const step = markupSequence[i];
-    console.log(`\nШаг ${i + 1}:`, {
-      step,
-      baseIndex: step.baseIndex,
-      action1: step.action1,
-      operand1Type: step.operand1Type,
-      operand1Key: step.operand1Key
-    });
 
     try {
       // Получаем базовое значение для этого шага
       const baseValue = getBaseValue(step.baseIndex, baseAmount, stepResults);
-      console.log(`  Базовое значение: ${baseValue}`);
 
       // Применяем до 5 операций (если они определены)
       let stepResult = baseValue;
 
       // Операция 1 (обязательная)
-      console.log(`  Получаем операнд1: тип=${step.operand1Type}, ключ=${step.operand1Key}`);
       const operand1 = getOperandValue(
         step.operand1Type,
         step.operand1Key,
@@ -118,9 +94,7 @@ export function calculateMarkupResult(context: CalculationContext): CalculationR
         stepResults,
         baseAmount
       );
-      console.log(`  Операнд1 = ${operand1}`);
       stepResult = applyOperation(stepResult, step.action1, operand1);
-      console.log(`  Результат операции ${step.action1}: ${baseValue} ${step.action1} ${operand1} = ${stepResult}`);
 
       // Операция 2 (опциональная)
       if (step.action2 && step.operand2Type) {
@@ -179,22 +153,14 @@ export function calculateMarkupResult(context: CalculationContext): CalculationR
       }
 
       stepResults.push(stepResult);
-      currentAmount = stepResult; // Последний результат становится итоговой стоимостью
-      console.log(`  Шаг ${i + 1} завершен. Результат: ${stepResult}, Текущая стоимость: ${currentAmount}`);
-      console.log(`  stepResults теперь:`, stepResults);
+      currentAmount = stepResult;
 
     } catch (error) {
       const errorMessage = `Ошибка в шаге ${i + 1}: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`;
       errors.push(errorMessage);
-      console.error(errorMessage, { step, error, stackTrace: error instanceof Error ? error.stack : undefined });
-
-      // Продолжаем расчет, используя предыдущее значение
       stepResults.push(currentAmount);
-      console.log(`  После ошибки stepResults:`, stepResults);
     }
   }
-
-  console.log(`\nЗавершена обработка шагов. Итоговая стоимость: ${currentAmount}, Всего шагов обработано: ${stepResults.length}`);
 
   // Рассчитываем итоговый коэффициент наценки
   const markupCoefficient = baseAmount > 0 ? currentAmount / baseAmount : 1;
@@ -262,35 +228,17 @@ function getOperandValue(
 
       const markupValue = markupParameters.get(String(operandKey));
 
-      // Специальное логирование для material_cost_growth
-      if (String(operandKey) === 'material_cost_growth') {
-        console.log('🔍 ПРОВЕРКА material_cost_growth в getOperandValue:');
-        console.log('  - Ключ запрошен:', operandKey);
-        console.log('  - Значение из Map:', markupValue);
-        console.log('  - Все параметры в Map:', Array.from(markupParameters.entries()));
-      }
-
       if (markupValue === undefined) {
-        console.error(`❌ Параметр "${operandKey}" НЕ НАЙДЕН в Map!`);
-        console.error('Доступные параметры:', Array.from(markupParameters.keys()));
         throw new Error(`Параметр наценки "${operandKey}" не найден`);
       }
 
       // Применяем формат умножения
       if (multiplyFormat === 'addOne') {
         // Формат (1 + %): например, 10% становится 1.1
-        const result = 1 + markupValue / 100;
-        if (String(operandKey) === 'material_cost_growth') {
-          console.log(`  - Формат: addOne, результат: ${result} (1 + ${markupValue}/100)`);
-        }
-        return result;
+        return 1 + markupValue / 100;
       } else {
         // Прямое значение: например, 10% становится 0.1
-        const result = markupValue / 100;
-        if (String(operandKey) === 'material_cost_growth') {
-          console.log(`  - Формат: direct, результат: ${result} (${markupValue}/100)`);
-        }
-        return result;
+        return markupValue / 100;
       }
     }
 
@@ -304,7 +252,6 @@ function getOperandValue(
         if (baseAmount === undefined) {
           throw new Error('Базовая сумма не передана для operandIndex = -1');
         }
-        console.log(`  🔹 operandIndex = -1, возвращаем baseAmount = ${baseAmount}`);
         return baseAmount;
       }
 

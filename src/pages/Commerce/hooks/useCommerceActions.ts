@@ -16,14 +16,19 @@ export function useCommerceActions(
   loadPositions: (tenderId: string) => Promise<void>
 ) {
   const handleRecalculate = async () => {
+    console.log('%c[COMMERCE] handleRecalculate вызван', 'background: blue; color: white; font-size: 14px;');
+    console.log('[COMMERCE] selectedTenderId:', selectedTenderId);
+
     if (!selectedTenderId) {
       message.warning('Выберите тендер для пересчета');
       return;
     }
 
     setCalculating(true);
+    console.log('[COMMERCE] Вызываем applyTacticToTender...');
     try {
       const result = await applyTacticToTender(selectedTenderId);
+      console.log('[COMMERCE] Результат applyTacticToTender:', result);
 
       if (result.success) {
         message.success(`Пересчитано элементов: ${result.updatedCount}`);

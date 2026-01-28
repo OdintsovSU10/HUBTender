@@ -25,7 +25,7 @@ interface CategoryBreakdown {
 }
 
 interface DrillDownLevel {
-  type: 'root' | 'direct_costs' | 'markups' | 'indicator' | 'profit_breakdown' | 'ooz_breakdown' | 'cost_growth_breakdown';
+  type: 'root' | 'direct_costs' | 'markups' | 'indicator' | 'profit_breakdown' | 'ooz_breakdown' | 'cost_growth_breakdown' | 'reserve_breakdown';
   indicatorName?: string;
   rowNumber?: number;
 }
@@ -70,24 +70,24 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 2 &&
-        d.row_number <= 14
+        d.row_number <= 15
       );
 
-      // Прямые затраты: строки 2-6
+      // Прямые затраты: строки 2-7 (Субподряд, СУ-10, Запас на сдачу, СМ, МБП+ГСМ, Гарантия)
       let directCosts = baseData
-        .filter(d => d.row_number >= 2 && d.row_number <= 6)
+        .filter(d => d.row_number >= 2 && d.row_number <= 7)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
       // Если НДС в конструкторе, добавляем НДС к прямым затратам
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       const vatCost = vatRow?.total_cost || 0;
       if (isVatInConstructor && vatCost > 0) {
         directCosts += vatCost;
       }
 
-      // Наценки: строки 7-14
+      // Наценки: строки 8-15
       const markups = baseData
-        .filter(d => d.row_number >= 7 && d.row_number <= 14)
+        .filter(d => d.row_number >= 8 && d.row_number <= 15)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
       // Сортируем по убыванию
@@ -117,12 +117,13 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 2 &&
-        d.row_number <= 6
+        d.row_number <= 7
       );
 
       const colors = [
         '#ff4d4f', // Субподряд
         '#1890ff', // Работы + Материалы СУ-10
+        '#13c2c2', // Запас на сдачу объекта
         '#52c41a', // Служба механизации
         '#faad14', // МБП+ГСМ
         '#722ed1', // Гарантийный период
@@ -138,12 +139,12 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       }));
 
       // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
         items.push({
           label: 'НДС',
           value: vatRow.total_cost || 0,
-          color: colors[5],
+          color: colors[6],
           originalIndex: -1, // Специальное значение для НДС
         });
       }
@@ -171,37 +172,37 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       const markupsData = data.filter(d =>
         !d.is_header &&
         !d.is_total &&
-        d.row_number >= 7 &&
-        d.row_number <= 14
+        d.row_number >= 8 &&
+        d.row_number <= 15
       );
 
       // Находим строки прибыли и объединяем их
-      const profitRow = markupsData.find(d => d.row_number === 13);
-      const profitSubRow = markupsData.find(d => d.row_number === 14);
+      const profitRow = markupsData.find(d => d.row_number === 14);
+      const profitSubRow = markupsData.find(d => d.row_number === 15);
 
       const combinedProfit = profitRow && profitSubRow ? {
         ...profitRow,
         indicator_name: 'Прибыль',
         total_cost: (profitRow.total_cost || 0) + (profitSubRow.total_cost || 0),
-        row_number: 13,
+        row_number: 14,
       } : profitRow;
 
       // Находим строки ООЗ и объединяем их
-      const oozRow = markupsData.find(d => d.row_number === 10);
-      const oozSubRow = markupsData.find(d => d.row_number === 11);
+      const oozRow = markupsData.find(d => d.row_number === 11);
+      const oozSubRow = markupsData.find(d => d.row_number === 12);
 
       const combinedOOZ = oozRow && oozSubRow ? {
         ...oozRow,
         indicator_name: 'ООЗ',
         total_cost: (oozRow.total_cost || 0) + (oozSubRow.total_cost || 0),
-        row_number: 10,
+        row_number: 11,
       } : oozRow;
 
       const filteredMarkups = markupsData
-        .filter(d => d.row_number !== 14 && d.row_number !== 11) // Исключаем "Прибыль субподряд" и "ООЗ Субподряд"
+        .filter(d => d.row_number !== 15 && d.row_number !== 12) // Исключаем "Прибыль субподряд" и "ООЗ Субподряд"
         .map(d => {
-          if (d.row_number === 13) return combinedProfit;
-          if (d.row_number === 10) return combinedOOZ;
+          if (d.row_number === 14) return combinedProfit;
+          if (d.row_number === 11) return combinedOOZ;
           return d;
         })
         .filter(Boolean);
@@ -238,8 +239,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     // Уровень 2: Показываем drill-down для прибыли
     if (currentLevel.type === 'profit_breakdown') {
-      const profitRow = data.find(d => d.row_number === 13);
-      const profitSubRow = data.find(d => d.row_number === 14);
+      const profitRow = data.find(d => d.row_number === 14);
+      const profitSubRow = data.find(d => d.row_number === 15);
 
       if (profitRow && profitSubRow) {
         // Сортируем по убыванию стоимости
@@ -264,8 +265,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     // Уровень 3: Показываем drill-down для ООЗ
     if (currentLevel.type === 'ooz_breakdown') {
-      const oozRow = data.find(d => d.row_number === 10);
-      const oozSubRow = data.find(d => d.row_number === 11);
+      const oozRow = data.find(d => d.row_number === 11);
+      const oozSubRow = data.find(d => d.row_number === 12);
 
       if (oozRow && oozSubRow) {
         // Сортируем по убыванию стоимости
@@ -291,7 +292,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
     // Уровень 3: Показываем drill-down для роста стоимости
     if (currentLevel.type === 'cost_growth_breakdown') {
       // Получаем данные из промежуточных расчетов (не из tooltip)
-      const costGrowthRow = data.find(d => d.row_number === 8);
+      const costGrowthRow = data.find(d => d.row_number === 9);
 
       if (costGrowthRow) {
         // Используем промежуточные значения расчетов
@@ -319,6 +320,46 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
             },
           ],
         };
+      }
+    }
+
+    // Уровень 3: Показываем drill-down для запаса на сдачу объекта (мат-комп. + раб-комп.)
+    if (currentLevel.type === 'reserve_breakdown') {
+      // Строка 4 содержит общий запас, но нам нужны отдельные значения из боитемов
+      // Загружаем их из breakdownData если доступны
+      if (breakdownData.length > 0) {
+        const colors = [
+          '#13c2c2', // Материалы комп.
+          '#36cfc9', // Работы комп.
+        ];
+
+        // Группируем по типу (материалы/работы)
+        const materialsComp = breakdownData
+          .filter(item => item.category_name === 'мат-комп.')
+          .reduce((sum, item) => sum + item.total_amount, 0);
+        const worksComp = breakdownData
+          .filter(item => item.category_name === 'раб-комп.')
+          .reduce((sum, item) => sum + item.total_amount, 0);
+
+        // Если данные есть, показываем разбивку по типу
+        if (materialsComp > 0 || worksComp > 0) {
+          const items = [
+            { label: 'Запас материалов на сдачу объекта', value: materialsComp, color: colors[0] },
+            { label: 'Запас работ на сдачу объекта', value: worksComp, color: colors[1] },
+          ].filter(item => item.value > 0).sort((a, b) => b.value - a.value);
+
+          return {
+            labels: items.map(item => item.label),
+            datasets: [
+              {
+                data: items.map(item => item.value),
+                backgroundColor: items.map(item => item.color),
+                borderWidth: 2,
+                borderColor: currentTheme === 'dark' ? '#1f1f1f' : '#ffffff',
+              },
+            ],
+          };
+        }
       }
     }
 
@@ -358,7 +399,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
   // Проверка, доступна ли детализация для данного показателя
   const hasDetailedBreakdown = (rowNumber: number): boolean => {
     // Детализация доступна только для показателей, привязанных к boq_items
-    return rowNumber === 2 || rowNumber === 3; // Субподряд или Работы+Материалы СУ-10
+    // 2 = Субподряд, 3 = Работы+Материалы СУ-10, 4 = Запас на сдачу объекта
+    return rowNumber === 2 || rowNumber === 3 || rowNumber === 4;
   };
 
   // Загрузка детализации по категориям затрат для выбранного индикатора
@@ -384,6 +426,9 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
           break;
         case 3: // Работы + Материалы СУ-10
           boqItemTypes = ['раб', 'мат'];
+          break;
+        case 4: // Запас на сдачу объекта
+          boqItemTypes = ['мат-комп.', 'раб-комп.'];
           break;
         default:
           boqItemTypes = [];
@@ -421,33 +466,66 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         const costCategory = detailCategory?.cost_category;
         const categoryObj = Array.isArray(costCategory) ? costCategory[0] : costCategory;
 
-        const categoryName = categoryObj?.name || 'Без категории';
-        const detailName = detailCategory?.name || 'Без вида';
-        const locationName = detailCategory?.location || 'Без локализации';
         const amount = item.total_amount || 0;
         const isWork = item.boq_item_type === 'раб' || item.boq_item_type === 'суб-раб' || item.boq_item_type === 'раб-комп.';
 
-        // Ключ: категория + вид + локализация для группировки
-        const key = `${categoryName}|${detailName}|${locationName}`;
+        // Для строки 4 (запас на сдачу) группируем по типу элемента
+        if (rowNumber === 4) {
+          const categoryName = item.boq_item_type; // 'мат-комп.' или 'раб-комп.'
+          const detailCategoryName = categoryObj?.name || 'Без категории';
+          const detailName = detailCategory?.name || 'Без вида';
+          const locationName = detailCategory?.location || 'Без локализации';
 
-        if (!categoryMap.has(key)) {
-          categoryMap.set(key, {
-            category_name: categoryName,
-            detail_name: detailName,
-            location_name: locationName,
-            total_amount: 0,
-            works_amount: 0,
-            materials_amount: 0,
-          });
-        }
+          // Ключ: тип элемента + категория + вид + локализация
+          const key = `${categoryName}|${detailCategoryName}|${detailName}|${locationName}`;
 
-        const cat = categoryMap.get(key)!;
-        cat.total_amount += amount;
+          if (!categoryMap.has(key)) {
+            categoryMap.set(key, {
+              category_name: categoryName,
+              detail_name: `${detailCategoryName} / ${detailName}`,
+              location_name: locationName,
+              total_amount: 0,
+              works_amount: 0,
+              materials_amount: 0,
+            });
+          }
 
-        if (isWork) {
-          cat.works_amount += amount;
+          const cat = categoryMap.get(key)!;
+          cat.total_amount += amount;
+
+          if (isWork) {
+            cat.works_amount += amount;
+          } else {
+            cat.materials_amount += amount;
+          }
         } else {
-          cat.materials_amount += amount;
+          // Для остальных строк группируем по категории затрат
+          const categoryName = categoryObj?.name || 'Без категории';
+          const detailName = detailCategory?.name || 'Без вида';
+          const locationName = detailCategory?.location || 'Без локализации';
+
+          // Ключ: категория + вид + локализация для группировки
+          const key = `${categoryName}|${detailName}|${locationName}`;
+
+          if (!categoryMap.has(key)) {
+            categoryMap.set(key, {
+              category_name: categoryName,
+              detail_name: detailName,
+              location_name: locationName,
+              total_amount: 0,
+              works_amount: 0,
+              materials_amount: 0,
+            });
+          }
+
+          const cat = categoryMap.get(key)!;
+          cat.total_amount += amount;
+
+          if (isWork) {
+            cat.works_amount += amount;
+          } else {
+            cat.materials_amount += amount;
+          }
         }
       });
 
@@ -571,7 +649,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 2 &&
-        d.row_number <= 6
+        d.row_number <= 7
       );
 
       // Строим массив элементов точно так же, как в getCategoriesData
@@ -579,15 +657,17 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         label: row.indicator_name,
         value: row.total_cost || 0,
         originalIndex: idx,
+        rowNumber: row.row_number,
       }));
 
       // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
         items.push({
           label: 'НДС',
           value: vatRow.total_cost || 0,
           originalIndex: -1, // Специальное значение для НДС
+          rowNumber: 17,
         });
       }
 
@@ -628,33 +708,33 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       const markupsData = data.filter(d =>
         !d.is_header &&
         !d.is_total &&
-        d.row_number >= 7 &&
-        d.row_number <= 14
+        d.row_number >= 8 &&
+        d.row_number <= 15
       );
 
-      const profitRow = markupsData.find(d => d.row_number === 13);
-      const profitSubRow = markupsData.find(d => d.row_number === 14);
+      const profitRow = markupsData.find(d => d.row_number === 14);
+      const profitSubRow = markupsData.find(d => d.row_number === 15);
       const combinedProfit = profitRow && profitSubRow ? {
         ...profitRow,
         indicator_name: 'Прибыль',
         total_cost: (profitRow.total_cost || 0) + (profitSubRow.total_cost || 0),
-        row_number: 13,
+        row_number: 14,
       } : profitRow;
 
-      const oozRow = markupsData.find(d => d.row_number === 10);
-      const oozSubRow = markupsData.find(d => d.row_number === 11);
+      const oozRow = markupsData.find(d => d.row_number === 11);
+      const oozSubRow = markupsData.find(d => d.row_number === 12);
       const combinedOOZ = oozRow && oozSubRow ? {
         ...oozRow,
         indicator_name: 'ООЗ',
         total_cost: (oozRow.total_cost || 0) + (oozSubRow.total_cost || 0),
-        row_number: 10,
+        row_number: 11,
       } : oozRow;
 
       const filteredMarkups = markupsData
-        .filter(d => d.row_number !== 14 && d.row_number !== 11)
+        .filter(d => d.row_number !== 15 && d.row_number !== 12)
         .map(d => {
-          if (d.row_number === 13) return combinedProfit;
-          if (d.row_number === 10) return combinedOOZ;
+          if (d.row_number === 14) return combinedProfit;
+          if (d.row_number === 11) return combinedOOZ;
           return d;
         })
         .filter(Boolean);
@@ -670,34 +750,34 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
       if (clickedRow) {
         // Проверяем, это прибыль?
-        if (clickedRow.row_number === 13) {
+        if (clickedRow.row_number === 14) {
           // Переходим к drill-down прибыли
           setDrillDownPath([
             ...drillDownPath,
             {
               type: 'profit_breakdown',
               indicatorName: 'Прибыль',
-              rowNumber: 13,
+              rowNumber: 14,
             },
           ]);
-        } else if (clickedRow.row_number === 10) {
+        } else if (clickedRow.row_number === 11) {
           // Переходим к drill-down ООЗ
           setDrillDownPath([
             ...drillDownPath,
             {
               type: 'ooz_breakdown',
               indicatorName: 'ООЗ',
-              rowNumber: 10,
+              rowNumber: 11,
             },
           ]);
-        } else if (clickedRow.row_number === 8) {
+        } else if (clickedRow.row_number === 9) {
           // Переходим к drill-down роста стоимости
           setDrillDownPath([
             ...drillDownPath,
             {
               type: 'cost_growth_breakdown',
               indicatorName: 'Рост стоимости',
-              rowNumber: 8,
+              rowNumber: 9,
             },
           ]);
         } else {
@@ -770,17 +850,17 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     if (currentLevel.type === 'root') {
       // Корневой уровень: Прямые затраты и Наценки
-      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
+      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
       // Если НДС в конструкторе, добавляем его к прямым затратам
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       const vatCost = vatRow?.total_cost || 0;
       if (isVatInConstructor && vatCost > 0) {
         directCosts += vatCost;
       }
 
-      const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 7 && d.row_number <= 14)
+      const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 8 && d.row_number <= 15)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
       barItems = [
@@ -793,7 +873,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 2 &&
-        d.row_number <= 6
+        d.row_number <= 7
       );
 
       const colors = [
@@ -812,7 +892,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       }));
 
       // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
         barItems.push({
           label: 'НДС',
@@ -827,13 +907,13 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       const markupsData = data.filter(d =>
         !d.is_header &&
         !d.is_total &&
-        d.row_number >= 7 &&
-        d.row_number <= 14
+        d.row_number >= 8 &&
+        d.row_number <= 15
       );
 
       // Объединяем строки прибыли
-      const profitRow = markupsData.find(d => d.row_number === 13);
-      const profitSubRow = markupsData.find(d => d.row_number === 14);
+      const profitRow = markupsData.find(d => d.row_number === 14);
+      const profitSubRow = markupsData.find(d => d.row_number === 15);
       const combinedProfit = profitRow && profitSubRow ? {
         ...profitRow,
         indicator_name: 'Прибыль',
@@ -841,8 +921,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       } : profitRow;
 
       // Объединяем строки ООЗ
-      const oozRow = markupsData.find(d => d.row_number === 10);
-      const oozSubRow = markupsData.find(d => d.row_number === 11);
+      const oozRow = markupsData.find(d => d.row_number === 11);
+      const oozSubRow = markupsData.find(d => d.row_number === 12);
       const combinedOOZ = oozRow && oozSubRow ? {
         ...oozRow,
         indicator_name: 'ООЗ',
@@ -850,10 +930,10 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       } : oozRow;
 
       const filteredMarkups = markupsData
-        .filter(d => d.row_number !== 14 && d.row_number !== 11)
+        .filter(d => d.row_number !== 15 && d.row_number !== 12)
         .map(d => {
-          if (d.row_number === 13) return combinedProfit;
-          if (d.row_number === 10) return combinedOOZ;
+          if (d.row_number === 14) return combinedProfit;
+          if (d.row_number === 11) return combinedOOZ;
           return d;
         })
         .filter(Boolean);
@@ -922,7 +1002,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       }
     } else if (currentLevel.type === 'profit_breakdown') {
       // Детализация прибыли
-      const profitItems = data.filter(d => d.row_number === 13 || d.row_number === 14);
+      const profitItems = data.filter(d => d.row_number === 14 || d.row_number === 15);
       barItems = profitItems.map((d, idx) => ({
         label: d.indicator_name,
         cost: d.total_cost || 0,
@@ -930,7 +1010,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       })).sort((a, b) => b.cost - a.cost); // Сортируем по убыванию стоимости
     } else if (currentLevel.type === 'ooz_breakdown') {
       // Детализация ООЗ
-      const oozItems = data.filter(d => d.row_number === 10 || d.row_number === 11);
+      const oozItems = data.filter(d => d.row_number === 11 || d.row_number === 12);
       barItems = oozItems.map((d, idx) => ({
         label: d.indicator_name,
         cost: d.total_cost || 0,
@@ -938,7 +1018,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       })).sort((a, b) => b.cost - a.cost); // Сортируем по убыванию стоимости
     } else if (currentLevel.type === 'cost_growth_breakdown') {
       // Детализация роста стоимости
-      const costGrowthRow = data.find(d => d.row_number === 8);
+      const costGrowthRow = data.find(d => d.row_number === 9);
 
       if (costGrowthRow) {
         // Используем промежуточные значения расчетов
@@ -1037,17 +1117,17 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     if (currentLevel.type === 'root') {
       // Корневой уровень: показываем Прямые затраты и Наценки
-      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
+      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
       // Если НДС в конструкторе, добавляем его к прямым затратам
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       const vatCost = vatRow?.total_cost || 0;
       if (isVatInConstructor && vatCost > 0) {
         directCosts += vatCost;
       }
 
-      const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 7 && d.row_number <= 14)
+      const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 8 && d.row_number <= 15)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
 
       return [
@@ -1067,7 +1147,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
     } else if (currentLevel.type === 'direct_costs') {
       // Детализация прямых затрат
       const items = data
-        .filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
+        .filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
         .map((d, idx) => ({
           key: idx,
           indicator_name: d.indicator_name,
@@ -1076,7 +1156,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         }));
 
       // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 16);
+      const vatRow = data.find(d => d.row_number === 17);
       if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
         items.push({
           key: items.length,
@@ -1092,13 +1172,13 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       const markupsData = data.filter(d =>
         !d.is_header &&
         !d.is_total &&
-        d.row_number >= 7 &&
-        d.row_number <= 14
+        d.row_number >= 8 &&
+        d.row_number <= 15
       );
 
       // Объединяем строки прибыли
-      const profitRow = markupsData.find(d => d.row_number === 13);
-      const profitSubRow = markupsData.find(d => d.row_number === 14);
+      const profitRow = markupsData.find(d => d.row_number === 14);
+      const profitSubRow = markupsData.find(d => d.row_number === 15);
       const combinedProfit = profitRow && profitSubRow ? {
         ...profitRow,
         indicator_name: 'Прибыль',
@@ -1106,8 +1186,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       } : profitRow;
 
       // Объединяем строки ООЗ
-      const oozRow = markupsData.find(d => d.row_number === 10);
-      const oozSubRow = markupsData.find(d => d.row_number === 11);
+      const oozRow = markupsData.find(d => d.row_number === 11);
+      const oozSubRow = markupsData.find(d => d.row_number === 12);
       const combinedOOZ = oozRow && oozSubRow ? {
         ...oozRow,
         indicator_name: 'ООЗ',
@@ -1115,10 +1195,10 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       } : oozRow;
 
       const filteredMarkups = markupsData
-        .filter(d => d.row_number !== 14 && d.row_number !== 11)
+        .filter(d => d.row_number !== 15 && d.row_number !== 12)
         .map(d => {
-          if (d.row_number === 13) return combinedProfit;
-          if (d.row_number === 10) return combinedOOZ;
+          if (d.row_number === 14) return combinedProfit;
+          if (d.row_number === 11) return combinedOOZ;
           return d;
         })
         .filter(Boolean);
@@ -1131,7 +1211,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       })).sort((a, b) => b.amount - a.amount);
     } else if (currentLevel.type === 'profit_breakdown') {
       // Детализация прибыли
-      const profitItems = data.filter(d => d.row_number === 13 || d.row_number === 14);
+      const profitItems = data.filter(d => d.row_number === 14 || d.row_number === 15);
       return profitItems.map((d, idx) => ({
         key: idx,
         indicator_name: d.indicator_name,
@@ -1140,7 +1220,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       })).sort((a, b) => b.amount - a.amount);
     } else if (currentLevel.type === 'ooz_breakdown') {
       // Детализация ООЗ
-      const oozItems = data.filter(d => d.row_number === 10 || d.row_number === 11);
+      const oozItems = data.filter(d => d.row_number === 11 || d.row_number === 12);
       return oozItems.map((d, idx) => ({
         key: idx,
         indicator_name: d.indicator_name,
@@ -1149,7 +1229,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       })).sort((a, b) => b.amount - a.amount);
     } else if (currentLevel.type === 'cost_growth_breakdown') {
       // Детализация роста стоимости
-      const costGrowthRow = data.find(d => d.row_number === 8);
+      const costGrowthRow = data.find(d => d.row_number === 9);
 
       if (costGrowthRow) {
         // Используем промежуточные значения расчетов
@@ -1362,7 +1442,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 2 &&
-        d.row_number <= 6
+        d.row_number <= 7
       );
 
       if (clickedIndex < directCostsData.length) {
@@ -1387,35 +1467,35 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       const markupsData = data.filter(d =>
         !d.is_header &&
         !d.is_total &&
-        d.row_number >= 7 &&
-        d.row_number <= 14
+        d.row_number >= 8 &&
+        d.row_number <= 15
       );
 
       // Объединяем строки прибыли
-      const profitRow = markupsData.find(d => d.row_number === 13);
-      const profitSubRow = markupsData.find(d => d.row_number === 14);
+      const profitRow = markupsData.find(d => d.row_number === 14);
+      const profitSubRow = markupsData.find(d => d.row_number === 15);
       const combinedProfit = profitRow && profitSubRow ? {
         ...profitRow,
         indicator_name: 'Прибыль',
         total_cost: (profitRow.total_cost || 0) + (profitSubRow.total_cost || 0),
-        row_number: 13,
+        row_number: 14,
       } : profitRow;
 
       // Объединяем строки ООЗ
-      const oozRow = markupsData.find(d => d.row_number === 10);
-      const oozSubRow = markupsData.find(d => d.row_number === 11);
+      const oozRow = markupsData.find(d => d.row_number === 11);
+      const oozSubRow = markupsData.find(d => d.row_number === 12);
       const combinedOOZ = oozRow && oozSubRow ? {
         ...oozRow,
         indicator_name: 'ООЗ',
         total_cost: (oozRow.total_cost || 0) + (oozSubRow.total_cost || 0),
-        row_number: 10,
+        row_number: 11,
       } : oozRow;
 
       const filteredMarkups = markupsData
-        .filter(d => d.row_number !== 14 && d.row_number !== 11) // Исключаем "Прибыль субподряд" и "ООЗ Субподряд"
+        .filter(d => d.row_number !== 15 && d.row_number !== 12) // Исключаем "Прибыль субподряд" и "ООЗ Субподряд"
         .map(d => {
-          if (d.row_number === 13) return combinedProfit;
-          if (d.row_number === 10) return combinedOOZ;
+          if (d.row_number === 14) return combinedProfit;
+          if (d.row_number === 11) return combinedOOZ;
           return d;
         })
         .filter(Boolean);
@@ -1431,33 +1511,33 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
       if (clickedRow) {
         // Проверяем, это прибыль?
-        if (clickedRow.row_number === 13) {
+        if (clickedRow.row_number === 14) {
           setDrillDownPath([
             ...drillDownPath,
             {
               type: 'profit_breakdown',
               indicatorName: 'Прибыль',
-              rowNumber: 13,
+              rowNumber: 14,
             },
           ]);
-        } else if (clickedRow.row_number === 10) {
+        } else if (clickedRow.row_number === 11) {
           // Переходим к drill-down ООЗ
           setDrillDownPath([
             ...drillDownPath,
             {
               type: 'ooz_breakdown',
               indicatorName: 'ООЗ',
-              rowNumber: 10,
+              rowNumber: 11,
             },
           ]);
-        } else if (clickedRow.row_number === 8) {
+        } else if (clickedRow.row_number === 9) {
           // Переходим к drill-down роста стоимости
           setDrillDownPath([
             ...drillDownPath,
             {
               type: 'cost_growth_breakdown',
               indicatorName: 'Рост стоимости',
-              rowNumber: 8,
+              rowNumber: 9,
             },
           ]);
         } else {
@@ -1587,13 +1667,13 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
                         drillDownPath.length === 1
                           ? data.find(d => d.is_total)?.total_cost
                           : drillDownPath[drillDownPath.length - 1].type === 'direct_costs'
-                          ? data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6).reduce((sum, d) => sum + (d.total_cost || 0), 0)
+                          ? data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7).reduce((sum, d) => sum + (d.total_cost || 0), 0)
                           : drillDownPath[drillDownPath.length - 1].type === 'markups'
-                          ? data.filter(d => !d.is_header && !d.is_total && d.row_number >= 7 && d.row_number <= 14).reduce((sum, d) => sum + (d.total_cost || 0), 0)
+                          ? data.filter(d => !d.is_header && !d.is_total && d.row_number >= 8 && d.row_number <= 15).reduce((sum, d) => sum + (d.total_cost || 0), 0)
                           : drillDownPath[drillDownPath.length - 1].type === 'indicator' && selectedIndicator
                           ? data.find(d => d.row_number === selectedIndicator)?.total_cost
                           : drillDownPath[drillDownPath.length - 1].type === 'profit_breakdown'
-                          ? data.filter(d => d.row_number === 13 || d.row_number === 14).reduce((sum, d) => sum + (d.total_cost || 0), 0)
+                          ? data.filter(d => d.row_number === 14 || d.row_number === 15).reduce((sum, d) => sum + (d.total_cost || 0), 0)
                           : data.find(d => d.is_total)?.total_cost
                       )} Руб.
                     </Text>
@@ -1641,6 +1721,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
                           ? 'Наценки'
                           : level.type === 'profit_breakdown'
                           ? 'Детализация прибыли'
+                          : level.type === 'reserve_breakdown'
+                          ? 'Запас на сдачу объекта'
                           : level.indicatorName || 'Детализация'}
                       </Text>
                     </span>
@@ -1707,15 +1789,15 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
                         if (currentLevel.type === 'root') {
                           currentCost = data.find(d => d.is_total)?.total_cost || 0;
                         } else if (currentLevel.type === 'direct_costs') {
-                          currentCost = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 6)
+                          currentCost = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
                             .reduce((sum, d) => sum + (d.total_cost || 0), 0);
                         } else if (currentLevel.type === 'markups') {
-                          currentCost = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 7 && d.row_number <= 14)
+                          currentCost = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 8 && d.row_number <= 15)
                             .reduce((sum, d) => sum + (d.total_cost || 0), 0);
                         } else if (currentLevel.type === 'indicator' && selectedIndicator) {
                           currentCost = data.find(d => d.row_number === selectedIndicator)?.total_cost || 0;
                         } else if (currentLevel.type === 'profit_breakdown') {
-                          currentCost = data.filter(d => d.row_number === 13 || d.row_number === 14)
+                          currentCost = data.filter(d => d.row_number === 14 || d.row_number === 15)
                             .reduce((sum, d) => sum + (d.total_cost || 0), 0);
                         }
 
@@ -1746,7 +1828,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       </Row>
 
       {/* Детализация по категориям затрат (показывается только для Субподряда и Работы+Материалы СУ-10) */}
-      {selectedIndicator && (selectedIndicator === 2 || selectedIndicator === 3) && (
+      {selectedIndicator && (selectedIndicator === 2 || selectedIndicator === 3 || selectedIndicator === 4) && (
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
           <Col xs={24}>
             <Card
@@ -1802,7 +1884,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       )}
 
       {/* Нижний ряд: Таблица сводки по выбранному уровню (скрыт когда открыт блок детализации затрат) */}
-      {!(selectedIndicator && (selectedIndicator === 2 || selectedIndicator === 3)) && (
+      {!(selectedIndicator && (selectedIndicator === 2 || selectedIndicator === 3 || selectedIndicator === 4)) && (
         <Row gutter={[16, 16]}>
           <Col xs={24}>
             <Card
@@ -1828,6 +1910,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
                   ? 'Детализация ООЗ'
                   : drillDownPath[drillDownPath.length - 1].type === 'cost_growth_breakdown'
                   ? 'Детализация роста стоимости'
+                  : drillDownPath[drillDownPath.length - 1].type === 'reserve_breakdown'
+                  ? 'Запас на сдачу объекта'
                   : drillDownPath[drillDownPath.length - 1].indicatorName || 'Детализация'}
               </Text>
             </div>

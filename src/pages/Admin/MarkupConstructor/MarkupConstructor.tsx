@@ -24,7 +24,7 @@ import {
 } from 'antd';
 import { SaveOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, EditOutlined, CloseOutlined, ArrowLeftOutlined, CheckOutlined, CopyOutlined } from '@ant-design/icons';
 import { supabase, Tender, TenderMarkupPercentageInsert, MarkupParameter, MarkupTactic, PricingDistribution, PricingDistributionInsert, DistributionTarget } from '../../../lib/supabase';
-import { formatNumberWithSpaces, parseNumberWithSpaces } from '../../../utils/numberFormat';
+import { formatNumberWithSpaces, parseNumberWithSpaces, parseNumberInput, formatNumberInput } from '../../../utils/numberFormat';
 import dayjs from 'dayjs';
 import './MarkupConstructor.css';
 
@@ -533,14 +533,17 @@ const MarkupConstructor: React.FC = () => {
       if (error) throw error;
 
       if (data) {
+        console.log('=== Загружены параметры из БД ===');
         setMarkupParameters(data);
 
         // Инициализируем форму базовых процентов значениями из default_value
         const initialValues: Record<string, number> = {};
         data.forEach((param) => {
           initialValues[param.key] = param.default_value || 0;
+          console.log(`  ${param.label} (${param.key}): ${param.default_value}`);
         });
         basePercentagesForm.setFieldsValue(initialValues);
+        console.log('================================');
 
         // Также инициализируем основную форму базовыми значениями (для расчётов)
         form.setFieldsValue(initialValues);
@@ -560,17 +563,26 @@ const MarkupConstructor: React.FC = () => {
       const values = basePercentagesForm.getFieldsValue();
       setSavingBasePercentages(true);
 
+      console.log('=== Сохранение базовых процентов ===');
+      console.log('Значения формы:', values);
+
       // Обновляем default_value для каждого параметра
       const updatePromises = markupParameters.map(async (param) => {
+        const newValue = values[param.key] ?? param.default_value ?? 0;
+        console.log(`  ${param.label} (${param.key}): ${param.default_value} -> ${newValue}`);
+
         const { error } = await supabase
           .from('markup_parameters')
           .update({
-            default_value: values[param.key] || 0,
+            default_value: newValue,
             updated_at: new Date().toISOString()
           })
           .eq('id', param.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error(`Ошибка обновления ${param.key}:`, error);
+          throw error;
+        }
       });
 
       await Promise.all(updatePromises);
@@ -2090,7 +2102,7 @@ const MarkupConstructor: React.FC = () => {
 
     // Опции для выбора операндов (наценки или пункты) с группировкой
     const markupOptionsList = availableMarkups.map(markup => ({
-      label: `${markup.label} (${markup.default_value || 0}%)`,
+      label: `${markup.label} (${parseFloat((markup.default_value || 0).toFixed(5))}%)`,
       value: `markup:${markup.key}`
     }));
 
@@ -3330,7 +3342,7 @@ const MarkupConstructor: React.FC = () => {
                         <Space wrap size="small">
                           {markupParameters.map((param, index) => (
                             <Tag key={param.id} color="blue">
-                              {index + 1}. {param.label}: <Text strong>{param.default_value || 0}%</Text>
+                              {index + 1}. {param.label}: <Text strong>{parseFloat((param.default_value || 0).toFixed(5))}%</Text>
                             </Tag>
                           ))}
                         </Space>
@@ -3439,11 +3451,13 @@ const MarkupConstructor: React.FC = () => {
                             >
                               <InputNumber
                                 min={0}
-                                max={999.99}
-                                step={0.01}
+                                max={999.99999}
+                                step={0.00001}
                                 addonAfter="%"
-                                style={{ width: '120px' }}
-                                precision={2}
+                                style={{ width: '140px' }}
+                                precision={5}
+                                parser={parseNumberInput}
+                                formatter={formatNumberInput}
                               />
                             </Form.Item>
                           </Col>

@@ -9,6 +9,7 @@ import {
   loadPricingDistribution,
   calculateBoqItemCost,
   loadSubcontractGrowthExclusions,
+  resetTypeCoefficientsCache,
   type TacticApplicationResult
 } from './calculation';
 
@@ -269,7 +270,8 @@ export async function applyTacticToTender(
   tacticId?: string
 ): Promise<TacticApplicationResult> {
   try {
-    console.log('🚀 Начало пересчёта тендера:', tenderId);
+    // Сбрасываем кэш коэффициентов перед пересчётом
+    resetTypeCoefficientsCache();
 
     // Если тактика не указана, получаем ее из тендера
     if (!tacticId) {
@@ -304,19 +306,12 @@ export async function applyTacticToTender(
     }
 
     const markupParameters = await loadMarkupParameters(tenderId);
-    console.log('✅ Загружена тактика и параметры');
 
     // Загружаем настройки ценообразования
     const pricingDistribution = await loadPricingDistribution(tenderId);
-    console.log('💰 Настройки ценообразования:', pricingDistribution ? 'загружены' : 'используются defaults');
 
     // Загружаем исключения роста субподряда
     const exclusions = await loadSubcontractGrowthExclusions(tenderId);
-    const totalExclusions = exclusions.works.size + exclusions.materials.size;
-
-    if (totalExclusions > 0) {
-      console.log(`🚫 Найдено ${totalExclusions} исключений роста субподряда (работ: ${exclusions.works.size}, материалов: ${exclusions.materials.size})`);
-    }
 
     // Загружаем ВСЕ элементы BOQ тендера с батчингом (Supabase лимит 1000 строк)
     let allBoqItems: any[] = [];
@@ -330,6 +325,7 @@ export async function applyTacticToTender(
         .select('*')
         .eq('tender_id', tenderId)
         .order('sort_number')
+        .order('id')  // Вторичная сортировка для детерминированной пагинации
         .range(from, from + loadBatchSize - 1);
 
       if (error) {
@@ -356,8 +352,6 @@ export async function applyTacticToTender(
       };
     }
 
-    console.log(`📦 Загружено ${allBoqItems.length} элементов BOQ`);
-
     // Обрабатываем все элементы и готовим batch updates
     const updates: Array<{ id: string; data: any }> = [];
     const errors: string[] = [];
@@ -381,8 +375,6 @@ export async function applyTacticToTender(
       updates.push({ id: item.id, data: updateData });
     }
 
-    console.log(`⚡ Подготовлено ${updates.length} обновлений`);
-
     // Выполняем batch updates параллельно (порциями по 50)
     const BATCH_SIZE = 50;
     let successCount = 0;
@@ -402,14 +394,15 @@ export async function applyTacticToTender(
           successCount++;
         } else {
           const error = result.status === 'rejected' ? result.reason : result.value.error;
-          errors.push(`Элемент ${batch[idx].id}: ${error?.message || 'Ошибка обновления'}`);
+          const errorMsg = error?.message || 'Ошибка обновления';
+
+          // Логируем только первые 5 ошибок
+          if (errors.length < 5) {
+            errors.push(`Элемент ${batch[idx].id}: ${errorMsg}`);
+          }
         }
       });
-
-      console.log(`✅ Обработан батч ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(updates.length / BATCH_SIZE)}`);
     }
-
-    console.log(`🎉 Обновлено ${successCount} элементов`);
 
     return {
       success: successCount > 0,
@@ -419,7 +412,6 @@ export async function applyTacticToTender(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    console.error('❌ Ошибка пересчёта:', errorMessage);
     return {
       success: false,
       errors: [`Ошибка применения тактики к тендеру: ${errorMessage}`]
@@ -444,6 +436,7 @@ async function updatePositionTotals(positionId: string): Promise<void> {
         .from('boq_items')
         .select('total_commercial_material_cost, total_commercial_work_cost')
         .eq('client_position_id', positionId)
+        .order('id')  // Сортировка по уникальному ключу для детерминированной пагинации
         .range(from, from + batchSize - 1);
 
       if (error) {

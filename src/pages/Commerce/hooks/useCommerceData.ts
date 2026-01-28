@@ -243,13 +243,17 @@ export function useCommerceData() {
         let workCostTotal = 0;
         let itemsCount = 0;
 
+        // Детализация по типам для диагностики
+        const typeDetails: Record<string, { count: number; base: number; commercial: number }> = {};
+
         for (const item of boqItems) {
           const itemBase = item.total_amount || 0;
           const itemMaterial = item.total_commercial_material_cost || 0;
           const itemWork = item.total_commercial_work_cost || 0;
+          const itemCommercial = itemMaterial + itemWork;
 
           baseTotal += itemBase;
-          commercialTotal += itemMaterial + itemWork; // ПОЛНАЯ коммерческая
+          commercialTotal += itemCommercial;
 
           // Материалы КП = коммерческая стоимость материалов (с НДС)
           materialCostTotal += itemMaterial;
@@ -257,6 +261,15 @@ export function useCommerceData() {
           workCostTotal += itemWork;
 
           itemsCount++;
+
+          // Собираем статистику по типам
+          const itemType = item.boq_item_type || 'unknown';
+          if (!typeDetails[itemType]) {
+            typeDetails[itemType] = { count: 0, base: 0, commercial: 0 };
+          }
+          typeDetails[itemType].count++;
+          typeDetails[itemType].base += itemBase;
+          typeDetails[itemType].commercial += itemCommercial;
         }
         const commercialTotalFinal = commercialTotal;
 
@@ -264,6 +277,34 @@ export function useCommerceData() {
         const markupCoefficient = baseTotal > 0
           ? commercialTotalFinal / baseTotal
           : 1;
+
+        // Логируем позиции с коэффициентом отличным от ожидаемого 1.3444 (суб) или 2.0 (раб/мат)
+        const hasSubOnly = Object.keys(typeDetails).every(t => ['суб-раб', 'суб-мат'].includes(t));
+        const expectedCoeff = hasSubOnly ? 1.3444 : 2.0;
+        const coeffDiff = Math.abs(markupCoefficient - expectedCoeff);
+
+        // Если коэффициент отличается и есть смешение типов, выводим диагностику
+        const hasMultipleTypes = Object.keys(typeDetails).length > 1;
+        const hasMixedSubAndRegular =
+          (Object.keys(typeDetails).some(t => ['суб-раб', 'суб-мат'].includes(t))) &&
+          (Object.keys(typeDetails).some(t => ['раб', 'мат', 'раб-комп.', 'мат-комп.'].includes(t)));
+
+        if (hasMixedSubAndRegular && coeffDiff > 0.01) {
+          console.log(`\n⚠️ ПОЗИЦИЯ ${position.item_no || position.position_number}: коэфф=${markupCoefficient.toFixed(4)} (смешанные типы):`);
+          Object.entries(typeDetails).forEach(([type, stats]) => {
+            const typeCoeff = stats.base > 0 ? stats.commercial / stats.base : 0;
+            console.log(`   ${type}: ${stats.count} шт, база=${stats.base.toLocaleString('ru-RU')}, коэфф=${typeCoeff.toFixed(4)}`);
+          });
+        }
+
+        // Позиции только с суб типами, но коэфф != 1.3444
+        if (hasSubOnly && Math.abs(markupCoefficient - 1.3444) > 0.01 && baseTotal > 0) {
+          console.log(`\n🔴 АНОМАЛИЯ: ${position.item_no || position.position_number}: ТОЛЬКО СУБ-ТИПЫ, но коэфф=${markupCoefficient.toFixed(4)} ≠ 1.3444:`);
+          Object.entries(typeDetails).forEach(([type, stats]) => {
+            const typeCoeff = stats.base > 0 ? stats.commercial / stats.base : 0;
+            console.log(`   ${type}: ${stats.count} шт, база=${stats.base.toLocaleString('ru-RU')}, коэфф=${typeCoeff.toFixed(4)}`);
+          });
+        }
 
         return {
           ...position,
