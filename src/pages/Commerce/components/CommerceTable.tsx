@@ -24,13 +24,30 @@ export default function CommerceTable({
 }: CommerceTableProps) {
   // Определение конечной позиции (листового узла) на основе иерархии
   const isLeafPosition = (record: PositionWithCommercialCost, index: number): boolean => {
+    // Дополнительные работы всегда листовые
+    if (record.is_additional) {
+      return true;
+    }
+
     // Последняя строка всегда конечная
     if (index === positions.length - 1) {
       return true;
     }
 
     const currentLevel = record.hierarchy_level || 0;
-    const nextLevel = positions[index + 1]?.hierarchy_level || 0;
+
+    // Пропускаем дополнительные работы при поиске следующей позиции
+    let nextIndex = index + 1;
+    while (nextIndex < positions.length && positions[nextIndex].is_additional) {
+      nextIndex++;
+    }
+
+    // Если после пропуска доп. работ позиций не осталось — это листовой узел
+    if (nextIndex >= positions.length) {
+      return true;
+    }
+
+    const nextLevel = positions[nextIndex].hierarchy_level || 0;
 
     // Если текущий уровень >= следующего, значит это листовой узел
     return currentLevel >= nextLevel;
