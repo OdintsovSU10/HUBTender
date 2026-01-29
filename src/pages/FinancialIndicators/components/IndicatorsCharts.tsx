@@ -469,20 +469,22 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         const amount = item.total_amount || 0;
         const isWork = item.boq_item_type === 'раб' || item.boq_item_type === 'суб-раб' || item.boq_item_type === 'раб-комп.';
 
-        // Для строки 4 (запас на сдачу) группируем по типу элемента
+        // Для строки 4 (запас на сдачу) группируем по виду затрат
         if (rowNumber === 4) {
-          const categoryName = item.boq_item_type; // 'мат-комп.' или 'раб-комп.'
           const detailCategoryName = categoryObj?.name || 'Без категории';
           const detailName = detailCategory?.name || 'Без вида';
           const locationName = detailCategory?.location || 'Без локализации';
 
-          // Ключ: тип элемента + категория + вид + локализация
-          const key = `${categoryName}|${detailCategoryName}|${detailName}|${locationName}`;
+          // Используем вид затрат для названия категории (а не тип элемента)
+          const categoryName = detailName;
+
+          // Ключ: вид + локализация
+          const key = `${detailName}|${locationName}`;
 
           if (!categoryMap.has(key)) {
             categoryMap.set(key, {
               category_name: categoryName,
-              detail_name: `${detailCategoryName} / ${detailName}`,
+              detail_name: detailCategoryName,
               location_name: locationName,
               total_amount: 0,
               works_amount: 0,
@@ -840,11 +842,6 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
     const currentLevel = drillDownPath[drillDownPath.length - 1];
     const totalAreaM2 = spTotal; // Используем только площадь по СП
 
-    console.log('=== DEBUG getAreaBarData ===');
-    console.log('currentLevel.type:', currentLevel.type);
-    console.log('drillDownPath:', drillDownPath);
-    console.log('breakdownData в начале функции:', breakdownData);
-
     // Определяем элементы для отображения в зависимости от уровня
     let barItems: { label: string; cost: number; color: string }[] = [];
 
@@ -954,10 +951,6 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       })).sort((a, b) => b.cost - a.cost); // Сортируем по убыванию стоимости
     } else if (currentLevel.type === 'indicator' && breakdownData.length > 0) {
       // Детализация по категориям затрат для конкретного индикатора
-      console.log('=== DEBUG getAreaBarData для indicator (с данными breakdown) ===');
-      console.log('breakdownData.length:', breakdownData.length);
-      console.log('breakdownData:', breakdownData);
-
       // Группируем данные только по категориям (без видов и локализаций)
       const categoryMap = new Map<string, number>();
       breakdownData.forEach(item => {
@@ -988,8 +981,6 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         cost: totalCost,
         color: colors[idx % colors.length],
       })).sort((a, b) => b.cost - a.cost);
-
-      console.log('barItems после маппинга:', barItems);
     } else if (currentLevel.type === 'indicator' && selectedIndicator) {
       // Конкретный показатель - один столбец (только если нет breakdown данных)
       const indicator = data.find(d => d.row_number === selectedIndicator);
