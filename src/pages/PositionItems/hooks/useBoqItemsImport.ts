@@ -137,7 +137,7 @@ const normalizeMaterialType = (value: string | undefined): 'основн.' | 'в
   let result: 'основн.' | 'вспомогат.' | undefined = undefined;
 
   // Основной материал
-  if (normalized === 'основной' || normalized === 'основн' || normalized === 'осн') {
+  if (normalized === 'основной' || normalized === 'основн' || normalized === 'основ' || normalized === 'осн') {
     result = 'основн.';
   }
   // Вспомогательный материал
@@ -292,19 +292,28 @@ export const useBoqItemsImport = () => {
       });
 
       const costsMap = new Map<string, string>();
+      let costLogCount = 0;
       costs?.forEach((c: any) => {
         const costCategoryName = c.cost_categories?.name || '';
+        // Основной ключ - раздельные части
         const key = `${normalizeString(costCategoryName)}|${normalizeString(c.name)}|${normalizeString(c.location)}`;
         costsMap.set(key, c.id);
 
-        // Логирование для затрат, содержащих "Снос"
-        if (c.name.includes('Снос') || c.name.includes('снос')) {
+        // Альтернативный ключ - полная строка в формате Excel "category / detail / location"
+        // Это позволяет находить затраты когда категория содержит слэши
+        const fullPath = normalizeString(`${costCategoryName} / ${c.name} / ${c.location}`);
+        costsMap.set(fullPath, c.id);
+
+        // Логирование первых 5 затрат и затрат со слэшами в названии
+        if (costLogCount < 5 || c.name.includes('/') || costCategoryName.includes('/')) {
           console.log('[CostCategory] Загружена затрата:', {
             category: costCategoryName,
             detail: c.name,
             location: c.location,
             key,
+            fullPath,
           });
+          costLogCount++;
         }
       });
 
@@ -596,34 +605,42 @@ export const useBoqItemsImport = () => {
 
       // 7. Проверка затраты на строительство (ОБЯЗАТЕЛЬНАЯ)
       if (item.costCategoryText) {
-        const parsed = parseCostCategory(item.costCategoryText);
-        if (parsed.category && parsed.detail && parsed.location) {
-          const key = `${normalizeString(parsed.category)}|${normalizeString(parsed.detail)}|${normalizeString(parsed.location)}`;
-          const costId = costCategoriesMap.get(key);
+        // Сначала пробуем найти по полной строке (более надёжный способ)
+        const fullPath = normalizeString(item.costCategoryText);
+        let costId = costCategoriesMap.get(fullPath);
 
-          console.log(`[CostCategory] Строка ${row}:`, {
-            original: item.costCategoryText,
-            parsed,
-            key,
-            found: !!costId,
+        // Если не нашли по полной строке, пробуем парсить на части
+        let key = fullPath;
+        if (!costId) {
+          const parsed = parseCostCategory(item.costCategoryText);
+          if (parsed.category && parsed.detail && parsed.location) {
+            key = `${normalizeString(parsed.category)}|${normalizeString(parsed.detail)}|${normalizeString(parsed.location)}`;
+            costId = costCategoriesMap.get(key);
+          }
+        }
+
+        console.log(`[CostCategory] Строка ${row}:`, {
+          original: item.costCategoryText,
+          fullPath,
+          key,
+          found: !!costId,
+        });
+
+        if (!costId) {
+          errors.push({
+            rowIndex: row,
+            type: 'missing_cost',
+            field: 'detail_cost_category_id',
+            message: `Затрата "${item.costCategoryText}" не найдена в БД`,
+            severity: 'error',
           });
 
-          if (!costId) {
-            errors.push({
-              rowIndex: row,
-              type: 'missing_cost',
-              field: 'detail_cost_category_id',
-              message: `Затрата "${item.costCategoryText}" не найдена в БД`,
-              severity: 'error',
-            });
-
-            if (!unknownCostsMap.has(item.costCategoryText)) {
-              unknownCostsMap.set(item.costCategoryText, []);
-            }
-            unknownCostsMap.get(item.costCategoryText)!.push(row);
-          } else {
-            item.detail_cost_category_id = costId;
+          if (!unknownCostsMap.has(item.costCategoryText)) {
+            unknownCostsMap.set(item.costCategoryText, []);
           }
+          unknownCostsMap.get(item.costCategoryText)!.push(row);
+        } else {
+          item.detail_cost_category_id = costId;
         }
       }
     });
