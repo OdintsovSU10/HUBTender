@@ -188,26 +188,48 @@ const normalizeDeliveryPriceType = (value: string | undefined): 'в цене' | 
   return undefined;
 };
 
-// Парсинг затраты на строительство
-const parseCostCategory = (text: string): { category?: string; detail?: string; location?: string } => {
-  if (!text) return {};
+// Поиск ID затраты с fallback для многоуровневых названий со слэшами
+// В БД cost_categories.name и detail_cost_categories.name могут содержать слэши.
+// Например: category="ВИС / Слаботочные системы", detail="Пожарная сигнализация", location="Здание"
+// Пробуем все возможные комбинации разбиения строки на category/detail/location.
+const findCostCategoryId = (
+  text: string,
+  costCategoriesMap: Map<string, string>
+): string | undefined => {
+  if (!text) return undefined;
 
-  const parts = text.split(' / ').map(p => p.trim());
+  const parts = text.split(' / ').map(p => p.trim()).filter(p => p);
+  if (parts.length < 2) return undefined;
 
-  if (parts.length === 1) {
-    return { category: parts[0] };
-  } else if (parts.length === 2) {
-    return { category: parts[0], detail: parts[1] };
-  } else {
-    const category = parts[0];
-    const location = parts[parts.length - 1];
-    const detail = parts.slice(1, parts.length - 1).join(' / ');
-    return {
-      category: category || undefined,
-      detail: detail || undefined,
-      location: location || undefined,
-    };
+  // Пробуем все возможные комбинации разбиения на category, detail, location
+  // categoryParts: сколько частей отдаём на category (минимум 1)
+  // locationParts: сколько частей отдаём на location (0 = пустая, или 1+)
+  // Остальное уходит в detail
+  for (let categoryParts = 1; categoryParts < parts.length; categoryParts++) {
+    const category = normalizeString(parts.slice(0, categoryParts).join(' / '));
+
+    // Вариант 1: location = последняя часть (или несколько частей)
+    for (let locationParts = 1; locationParts <= parts.length - categoryParts; locationParts++) {
+      const location = normalizeString(parts.slice(parts.length - locationParts).join(' / '));
+      const detail = normalizeString(parts.slice(categoryParts, parts.length - locationParts).join(' / '));
+
+      if (!detail) continue;
+
+      const key = `${category}|${detail}|${location}`;
+      const costId = costCategoriesMap.get(key);
+      if (costId) return costId;
+    }
+
+    // Вариант 2: пустая location (всё после category = detail)
+    const fullDetail = normalizeString(parts.slice(categoryParts).join(' / '));
+    if (fullDetail) {
+      const keyEmptyLocation = `${category}|${fullDetail}|`;
+      const costIdEmptyLocation = costCategoriesMap.get(keyEmptyLocation);
+      if (costIdEmptyLocation) return costIdEmptyLocation;
+    }
   }
+
+  return undefined;
 };
 
 // ===========================
@@ -276,6 +298,11 @@ export const useMassBoqImport = () => {
         const key = `${normalizeString(costCategoryName)}|${normalizeString(c.name)}|${normalizeString(c.location)}`;
         costsMap.set(key, c.id);
       });
+
+      // Логирование затрат с "ВИС" для отладки
+      console.log('[MassBoqImport] Затраты ВИС в БД:',
+        Array.from(costsMap.keys()).filter(k => k.toLowerCase().startsWith('вис')).slice(0, 30)
+      );
 
       // Создание Map для позиций заказчика (ключ - нормализованный номер позиции)
       const positionsMap = new Map<string, ClientPosition>();
@@ -651,29 +678,25 @@ export const useMassBoqImport = () => {
         }
       }
 
-      // 5. Проверка затраты на строительство
+      // 5. Проверка затраты на строительство (с поддержкой многоуровневых названий со слэшами)
       if (item.costCategoryText) {
-        const parsed = parseCostCategory(item.costCategoryText);
-        if (parsed.category && parsed.detail && parsed.location) {
-          const key = `${normalizeString(parsed.category)}|${normalizeString(parsed.detail)}|${normalizeString(parsed.location)}`;
-          const costId = costCategoriesMap.get(key);
+        const costId = findCostCategoryId(item.costCategoryText, costCategoriesMap);
 
-          if (!costId) {
-            errors.push({
-              rowIndex: row,
-              type: 'missing_cost',
-              field: 'detail_cost_category_id',
-              message: `Затрата "${item.costCategoryText}" не найдена в БД`,
-              severity: 'error',
-            });
+        if (!costId) {
+          errors.push({
+            rowIndex: row,
+            type: 'missing_cost',
+            field: 'detail_cost_category_id',
+            message: `Затрата "${item.costCategoryText}" не найдена в БД`,
+            severity: 'error',
+          });
 
-            if (!unknownCostsMap.has(item.costCategoryText)) {
-              unknownCostsMap.set(item.costCategoryText, []);
-            }
-            unknownCostsMap.get(item.costCategoryText)!.push(row);
-          } else {
-            item.detail_cost_category_id = costId;
+          if (!unknownCostsMap.has(item.costCategoryText)) {
+            unknownCostsMap.set(item.costCategoryText, []);
           }
+          unknownCostsMap.get(item.costCategoryText)!.push(row);
+        } else {
+          item.detail_cost_category_id = costId;
         }
       }
     });
