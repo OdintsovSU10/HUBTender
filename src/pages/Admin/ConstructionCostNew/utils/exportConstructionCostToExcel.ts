@@ -303,8 +303,7 @@ function buildExportData(
   filteredData.forEach((category) => {
     if (category.is_category && category.total_cost > 0) {
       const catNum = String(categoryIndex).padStart(2, '0');
-      const categoryTotalVolume =
-        category.children?.reduce((sum, c) => sum + (c.volume || 0), 0) || 0;
+      const categoryTotalVolume = category.volume || 0;
       const categoryTotalWorks =
         category.works_cost + category.sub_works_cost + category.works_comp_cost;
       const categoryTotalMaterials =
@@ -680,7 +679,8 @@ function configureWorksheet(ws: XLSX.WorkSheet, rowTypes: RowType[]): void {
       // Формат чисел для колонок начиная с C (индекс 2)
       let numFmt = undefined;
       if (C >= 2 && rowType !== 'header' && rowType !== 'subheader') {
-        numFmt = '#,##0';
+        // Для колонки объёма (C, индекс 2) — формат с дробной частью
+        numFmt = C === 2 ? '#,##0.00' : '#,##0';
       }
 
       // Жирный шрифт и цвет

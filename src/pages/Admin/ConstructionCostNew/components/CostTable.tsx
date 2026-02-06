@@ -84,14 +84,14 @@ const CostTable: React.FC<CostTableProps> = ({
             <InputNumber
               value={value}
               onBlur={(e) => {
-                const newValue = parseFloat(e.target.value);
+                const newValue = parseFloat(e.target.value.replace(',', '.').replace(/\s/g, ''));
                 if (!isNaN(newValue)) {
                   onVolumeChange(newValue, record);
                 }
               }}
               onPressEnter={(e) => {
                 const target = e.target as HTMLInputElement;
-                const newValue = parseFloat(target.value);
+                const newValue = parseFloat(target.value.replace(',', '.').replace(/\s/g, ''));
                 if (!isNaN(newValue)) {
                   onVolumeChange(newValue, record);
                   target.blur();
@@ -111,14 +111,14 @@ const CostTable: React.FC<CostTableProps> = ({
           <InputNumber
             value={value}
             onBlur={(e) => {
-              const newValue = parseFloat(e.target.value);
+              const newValue = parseFloat(e.target.value.replace(',', '.').replace(/\s/g, ''));
               if (!isNaN(newValue)) {
                 onVolumeChange(newValue, record);
               }
             }}
             onPressEnter={(e) => {
               const target = e.target as HTMLInputElement;
-              const newValue = parseFloat(target.value);
+              const newValue = parseFloat(target.value.replace(',', '.').replace(/\s/g, ''));
               if (!isNaN(newValue)) {
                 onVolumeChange(newValue, record);
                 target.blur();
