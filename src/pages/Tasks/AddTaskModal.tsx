@@ -58,7 +58,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
         .from('user_tasks')
         .insert({
           user_id: userId,
-          tender_id: values.tender_id,
+          tender_id: values.tender_id === 'other' ? null : values.tender_id,
           description: values.description,
           task_status: 'running',
         });
@@ -106,7 +106,10 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={tenders.map(t => ({ label: t.title, value: t.id }))}
+            options={[
+              ...tenders.map(t => ({ label: t.title, value: t.id })),
+              { label: 'Прочее', value: 'other' },
+            ]}
           />
         </Form.Item>
 

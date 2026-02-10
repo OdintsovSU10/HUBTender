@@ -12,6 +12,8 @@ import {
   FileAddOutlined,
   FilterOutlined,
   UploadOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { ClientPosition, Tender } from '../../../lib/supabase';
@@ -50,6 +52,8 @@ interface PositionTableProps {
   onToggleFilterCheckbox?: (positionId: string) => void;
   onApplyFilter?: () => void;
   onClearFilter?: () => void;
+  showAllPositions?: boolean;
+  onToggleShowAll?: () => void;
 }
 
 export const PositionTable: React.FC<PositionTableProps> = ({
@@ -84,6 +88,8 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onToggleFilterCheckbox,
   onApplyFilter,
   onClearFilter,
+  showAllPositions = false,
+  onToggleShowAll,
 }) => {
   // Состояние для отслеживания открытой позиции
   const [expandedPositionId, setExpandedPositionId] = useState<string | null>(null);
@@ -482,68 +488,40 @@ export const PositionTable: React.FC<PositionTableProps> = ({
         <Space>
           {/* Кнопки фильтра */}
           {!isFilterActive && tempSelectedPositionIds.size > 0 && (
-            <Button
-              type="primary"
-              icon={<FilterOutlined />}
-              onClick={onApplyFilter}
-              disabled={readOnly}
-            >
+            <Button type="primary" icon={<FilterOutlined />} onClick={onApplyFilter} disabled={readOnly}>
               Скрыть невыбранные строки ({tempSelectedPositionIds.size})
             </Button>
           )}
-
           {isFilterActive && (
             <>
               <Button
-                icon={<FilterOutlined />}
-                onClick={onApplyFilter}
-                disabled={readOnly}
+                icon={showAllPositions ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                onClick={onToggleShowAll}
+                type={showAllPositions ? 'primary' : 'default'}
               >
+                {showAllPositions ? 'Скрыть невыбранные' : 'Отобразить все строки'}
+              </Button>
+              <Button icon={<FilterOutlined />} onClick={onApplyFilter} disabled={readOnly}>
                 Обновить фильтр
               </Button>
-              <Button onClick={onClearFilter} disabled={readOnly}>
-                Отменить фильтр
-              </Button>
+              <Button onClick={onClearFilter} disabled={readOnly}>Отменить фильтр</Button>
             </>
           )}
-
           {/* Существующие кнопки */}
           {copiedPositionId && selectedTargetIds.size > 0 && (
-            <Button
-              type="primary"
-              icon={<CheckOutlined />}
-              onClick={onBulkPaste}
-              loading={isBulkPasting}
-              disabled={loading}
-            >
+            <Button type="primary" icon={<CheckOutlined />} onClick={onBulkPaste} loading={isBulkPasting} disabled={loading}>
               Вставить работы и материалы ({selectedTargetIds.size})
             </Button>
           )}
-
           {copiedNotePositionId && selectedTargetIds.size > 0 && (
-            <Button
-              type="primary"
-              icon={<FileAddOutlined />}
-              onClick={onBulkPasteNote}
-              loading={isBulkPasting}
-              disabled={loading}
-            >
+            <Button type="primary" icon={<FileAddOutlined />} onClick={onBulkPasteNote} loading={isBulkPasting} disabled={loading}>
               Вставить примечание ({selectedTargetIds.size})
             </Button>
           )}
-
-          <Button
-            icon={<UploadOutlined />}
-            onClick={onMassImport}
-            disabled={!selectedTender || loading}
-          >
+          <Button icon={<UploadOutlined />} onClick={onMassImport} disabled={!selectedTender || loading}>
             Импорт из Excel
           </Button>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={onExportToExcel}
-            disabled={!selectedTender || loading}
-          >
+          <Button icon={<DownloadOutlined />} onClick={onExportToExcel} disabled={!selectedTender || loading}>
             Экспорт в Excel
           </Button>
         </Space>
@@ -578,6 +556,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
             },
             style: {
               cursor: isLeaf ? 'pointer' : 'default',
+              opacity: (showAllPositions && isFilterActive && !tempSelectedPositionIds.has(record.id)) ? 0.5 : 1,
             },
           };
         }}

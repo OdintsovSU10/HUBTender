@@ -135,10 +135,10 @@ const TaskListTab: React.FC<TaskListTabProps> = ({ userId }) => {
   const columns = [
     {
       title: 'Наименование проекта',
-      dataIndex: ['tender', 'title'],
       key: 'tender_title',
       align: 'left' as const,
       width: 200,
+      render: (_: any, record: UserTaskWithRelations) => record.tender?.title || 'Прочее',
     },
     {
       title: 'Описание задачи',

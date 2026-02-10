@@ -5,7 +5,7 @@ export type WorkMode = 'office' | 'remote';
 export interface UserTask {
   id: string;
   user_id: string;
-  tender_id: string;
+  tender_id: string | null;
   description: string;
   task_status: TaskStatus;
   completed_at: string | null;
@@ -17,7 +17,7 @@ export interface UserTaskWithRelations extends UserTask {
   tender: {
     id: string;
     title: string;
-  };
+  } | null;
   user: {
     id: string;
     full_name: string;

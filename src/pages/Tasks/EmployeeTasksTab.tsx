@@ -77,11 +77,11 @@ const EmployeeTasksTab: React.FC<EmployeeTasksTabProps> = ({ searchUserId }) => 
     },
     {
       title: <div style={{ textAlign: 'center' }}>Наименование проекта</div>,
-      dataIndex: ['tender', 'title'],
       key: 'tender_title',
       align: 'center' as const,
+      render: (_: any, record: UserTaskWithRelations) => record.tender?.title || 'Прочее',
       sorter: (a: UserTaskWithRelations, b: UserTaskWithRelations) =>
-        a.tender.title.localeCompare(b.tender.title),
+        (a.tender?.title || 'Прочее').localeCompare(b.tender?.title || 'Прочее'),
     },
     {
       title: <div style={{ textAlign: 'center' }}>Описание задачи</div>,

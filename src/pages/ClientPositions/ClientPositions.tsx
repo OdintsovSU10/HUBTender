@@ -37,6 +37,7 @@ const ClientPositions: React.FC = () => {
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [tempSelectedPositionIds, setTempSelectedPositionIds] = useState<Set<string>>(new Set());
   const [massImportModalOpen, setMassImportModalOpen] = useState(false);
+  const [showAllPositions, setShowAllPositions] = useState(false);
 
   // Hooks
   const {
@@ -127,12 +128,12 @@ const ClientPositions: React.FC = () => {
 
   // Фильтрация позиций в зависимости от активного фильтра
   const displayedPositions = useMemo(() => {
-    if (!isFilterActive || selectedPositionIds.size === 0) {
+    if (!isFilterActive || selectedPositionIds.size === 0 || showAllPositions) {
       return clientPositions;
     }
     // Строгая фильтрация: показываем только выбранные позиции
     return clientPositions.filter(pos => selectedPositionIds.has(pos.id));
-  }, [clientPositions, isFilterActive, selectedPositionIds]);
+  }, [clientPositions, isFilterActive, selectedPositionIds, showAllPositions]);
 
   // Обработка выбора наименования тендера
   const handleTenderTitleChange = (title: string) => {
@@ -215,12 +216,33 @@ const ClientPositions: React.FC = () => {
 
   // Обработчики фильтра
   const handleToggleFilterCheckbox = (positionId: string) => {
+    const clickedPosition = clientPositions.find(p => p.id === positionId);
+    if (!clickedPosition) return;
+
     setTempSelectedPositionIds(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(positionId)) {
-        newSet.delete(positionId);
-      } else {
-        newSet.add(positionId);
+      const isSelected = newSet.has(positionId);
+
+      // Собираем нажатую позицию и всех её дочерних по item_no
+      const idsToToggle = new Set<string>([positionId]);
+      if (clickedPosition.item_no) {
+        const prefix = clickedPosition.item_no + '.';
+        for (const pos of clientPositions) {
+          if (pos.item_no && pos.item_no.startsWith(prefix)) {
+            idsToToggle.add(pos.id);
+          }
+        }
+      }
+
+      // Добавляем ДОП-позиции, привязанные к собранным через parent_position_id
+      for (const pos of clientPositions) {
+        if (pos.is_additional && pos.parent_position_id && idsToToggle.has(pos.parent_position_id)) {
+          idsToToggle.add(pos.id);
+        }
+      }
+
+      for (const id of idsToToggle) {
+        isSelected ? newSet.delete(id) : newSet.add(id);
       }
       return newSet;
     });
@@ -229,11 +251,17 @@ const ClientPositions: React.FC = () => {
   const handleApplyFilter = async () => {
     const positionIds = Array.from(tempSelectedPositionIds);
     await saveFilter(positionIds);
+    setShowAllPositions(false);
   };
 
   const handleClearFilter = async () => {
     await clearFilter();
     setTempSelectedPositionIds(new Set());
+    setShowAllPositions(false);
+  };
+
+  const handleToggleShowAll = () => {
+    setShowAllPositions(prev => !prev);
   };
 
   // Синхронизация tempSelectedPositionIds с загруженным фильтром
@@ -320,6 +348,8 @@ const ClientPositions: React.FC = () => {
           onToggleFilterCheckbox={handleToggleFilterCheckbox}
           onApplyFilter={handleApplyFilter}
           onClearFilter={handleClearFilter}
+          showAllPositions={showAllPositions}
+          onToggleShowAll={handleToggleShowAll}
         />
       )}
 
