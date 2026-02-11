@@ -13,7 +13,16 @@ const { Title, Text } = Typography;
 
 const Tenders: React.FC = () => {
   const { user } = useAuth();
-  const isDirector = user?.role_code === 'director';
+  // Проверяем оба возможных кода роли: 'director' и 'general_director'
+  const isDirector = user?.role_code === 'director' || user?.role_code === 'general_director';
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[Tenders] User object:', user);
+    console.log('[Tenders] User role_code:', user?.role_code);
+    console.log('[Tenders] isDirector flag:', isDirector);
+  }, [user, isDirector]);
+
   const [tenders, setTenders] = useState<TenderRegistryWithRelations[]>([]);
   const [filteredTenders, setFilteredTenders] = useState<TenderRegistryWithRelations[]>([]);
   const [loading, setLoading] = useState(false);

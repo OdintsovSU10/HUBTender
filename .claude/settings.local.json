@@ -16,7 +16,11 @@
       "Bash(node scripts/restore-correct-values.cjs:*)",
       "Bash(node scripts/investigate-original-values.cjs:*)",
       "Bash(node:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nИсправить парсинг затрат со слэшами в названии детализации\n\nИзменена логика parseCostCategory: категория - первая часть,\nлокация - последняя, детализация - всё между ними \\(может содержать слэши\\).\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": [],
