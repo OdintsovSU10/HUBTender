@@ -1,0 +1,47 @@
+/* Подсветка строк в зависимости от статуса тендера - Светлая тема */
+
+.tender-status-working {
+  background-color: #f0fdf4 !important; /* светло зеленый */
+}
+
+.tender-status-waiting {
+  background-color: #fefce8 !important; /* желтый */
+}
+
+.tender-status-lost {
+  background-color: #fef2f2 !important; /* светло красный */
+}
+
+.tender-status-won {
+  background-color: #f0f9ff !important; /* голубой */
+}
+
+/* Подсветка строк в зависимости от статуса тендера - Темная тема */
+
+[data-theme='dark'] .tender-status-working,
+.dark .tender-status-working {
+  background-color: rgba(34, 197, 94, 0.15) !important; /* темно зеленый с прозрачностью */
+}
+
+[data-theme='dark'] .tender-status-waiting,
+.dark .tender-status-waiting {
+  background-color: rgba(234, 179, 8, 0.15) !important; /* темно желтый с прозрачностью */
+}
+
+[data-theme='dark'] .tender-status-lost,
+.dark .tender-status-lost {
+  background-color: rgba(239, 68, 68, 0.15) !important; /* темно красный с прозрачностью */
+}
+
+[data-theme='dark'] .tender-status-won,
+.dark .tender-status-won {
+  background-color: rgba(14, 165, 233, 0.15) !important; /* темно голубой с прозрачностью */
+}
+
+/* Hover эффект для строк */
+.tender-status-working:hover td,
+.tender-status-waiting:hover td,
+.tender-status-lost:hover td,
+.tender-status-won:hover td {
+  background-color: inherit !important;
+}

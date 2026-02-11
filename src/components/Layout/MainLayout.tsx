@@ -247,6 +247,11 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
       label: 'Дашборд',
     },
     {
+      key: '/tenders',
+      icon: <FileTextOutlined />,
+      label: 'Перечень тендеров',
+    },
+    {
       key: '/tasks',
       icon: <CheckSquareOutlined />,
       label: 'Список задач',
@@ -335,7 +340,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
         {
           key: '/admin/tenders',
           icon: <FileTextOutlined />,
-          label: 'Тендеры',
+          label: 'Перечень тендеров',
         },
         {
           key: '/admin/construction_cost',

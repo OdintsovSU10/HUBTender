@@ -11,7 +11,8 @@ import ResetPassword from './pages/Auth/ResetPassword';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Tasks from './pages/Tasks';
 import Nomenclatures from './pages/Admin/Nomenclatures/Nomenclatures';
-import Tenders from './pages/Admin/Tenders/Tenders';
+import AdminTenders from './pages/Admin/Tenders/Tenders';
+import Tenders from './pages/Tenders/Tenders';
 import ConstructionCost from './pages/Admin/ConstructionCost/ConstructionCost';
 import ConstructionCostNew from './pages/Admin/ConstructionCostNew';
 import MarkupConstructor from './pages/Admin/MarkupConstructor/MarkupConstructor';
@@ -63,6 +64,7 @@ function AppContent() {
           >
             <Route index element={<Dashboard />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="tenders" element={<Tenders />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="positions" element={<ClientPositions />} />
             <Route path="positions/:positionId/items" element={<PositionItems />} />
@@ -78,7 +80,7 @@ function AppContent() {
             <Route path="admin">
               <Route index element={<Navigate to="/admin/nomenclatures" replace />} />
               <Route path="nomenclatures" element={<Nomenclatures />} />
-              <Route path="tenders" element={<Tenders />} />
+              <Route path="tenders" element={<AdminTenders />} />
               <Route path="construction_cost" element={<ConstructionCost />} />
               <Route path="markup_constructor" element={<MarkupConstructor />} />
               <Route path="markup" element={<MarkupPercentages />} />

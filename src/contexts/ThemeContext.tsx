@@ -26,9 +26,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     return 'dark';
   });
 
-  // Сохраняем тему в localStorage при изменении
+  // Сохраняем тему в localStorage и устанавливаем data-theme атрибут при изменении
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
+    document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {

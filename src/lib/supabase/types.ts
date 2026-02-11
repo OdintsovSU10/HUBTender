@@ -2,6 +2,22 @@
 // Типы для таблицы tenders
 // =============================================
 
+// =============================================
+// Справочные таблицы для тендеров
+// =============================================
+
+export interface TenderStatus {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface ConstructionScope {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 export interface TenderInsert {
   title: string;
   description?: string;
@@ -19,10 +35,10 @@ export interface TenderInsert {
   tz_link?: string;
   qa_form_link?: string;
   project_folder_link?: string;
-  markup_tactic_id?: string; // Ссылка на тактику наценок для данного тендера
+  markup_tactic_id?: string;
   housing_class?: HousingClassType;
   construction_scope?: ConstructionScopeType;
-  is_archived?: boolean; // Флаг архивации тендера
+  is_archived?: boolean;
 }
 
 export interface Tender extends TenderInsert {
@@ -30,6 +46,39 @@ export interface Tender extends TenderInsert {
   created_at: string;
   updated_at: string;
   created_by?: string;
+}
+
+// =============================================
+// Типы для таблицы tender_registry (реестр тендеров)
+// =============================================
+
+export interface TenderRegistryInsert {
+  title: string;
+  client_name: string;
+  construction_scope_id?: string | null;
+  area?: number | null;
+  submission_date?: string | null;
+  construction_start_date?: string | null;
+  site_visit_photo_url?: string | null;
+  site_visit_date?: string | null;
+  has_tender_package?: string | null;
+  invitation_date?: string | null;
+  status_id?: string | null;
+  chronology?: string | null;
+  sort_order?: number | null;
+}
+
+export interface TenderRegistry extends TenderRegistryInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+  sort_order: number;
+}
+
+export interface TenderRegistryWithRelations extends TenderRegistry {
+  status?: TenderStatus | null;
+  construction_scope?: ConstructionScope | null;
 }
 
 // =============================================
@@ -773,6 +822,7 @@ export interface UserPositionFilter {
 // Все страницы портала (для Transfer component и проверки доступа)
 export const ALL_PAGES = [
   '/dashboard',
+  '/tenders',
   '/tasks',
   '/admin/nomenclatures',
   '/admin/tenders',
@@ -832,6 +882,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
 // Названия страниц (соответствуют левому боковому меню)
 export const PAGE_LABELS: Record<string, string> = {
   '/dashboard': 'Дашборд',
+  '/tenders': 'Тендеры',
   '/tasks': 'Список задач',
   '/positions': 'Позиции заказчика',
   '/commerce/proposal': 'Форма КП',
@@ -859,7 +910,7 @@ export const PAGE_LABELS: Record<string, string> = {
 export const PAGES_STRUCTURE = [
   {
     title: null, // Без группы
-    pages: ['/dashboard', '/tasks', '/positions'],
+    pages: ['/dashboard', '/tenders', '/tasks', '/positions'],
   },
   {
     title: 'Коммерция',
