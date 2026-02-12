@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Card, Tabs, Button, Space } from 'antd';
 import { UploadOutlined, PlusOutlined } from '@ant-design/icons';
 import type { TenderRegistryWithRelations, TenderRegistry } from '../../lib/supabase';
@@ -24,6 +24,18 @@ const Tenders: React.FC = () => {
 
   const { tenders, statuses, constructionScopes, tenderNumbers, loading, refetch } = useTenderData();
   const { handleMoveUp, handleMoveDown, handleArchive } = useTenderCRUD(tenders, refetch);
+
+  // Управление overflow body при открытии/закрытии Drawer
+  useEffect(() => {
+    if (drawerVisible) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [drawerVisible]);
 
   // Фильтрация тендеров по активной вкладке
   const filteredTenders = useMemo(() => {
@@ -163,6 +175,7 @@ const Tenders: React.FC = () => {
         tenderNumbers={tenderNumbers}
         statuses={statuses}
         constructionScopes={constructionScopes}
+        isDirector={isDirector}
         initialEditMode={editMode}
         onClose={handleDrawerClose}
         onUpdate={refetch}
