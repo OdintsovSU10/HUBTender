@@ -14,8 +14,10 @@ interface ImportTendersModalProps {
 }
 
 interface ParsedTender {
+  tender_number?: string;
   title: string;
   client_name: string;
+  object_address?: string;
   construction_scope?: string;
   area?: number;
   submission_date?: string;
@@ -76,8 +78,10 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
         }
 
         const parsed: ParsedTender[] = jsonData.map((row: any) => ({
+          tender_number: row['Номер тендера'] || row['Номер'] || undefined,
           title: row['Наименование ЖК'] || row['Наименование'] || '',
           client_name: row['Заказчик'] || '',
+          object_address: row['Адрес объекта'] || row['Адрес'] || undefined,
           construction_scope: row['Работа'] || row['Объем строительства'] || undefined,
           area: row['Площадь по СП, м2'] ? parseFloat(row['Площадь по СП, м2']) : (row['Площадь'] ? parseFloat(row['Площадь']) : undefined),
           submission_date: parseExcelDate(row['Дата подачи КП']) || undefined,
@@ -138,20 +142,33 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
           ? statusMap.get(tender.status.toLowerCase())
           : undefined;
 
+        // Конвертация старого текстового поля chronology в JSONB массив
+        const chronology_items = tender.chronology && tender.chronology.trim()
+          ? [{ date: null, text: tender.chronology }]
+          : [];
+
+        // Конвертация старого текстового поля has_tender_package в JSONB массив
+        const tender_package_items = tender.has_tender_package && tender.has_tender_package.trim()
+          ? [{ date: null, text: tender.has_tender_package }]
+          : [];
+
         return {
+          tender_number: tender.tender_number || null,
           title: tender.title,
           client_name: tender.client_name,
+          object_address: tender.object_address || null,
           construction_scope_id: construction_scope_id || null,
           area: tender.area || null,
           submission_date: tender.submission_date || null,
-          chronology: tender.chronology || null,
+          chronology_items,
           construction_start_date: tender.construction_start_date || null,
           site_visit_date: tender.site_visit_date || null,
           site_visit_photo_url: tender.site_visit_photo_url || null,
-          has_tender_package: tender.has_tender_package || null,
+          tender_package_items,
           invitation_date: tender.invitation_date || null,
           status_id: status_id || null,
           sort_order: nextSortOrder++,
+          is_archived: false,
         };
       });
 
@@ -182,6 +199,13 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
 
   const previewColumns = [
     {
+      title: 'Номер тендера',
+      dataIndex: 'tender_number',
+      key: 'tender_number',
+      width: 120,
+      render: (val: string) => val || '-',
+    },
+    {
       title: 'Наименование',
       dataIndex: 'title',
       key: 'title',
@@ -192,6 +216,13 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
       dataIndex: 'client_name',
       key: 'client_name',
       width: 150,
+    },
+    {
+      title: 'Адрес объекта',
+      dataIndex: 'object_address',
+      key: 'object_address',
+      width: 120,
+      render: (val: string) => val || '-',
     },
     {
       title: 'Объем строит-ва',
@@ -235,7 +266,7 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
     >
       <Alert
         message="Формат Excel файла"
-        description="Файл должен содержать следующие колонки: Наименование ЖК, Заказчик, Работа, Площадь по СП м2, Дата подачи КП, Хронологии тендеров (дата выхода на площадку), Дата выхода на строительную площадку, Дата посещения площадки, Фото посещения площадки, Наличие тендерного пакета, Когда поступило приглашение, Статус"
+        description="Файл должен содержать следующие колонки: Номер тендера, Наименование ЖК, Заказчик, Адрес объекта, Работа, Площадь по СП м2, Дата подачи КП, Хронологии тендеров (дата выхода на площадку), Дата выхода на строительную площадку, Дата посещения площадки, Фото посещения площадки, Наличие тендерного пакета, Когда поступило приглашение, Статус"
         type="info"
         style={{ marginBottom: 16 }}
       />

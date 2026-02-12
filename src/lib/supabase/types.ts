@@ -52,20 +52,36 @@ export interface Tender extends TenderInsert {
 // Типы для таблицы tender_registry (реестр тендеров)
 // =============================================
 
+// Новые типы для элементов списков
+export interface ChronologyItem {
+  date: string | null; // ISO date string или null
+  text: string;
+}
+
+export interface TenderPackageItem {
+  date: string | null;
+  text: string;
+}
+
 export interface TenderRegistryInsert {
   title: string;
   client_name: string;
+  tender_number?: string | null; // НОВОЕ: связь с tenders через текст
+  object_address?: string | null; // НОВОЕ: адрес объекта
   construction_scope_id?: string | null;
   area?: number | null;
   submission_date?: string | null;
   construction_start_date?: string | null;
   site_visit_photo_url?: string | null;
   site_visit_date?: string | null;
-  has_tender_package?: string | null;
+  has_tender_package?: string | null; // DEPRECATED
+  tender_package_items?: TenderPackageItem[] | null; // НОВОЕ
   invitation_date?: string | null;
   status_id?: string | null;
-  chronology?: string | null;
+  chronology?: string | null; // DEPRECATED
+  chronology_items?: ChronologyItem[] | null; // НОВОЕ
   sort_order?: number | null;
+  is_archived?: boolean; // НОВОЕ: флаг архивации
 }
 
 export interface TenderRegistry extends TenderRegistryInsert {
@@ -74,6 +90,11 @@ export interface TenderRegistry extends TenderRegistryInsert {
   updated_at: string;
   created_by?: string | null;
   sort_order: number;
+  tender_number?: string | null;
+  object_address?: string | null;
+  chronology_items?: ChronologyItem[] | null;
+  tender_package_items?: TenderPackageItem[] | null;
+  is_archived: boolean; // НОВОЕ: флаг архивации (NOT NULL)
 }
 
 export interface TenderRegistryWithRelations extends TenderRegistry {

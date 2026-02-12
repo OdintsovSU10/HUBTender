@@ -1,47 +1,46 @@
-/* Подсветка строк в зависимости от статуса тендера - Светлая тема */
-
-.tender-status-working {
-  background-color: #f0fdf4 !important; /* светло зеленый */
+/* Layout container */
+.tenders-layout {
+  display: flex;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.tender-status-waiting {
-  background-color: #fefce8 !important; /* желтый */
+/* Основной контент с анимацией сдвига */
+.tenders-content {
+  flex: 1;
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.tender-status-lost {
-  background-color: #fef2f2 !important; /* светло красный */
+.tenders-content.drawer-open {
+  margin-right: 600px; /* Ширина Drawer */
 }
 
-.tender-status-won {
-  background-color: #f0f9ff !important; /* голубой */
+/* Wrapper таблицы с прокруткой */
+.tenders-table-wrapper {
+  overflow: visible;
+  position: relative;
 }
 
-/* Подсветка строк в зависимости от статуса тендера - Темная тема */
-
-[data-theme='dark'] .tender-status-working,
-.dark .tender-status-working {
-  background-color: rgba(34, 197, 94, 0.15) !important; /* темно зеленый с прозрачностью */
+/* Drawer без затемняющей маски на десктопе */
+:global(.ant-drawer.tenders-drawer) {
+  position: absolute;
 }
 
-[data-theme='dark'] .tender-status-waiting,
-.dark .tender-status-waiting {
-  background-color: rgba(234, 179, 8, 0.15) !important; /* темно желтый с прозрачностью */
+:global(.ant-drawer.tenders-drawer .ant-drawer-mask) {
+  display: none; /* Убрать затемнение */
 }
 
-[data-theme='dark'] .tender-status-lost,
-.dark .tender-status-lost {
-  background-color: rgba(239, 68, 68, 0.15) !important; /* темно красный с прозрачностью */
-}
+/* Responsive: отключить push на мобильных */
+@media (max-width: 768px) {
+  .tenders-content.drawer-open {
+    margin-right: 0; /* Не сдвигать на мобильных */
+  }
 
-[data-theme='dark'] .tender-status-won,
-.dark .tender-status-won {
-  background-color: rgba(14, 165, 233, 0.15) !important; /* темно голубой с прозрачностью */
-}
+  :global(.ant-drawer.tenders-drawer) {
+    position: fixed; /* Поверх контента */
+  }
 
-/* Hover эффект для строк */
-.tender-status-working:hover td,
-.tender-status-waiting:hover td,
-.tender-status-lost:hover td,
-.tender-status-won:hover td {
-  background-color: inherit !important;
+  :global(.ant-drawer.tenders-drawer .ant-drawer-mask) {
+    display: block; /* Показать затемнение */
+  }
 }
