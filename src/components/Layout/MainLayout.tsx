@@ -340,7 +340,7 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
         {
           key: '/admin/tenders',
           icon: <FileTextOutlined />,
-          label: 'Перечень тендеров',
+          label: 'Тендеры',
         },
         {
           key: '/admin/construction_cost',

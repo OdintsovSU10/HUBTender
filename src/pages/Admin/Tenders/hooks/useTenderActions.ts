@@ -53,12 +53,15 @@ export const useTenderActions = (onRefresh: () => void) => {
   };
 
   const handleDelete = (record: TenderRecord) => {
+    const theme = localStorage.getItem('tenderHub_theme') || 'light';
+
     Modal.confirm({
       title: 'Удаление тендера',
       content: `Вы уверены, что хотите удалить тендер "${record.tender}"? Это действие нельзя будет отменить.`,
       okText: 'Удалить',
       okType: 'danger',
       cancelText: 'Отмена',
+      rootClassName: theme === 'dark' ? 'dark-modal' : '',
       onOk: async () => {
         try {
           const { error } = await supabase

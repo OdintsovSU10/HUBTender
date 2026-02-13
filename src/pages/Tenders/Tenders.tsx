@@ -13,7 +13,7 @@ const Tenders: React.FC = () => {
   const { user } = useAuth();
   const isDirector = user?.role_code === 'director' || user?.role_code === 'general_director';
 
-  const [activeTab, setActiveTab] = useState<'current' | 'archive'>('current');
+  const [activeTab, setActiveTab] = useState<'current' | 'waiting' | 'archive'>('current');
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedTender, setSelectedTender] = useState<TenderRegistryWithRelations | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -28,7 +28,15 @@ const Tenders: React.FC = () => {
   // Фильтрация тендеров по активной вкладке
   const filteredTenders = useMemo(() => {
     return tenders.filter((t) => {
-      if (activeTab === 'current') return !t.is_archived;
+      if (activeTab === 'current') {
+        // Текущие: не архивные и не в ожидании
+        return !t.is_archived && (t.status as any)?.name !== 'Ожидаем тендерный пакет';
+      }
+      if (activeTab === 'waiting') {
+        // В ожидании: не архивные и статус "Ожидаем тендерный пакет"
+        return !t.is_archived && (t.status as any)?.name === 'Ожидаем тендерный пакет';
+      }
+      // Архив
       return t.is_archived;
     });
   }, [tenders, activeTab]);
@@ -97,11 +105,11 @@ const Tenders: React.FC = () => {
         >
           <Tabs
             activeKey={activeTab}
-            onChange={(key) => setActiveTab(key as 'current' | 'archive')}
+            onChange={(key) => setActiveTab(key as 'current' | 'waiting' | 'archive')}
             items={[
               {
                 key: 'current',
-                label: `Текущие (${tenders.filter((t) => !t.is_archived).length})`,
+                label: `Текущие (${tenders.filter((t) => !t.is_archived && (t.status as any)?.name !== 'Ожидаем тендерный пакет').length})`,
                 children: (
                   <>
                     {/* Inline-форма добавления (только во вкладке "Текущие") */}
@@ -132,6 +140,24 @@ const Tenders: React.FC = () => {
                       />
                     </div>
                   </>
+                ),
+              },
+              {
+                key: 'waiting',
+                label: `В ожидании (${tenders.filter((t) => !t.is_archived && (t.status as any)?.name === 'Ожидаем тендерный пакет').length})`,
+                children: (
+                  <div ref={tableContainerRef} className="tenders-table-wrapper">
+                    <TenderTable
+                      dataSource={filteredTenders}
+                      loading={loading}
+                      isDirector={isDirector}
+                      onRowClick={handleRowClick}
+                      onEditClick={handleEditClick}
+                      onMoveUp={handleMoveUp}
+                      onMoveDown={handleMoveDown}
+                      onArchive={handleArchive}
+                    />
+                  </div>
                 ),
               },
               {

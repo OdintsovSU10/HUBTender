@@ -11,11 +11,11 @@
 /* Основной контент с анимацией сдвига */
 .tenders-content {
   flex: 1;
-  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 100%;
-  overflow: visible; /* Разрешаем видимость прокрутки Table */
+  overflow: hidden; /* Скрываем overflow для корректной работы margin */
   padding: 24px;
   box-sizing: border-box;
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tenders-content.drawer-open {
@@ -30,6 +30,9 @@
 /* Drawer без затемняющей маски на десктопе */
 :global(.ant-drawer.tenders-drawer) {
   position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
 }
 
 :global(.ant-drawer.tenders-drawer .ant-drawer-mask) {

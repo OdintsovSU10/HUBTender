@@ -68,7 +68,7 @@ export const TenderTable: React.FC<TenderTableProps> = ({
       title: 'Наименование',
       dataIndex: 'title',
       key: 'title',
-      width: 250,
+      width: 350,
       sorter: (a: TenderRegistryWithRelations, b: TenderRegistryWithRelations) =>
         a.title.localeCompare(b.title),
     },
@@ -76,7 +76,7 @@ export const TenderTable: React.FC<TenderTableProps> = ({
       title: 'Заказчик',
       dataIndex: 'client_name',
       key: 'client_name',
-      width: 200,
+      width: 280,
       align: 'center' as const,
       sorter: (a: TenderRegistryWithRelations, b: TenderRegistryWithRelations) =>
         a.client_name.localeCompare(b.client_name),
@@ -99,14 +99,6 @@ export const TenderTable: React.FC<TenderTableProps> = ({
       },
       sorter: (a: TenderRegistryWithRelations, b: TenderRegistryWithRelations) =>
         (a.area || 0) - (b.area || 0),
-    },
-    {
-      title: 'Статус',
-      dataIndex: 'status',
-      key: 'status',
-      width: 180,
-      align: 'center' as const,
-      render: (status: any) => status?.name || '-',
     },
     {
       title: 'Дата выхода на площадку',
@@ -190,7 +182,7 @@ export const TenderTable: React.FC<TenderTableProps> = ({
         pageSizeOptions: ['10', '20', '50', '100'],
         showTotal: (total) => `Всего: ${total}`,
       }}
-      scroll={{ x: 1260, y: 'calc(100vh - 300px)' }}
+      scroll={{ x: 1160, y: 'calc(100vh - 300px)' }}
       size="small"
       onRow={(record) => ({
         onClick: () => onRowClick(record),

@@ -24,11 +24,14 @@ export const useTenderCRUD = (tenders: TenderRegistryWithRelations[], refetch: (
   };
 
   const handleArchive = async (tender: TenderRegistry) => {
+    const theme = localStorage.getItem('tenderHub_theme') || 'light';
+
     Modal.confirm({
       title: 'Архивировать тендер?',
       content: `Вы уверены, что хотите переместить "${tender.title}" в архив?`,
       okText: 'Архивировать',
       cancelText: 'Отмена',
+      rootClassName: theme === 'dark' ? 'dark-modal' : '',
       onOk: async () => {
         const { error } = await supabase
           .from('tender_registry')

@@ -12,6 +12,7 @@ interface TenderDrawerProps {
   tenderNumbers: string[];
   statuses: TenderStatus[];
   constructionScopes: ConstructionScope[];
+  isDirector: boolean;
   initialEditMode?: boolean;
   onClose: () => void;
   onUpdate: () => void;
@@ -23,11 +24,14 @@ export const TenderDrawer: React.FC<TenderDrawerProps> = ({
   tenderNumbers,
   statuses,
   constructionScopes,
+  isDirector,
   initialEditMode = false,
   onClose,
   onUpdate,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [showChronology, setShowChronology] = useState(false);
+  const [showTenderPackage, setShowTenderPackage] = useState(false);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -119,19 +123,22 @@ export const TenderDrawer: React.FC<TenderDrawerProps> = ({
       onClose={onClose}
       className="tenders-drawer"
       getContainer={false}
+      mask={false}
       maskClosable={false}
       extra={
-        !isEditing ? (
-          <Button icon={<EditOutlined />} onClick={handleEdit} type="primary">
-            Редактировать
-          </Button>
-        ) : (
-          <Space>
-            <Button onClick={handleCancel}>Отмена</Button>
-            <Button type="primary" onClick={handleSave}>
-              Сохранить
+        !isDirector && (
+          !isEditing ? (
+            <Button icon={<EditOutlined />} onClick={handleEdit} type="primary">
+              Редактировать
             </Button>
-          </Space>
+          ) : (
+            <Space>
+              <Button onClick={handleCancel}>Отмена</Button>
+              <Button type="primary" onClick={handleSave}>
+                Сохранить
+              </Button>
+            </Space>
+          )
         )
       }
     >
@@ -184,11 +191,37 @@ export const TenderDrawer: React.FC<TenderDrawerProps> = ({
                 ? dayjs(tender.invitation_date).format('DD.MM.YYYY')
                 : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="Хронология">
-              <ChronologyList items={tender?.chronology_items || []} editable={false} />
+            <Descriptions.Item
+              label={
+                <Space>
+                  Хронология
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={() => setShowChronology(!showChronology)}
+                  >
+                    {showChronology ? '−' : '+'}
+                  </Button>
+                </Space>
+              }
+            >
+              {showChronology && <ChronologyList items={tender?.chronology_items || []} editable={false} />}
             </Descriptions.Item>
-            <Descriptions.Item label="Тендерный пакет">
-              <TenderPackageList items={tender?.tender_package_items || []} editable={false} />
+            <Descriptions.Item
+              label={
+                <Space>
+                  Тендерный пакет
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={() => setShowTenderPackage(!showTenderPackage)}
+                  >
+                    {showTenderPackage ? '−' : '+'}
+                  </Button>
+                </Space>
+              }
+            >
+              {showTenderPackage && <TenderPackageList items={tender?.tender_package_items || []} editable={false} />}
             </Descriptions.Item>
           </Descriptions>
         ) : (
