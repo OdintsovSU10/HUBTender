@@ -13,10 +13,7 @@
   flex: 1;
   transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 100%;
-  min-height: 0; /* Важно для работы overflow в flexbox */
-  overflow: hidden; /* Не прокручиваем контейнер, только вложенные элементы */
-  display: flex;
-  flex-direction: column;
+  overflow: hidden; /* Предотвращаем прокрутку контейнера */
   padding: 24px;
   box-sizing: border-box;
 }
@@ -25,44 +22,12 @@
   margin-right: 600px; /* Ширина Drawer */
 }
 
-/* Card должен занимать всю высоту */
-.tenders-content :global(.ant-card) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.tenders-content :global(.ant-card-body) {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.tenders-content :global(.ant-tabs) {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.tenders-content :global(.ant-tabs-content-holder) {
-  flex: 1;
-  overflow: hidden;
-}
-
-.tenders-content :global(.ant-tabs-content) {
-  height: 100%;
-}
-
-.tenders-content :global(.ant-tabs-tabpane) {
-  height: 100%;
-  overflow: auto; /* Прокрутка на уровне TabPane */
-}
-
 /* Wrapper таблицы с прокруткой */
 .tenders-table-wrapper {
   position: relative;
+  height: calc(100vh - 250px); /* Вычитаем padding (48px), card header (64px), tabs (46px), запас (92px) */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Drawer без затемняющей маски на десктопе */
