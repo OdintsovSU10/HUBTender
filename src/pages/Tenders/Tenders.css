@@ -4,7 +4,7 @@
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 100vh;
-  overflow: hidden;
+  overflow: visible; /* Разрешаем видимость прокрутки внутренних элементов */
   box-sizing: border-box;
 }
 
@@ -13,7 +13,7 @@
   flex: 1;
   transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 100%;
-  overflow: hidden; /* Предотвращаем прокрутку контейнера */
+  overflow: visible; /* Разрешаем видимость прокрутки Table */
   padding: 24px;
   box-sizing: border-box;
 }
@@ -22,12 +22,9 @@
   margin-right: 600px; /* Ширина Drawer */
 }
 
-/* Wrapper таблицы с прокруткой */
+/* Wrapper таблицы - прокрутка управляется Table */
 .tenders-table-wrapper {
   position: relative;
-  height: calc(100vh - 250px); /* Вычитаем padding (48px), card header (64px), tabs (46px), запас (92px) */
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 /* Drawer без затемняющей маски на десктопе */

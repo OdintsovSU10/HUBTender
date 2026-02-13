@@ -190,7 +190,7 @@ export const TenderTable: React.FC<TenderTableProps> = ({
         pageSizeOptions: ['10', '20', '50', '100'],
         showTotal: (total) => `Всего: ${total}`,
       }}
-      scroll={{ x: 1260 }}
+      scroll={{ x: 1260, y: 'calc(100vh - 300px)' }}
       size="small"
       onRow={(record) => ({
         onClick: () => onRowClick(record),
