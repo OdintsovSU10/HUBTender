@@ -39,24 +39,10 @@ const Tenders: React.FC = () => {
       setScrollPosition(tableContainerRef.current.scrollTop);
     }
 
-    // Если кликнули на тот же тендер, который уже открыт - ничего не делаем
-    if (drawerVisible && selectedTender?.id === record.id) {
-      return;
-    }
-
-    // Если Drawer открыт, но это другой тендер - переоткрываем
-    if (drawerVisible) {
-      setDrawerVisible(false);
-      setTimeout(() => {
-        setSelectedTender(record);
-        setEditMode(false);
-        setDrawerVisible(true);
-      }, 100);
-    } else {
-      setSelectedTender(record);
-      setEditMode(false);
-      setDrawerVisible(true);
-    }
+    // Обновляем выбранный тендер и открываем/обновляем Drawer
+    setSelectedTender(record);
+    setEditMode(false);
+    setDrawerVisible(true);
   };
 
   const handleEditClick = (record: TenderRegistryWithRelations) => {
@@ -65,24 +51,10 @@ const Tenders: React.FC = () => {
       setScrollPosition(tableContainerRef.current.scrollTop);
     }
 
-    // Если кликнули на редактирование того же тендера в режиме редактирования - ничего не делаем
-    if (drawerVisible && selectedTender?.id === record.id && editMode) {
-      return;
-    }
-
-    // Если Drawer открыт - переоткрываем в режиме редактирования
-    if (drawerVisible) {
-      setDrawerVisible(false);
-      setTimeout(() => {
-        setSelectedTender(record);
-        setEditMode(true);
-        setDrawerVisible(true);
-      }, 100);
-    } else {
-      setSelectedTender(record);
-      setEditMode(true);
-      setDrawerVisible(true);
-    }
+    // Обновляем выбранный тендер и открываем/обновляем Drawer в режиме редактирования
+    setSelectedTender(record);
+    setEditMode(true);
+    setDrawerVisible(true);
   };
 
   const handleDrawerClose = () => {
