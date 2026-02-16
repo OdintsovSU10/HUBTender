@@ -518,7 +518,11 @@ export const PositionTable: React.FC<PositionTableProps> = ({
               Вставить примечание ({selectedTargetIds.size})
             </Button>
           )}
-          <Button icon={<UploadOutlined />} onClick={onMassImport} disabled={!selectedTender || loading}>
+          <Button
+            icon={<UploadOutlined />}
+            onClick={onMassImport}
+            disabled={!selectedTender || loading || readOnly}
+          >
             Импорт из Excel
           </Button>
           <Button icon={<DownloadOutlined />} onClick={onExportToExcel} disabled={!selectedTender || loading}>
