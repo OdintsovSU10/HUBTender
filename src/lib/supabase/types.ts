@@ -82,6 +82,7 @@ export interface TenderRegistryInsert {
   chronology_items?: ChronologyItem[] | null; // НОВОЕ
   sort_order?: number | null;
   is_archived?: boolean; // НОВОЕ: флаг архивации
+  manual_total_cost?: number | null; // НОВОЕ: ручной ввод общей стоимости
 }
 
 export interface TenderRegistry extends TenderRegistryInsert {
@@ -95,11 +96,13 @@ export interface TenderRegistry extends TenderRegistryInsert {
   chronology_items?: ChronologyItem[] | null;
   tender_package_items?: TenderPackageItem[] | null;
   is_archived: boolean; // НОВОЕ: флаг архивации (NOT NULL)
+  manual_total_cost?: number | null; // НОВОЕ: ручной ввод общей стоимости
 }
 
 export interface TenderRegistryWithRelations extends TenderRegistry {
   status?: TenderStatus | null;
   construction_scope?: ConstructionScope | null;
+  total_cost?: number | null; // Общая стоимость из связанного тендера (рассчитывается динамически)
 }
 
 // =============================================

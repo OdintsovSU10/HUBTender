@@ -1,29 +1,72 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { Card, Tabs, Button, Space } from 'antd';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { Card, Tabs, Button, Space, message } from 'antd';
+import { supabase } from '../../lib/supabase';
 import { UploadOutlined, PlusOutlined } from '@ant-design/icons';
 import type { TenderRegistryWithRelations, TenderRegistry } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenderData } from './hooks/useTenderData';
 import { useTenderCRUD } from './hooks/useTenderCRUD';
-import { TenderAddForm, TenderDrawer, TenderTable } from './components';
+import { TenderAddForm, TenderDrawerModern } from './components';
+import { TenderGrid } from './components/TenderGrid';
 import ImportTendersModal from './ImportTendersModal';
 import './Tenders.css';
+import './TendersModern.css';
 
 const Tenders: React.FC = () => {
   const { user } = useAuth();
-  const isDirector = user?.role_code === 'director' || user?.role_code === 'general_director';
+  const isGeneralDirector = user?.role_code === 'general_director';
+  const isDirector = user?.role_code === 'director' || isGeneralDirector;
 
   const [activeTab, setActiveTab] = useState<'current' | 'waiting' | 'archive'>('current');
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedTender, setSelectedTender] = useState<TenderRegistryWithRelations | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const { tenders, statuses, constructionScopes, tenderNumbers, loading, refetch } = useTenderData();
   const { handleMoveUp, handleMoveDown, handleArchive } = useTenderCRUD(tenders, refetch);
+
+  // Синхронизация selectedTender с обновлёнными данными после refetch
+  useEffect(() => {
+    if (selectedTender && tenders.length > 0) {
+      const updatedTender = tenders.find(t => t.id === selectedTender.id);
+      if (updatedTender) {
+        setSelectedTender(updatedTender);
+      }
+    }
+  }, [tenders]);
+
+  // Обработчик drag and drop сортировки
+  const handleReorder = async (draggedId: string, targetId: string) => {
+    const draggedIndex = tenders.findIndex((t) => t.id === draggedId);
+    const targetIndex = tenders.findIndex((t) => t.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const draggedTender = tenders[draggedIndex];
+    const targetTender = tenders[targetIndex];
+
+    // Swap sort_order
+    const { error: error1 } = await supabase
+      .from('tender_registry')
+      .update({ sort_order: targetTender.sort_order })
+      .eq('id', draggedTender.id);
+
+    const { error: error2 } = await supabase
+      .from('tender_registry')
+      .update({ sort_order: draggedTender.sort_order })
+      .eq('id', targetTender.id);
+
+    if (!error1 && !error2) {
+      refetch();
+    } else {
+      message.error('Ошибка при изменении порядка');
+    }
+  };
 
   // Фильтрация тендеров по активной вкладке
   const filteredTenders = useMemo(() => {
@@ -47,28 +90,21 @@ const Tenders: React.FC = () => {
       setScrollPosition(tableContainerRef.current.scrollTop);
     }
 
-    // Обновляем выбранный тендер и открываем/обновляем Drawer
-    setSelectedTender(record);
-    setEditMode(false);
-    setDrawerVisible(true);
-  };
-
-  const handleEditClick = (record: TenderRegistryWithRelations) => {
-    // Сохранить текущую позицию прокрутки
-    if (tableContainerRef.current) {
-      setScrollPosition(tableContainerRef.current.scrollTop);
+    // Если кликнули на уже выбранную строку - закрыть drawer
+    if (selectedTender?.id === record.id && drawerVisible) {
+      setDrawerVisible(false);
+      setSelectedTender(null);
+      return;
     }
 
-    // Обновляем выбранный тендер и открываем/обновляем Drawer в режиме редактирования
+    // Обновляем выбранный тендер и открываем/обновляем Drawer
     setSelectedTender(record);
-    setEditMode(true);
     setDrawerVisible(true);
   };
 
   const handleDrawerClose = () => {
     setDrawerVisible(false);
     setSelectedTender(null);
-    setEditMode(false);
 
     // Восстановить прокрутку после анимации закрытия
     setTimeout(() => {
@@ -78,11 +114,18 @@ const Tenders: React.FC = () => {
     }, 300);
   };
 
+  const handlePageChange = (page: number, size: number) => {
+    setCurrentPage(page);
+    setPageSize(size);
+  };
+
   return (
-    <div className="tenders-layout">
-      <div className={`tenders-content ${drawerVisible ? 'drawer-open' : ''}`}>
+    <div className="tenders-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Card
           title="Перечень тендеров"
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', margin: 0 }}
+          styles={{ body: { flex: 1, overflow: 'auto', padding: '16px' } }}
           extra={
             !isDirector && activeTab === 'current' && (
               <Space>
@@ -128,15 +171,15 @@ const Tenders: React.FC = () => {
 
                     {/* Таблица текущих тендеров */}
                     <div ref={tableContainerRef} className="tenders-table-wrapper">
-                      <TenderTable
+                      <TenderGrid
                         dataSource={filteredTenders}
                         loading={loading}
-                        isDirector={isDirector}
+                        currentPage={currentPage}
+                        pageSize={pageSize}
+                        totalCount={filteredTenders.length}
+                        onPageChange={handlePageChange}
                         onRowClick={handleRowClick}
-                        onEditClick={handleEditClick}
-                        onMoveUp={handleMoveUp}
-                        onMoveDown={handleMoveDown}
-                        onArchive={handleArchive}
+                        onReorder={handleReorder}
                       />
                     </div>
                   </>
@@ -147,15 +190,15 @@ const Tenders: React.FC = () => {
                 label: `В ожидании (${tenders.filter((t) => !t.is_archived && (t.status as any)?.name === 'Ожидаем тендерный пакет').length})`,
                 children: (
                   <div ref={tableContainerRef} className="tenders-table-wrapper">
-                    <TenderTable
+                    <TenderGrid
                       dataSource={filteredTenders}
                       loading={loading}
-                      isDirector={isDirector}
+                      currentPage={currentPage}
+                      pageSize={pageSize}
+                      totalCount={filteredTenders.length}
+                      onPageChange={handlePageChange}
                       onRowClick={handleRowClick}
-                      onEditClick={handleEditClick}
-                      onMoveUp={handleMoveUp}
-                      onMoveDown={handleMoveDown}
-                      onArchive={handleArchive}
+                      onReorder={handleReorder}
                     />
                   </div>
                 ),
@@ -165,16 +208,15 @@ const Tenders: React.FC = () => {
                 label: `Архив (${tenders.filter((t) => t.is_archived).length})`,
                 children: (
                   <div ref={tableContainerRef} className="tenders-table-wrapper">
-                    <TenderTable
+                    <TenderGrid
                       dataSource={filteredTenders}
                       loading={loading}
-                      isDirector={isDirector}
-                      isArchiveTab={true}
+                      currentPage={currentPage}
+                      pageSize={pageSize}
+                      totalCount={filteredTenders.length}
+                      onPageChange={handlePageChange}
                       onRowClick={handleRowClick}
-                      onEditClick={handleEditClick}
-                      onMoveUp={handleMoveUp}
-                      onMoveDown={handleMoveDown}
-                      onArchive={handleArchive}
+                      onReorder={handleReorder}
                     />
                   </div>
                 ),
@@ -184,18 +226,18 @@ const Tenders: React.FC = () => {
         </Card>
       </div>
 
-      {/* Drawer с push-эффектом */}
-      <TenderDrawer
-        open={drawerVisible}
-        tender={selectedTender}
-        tenderNumbers={tenderNumbers}
-        statuses={statuses}
-        constructionScopes={constructionScopes}
-        isDirector={isDirector}
-        initialEditMode={editMode}
-        onClose={handleDrawerClose}
-        onUpdate={refetch}
-      />
+      {/* Drawer без разрыва */}
+      {drawerVisible && (
+        <TenderDrawerModern
+          open={drawerVisible}
+          tender={selectedTender}
+          statuses={statuses}
+          constructionScopes={constructionScopes}
+          onClose={handleDrawerClose}
+          onUpdate={refetch}
+          readOnly={isGeneralDirector}
+        />
+      )}
 
       {/* Import Modal */}
       <ImportTendersModal

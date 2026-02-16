@@ -1,0 +1,284 @@
+/* Импорт шрифтов */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
+/* Основной контейнер страницы тендеров */
+.tenders-modern-page {
+  background: #0b0c0e;
+  min-height: 100vh;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Внутренний контейнер */
+.tenders-modern-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Заголовок страницы */
+.tenders-modern-header {
+  margin-bottom: 24px;
+}
+
+.tenders-modern-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #e8e8e8;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+/* Вкладки */
+.tenders-modern-tabs {
+  margin-bottom: 24px;
+}
+
+.tenders-modern-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.tenders-modern-tabs .ant-tabs-tab {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+  font-size: 14px;
+  padding: 12px 20px;
+}
+
+.tenders-modern-tabs .ant-tabs-tab-active {
+  color: #34d399;
+}
+
+.tenders-modern-tabs .ant-tabs-tab:hover {
+  color: #34d399;
+}
+
+.tenders-modern-tabs .ant-tabs-ink-bar {
+  background: #34d399;
+  height: 3px;
+}
+
+/* Контент вкладки */
+.tenders-modern-tab-content {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 400px;
+}
+
+/* Кнопки импорта и т.д. */
+.tenders-modern-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tenders-modern-import-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s;
+}
+
+.tenders-modern-import-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Пагинация в темной теме */
+.tenders-modern-page .ant-pagination {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.tenders-modern-page .ant-pagination-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.tenders-modern-page .ant-pagination-item a {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.tenders-modern-page .ant-pagination-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #34d399;
+}
+
+.tenders-modern-page .ant-pagination-item:hover a {
+  color: #34d399;
+}
+
+.tenders-modern-page .ant-pagination-item-active {
+  background: #34d399;
+  border-color: #34d399;
+}
+
+.tenders-modern-page .ant-pagination-item-active a {
+  color: #000;
+  font-weight: 600;
+}
+
+.tenders-modern-page .ant-pagination-prev,
+.tenders-modern-page .ant-pagination-next {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.tenders-modern-page .ant-pagination-prev:hover .ant-pagination-item-link,
+.tenders-modern-page .ant-pagination-next:hover .ant-pagination-item-link {
+  color: #34d399;
+  border-color: #34d399;
+}
+
+.tenders-modern-page .ant-pagination-options .ant-select-selector {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.tenders-modern-page .ant-pagination-options .ant-select-selector:hover {
+  border-color: #34d399;
+}
+
+/* Drawer для детальной информации */
+.tenders-modern-drawer .ant-drawer-header {
+  background: #0b0c0e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 20px 24px;
+}
+
+.tenders-modern-drawer .ant-drawer-title {
+  color: #e8e8e8;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.tenders-modern-drawer .ant-drawer-body {
+  background: #0b0c0e;
+  padding: 24px;
+}
+
+.tenders-modern-drawer .ant-drawer-close {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.tenders-modern-drawer .ant-drawer-close:hover {
+  color: #34d399;
+}
+
+/* Модальные окна в темной теме */
+.dark-modal .ant-modal-content {
+  background: #1a1b1e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark-modal .ant-modal-header {
+  background: #1a1b1e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark-modal .ant-modal-title {
+  color: #e8e8e8;
+}
+
+.dark-modal .ant-modal-body {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dark-modal .ant-modal-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark-modal .ant-btn-default {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dark-modal .ant-btn-default:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #34d399;
+  color: #34d399;
+}
+
+.dark-modal .ant-btn-primary {
+  background: #34d399;
+  border-color: #34d399;
+  color: #000;
+}
+
+.dark-modal .ant-btn-primary:hover {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+/* Спиннер загрузки */
+.tenders-modern-page .ant-spin-dot-item {
+  background-color: #34d399;
+}
+
+/* Empty state */
+.tenders-modern-page .ant-empty-description {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .tenders-modern-container {
+    padding: 16px;
+  }
+
+  .tenders-modern-title {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tenders-modern-container {
+    padding: 12px;
+  }
+
+  .tenders-modern-title {
+    font-size: 20px;
+  }
+
+  .tenders-modern-tab-content {
+    padding: 12px;
+  }
+}
+
+/* Scrollbar для темной темы */
+.tenders-modern-page ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tenders-modern-page ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.tenders-modern-page ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.tenders-modern-page ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Скрыть scrollbar в drawer */
+.tender-drawer-hidden-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.tender-drawer-hidden-scroll::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
