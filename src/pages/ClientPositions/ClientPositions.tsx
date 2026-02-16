@@ -216,22 +216,30 @@ const ClientPositions: React.FC = () => {
 
   // Обработчики фильтра
   const handleToggleFilterCheckbox = (positionId: string) => {
-    const clickedPosition = clientPositions.find(p => p.id === positionId);
-    if (!clickedPosition) return;
+    const clickedIndex = clientPositions.findIndex(p => p.id === positionId);
+    if (clickedIndex === -1) return;
+
+    const clickedPosition = clientPositions[clickedIndex];
+    const clickedLevel = clickedPosition.hierarchy_level || 0;
 
     setTempSelectedPositionIds(prev => {
       const newSet = new Set(prev);
       const isSelected = newSet.has(positionId);
 
-      // Собираем нажатую позицию и всех её дочерних по item_no
+      // Собираем нажатую позицию и дочерних по позиции в массиве + hierarchy_level
+      // (вместо item_no prefix, чтобы не захватывать одноимённые разделы из другой части таблицы)
       const idsToToggle = new Set<string>([positionId]);
-      if (clickedPosition.item_no) {
-        const prefix = clickedPosition.item_no + '.';
-        for (const pos of clientPositions) {
-          if (pos.item_no && pos.item_no.startsWith(prefix)) {
-            idsToToggle.add(pos.id);
-          }
-        }
+      for (let i = clickedIndex + 1; i < clientPositions.length; i++) {
+        const pos = clientPositions[i];
+
+        // Пропускаем ДОП-позиции при определении границы раздела
+        if (pos.is_additional) continue;
+
+        const posLevel = pos.hierarchy_level || 0;
+        // Остановка на позиции того же или более высокого уровня (конец раздела)
+        if (posLevel <= clickedLevel) break;
+
+        idsToToggle.add(pos.id);
       }
 
       // Добавляем ДОП-позиции, привязанные к собранным через parent_position_id
