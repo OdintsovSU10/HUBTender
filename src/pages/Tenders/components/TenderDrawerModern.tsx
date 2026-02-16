@@ -86,7 +86,7 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
   return (
     <div
       style={{
-        padding: '10px 12px',
+        padding: '6px 8px',
         borderRadius: 9,
         background: colors.fieldBg,
         border: `1px solid ${colors.itemBorder}`,
@@ -121,17 +121,17 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
           <div>
             <div
               style={{
-                fontSize: 11,
-                color: colors.labelText,
+                fontSize: 10,
+                color: colors.normalText,
                 fontFamily: "'DM Mono', monospace",
-                marginBottom: 2,
+                marginBottom: 1,
               }}
             >
               {event.date ? dayjs(event.date).format('DD.MM.YYYY') : 'Без даты'}
             </div>
             <div
               style={{
-                fontSize: 13.5,
+                fontSize: 12,
                 color: colors.secondaryText,
                 fontWeight: 500,
                 fontFamily: "'Manrope', sans-serif",
@@ -210,7 +210,7 @@ const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate
   return (
     <div
       style={{
-        padding: '10px 12px',
+        padding: '6px 8px',
         borderRadius: 9,
         background: colors.fieldBg,
         border: `1px solid ${colors.itemBorder}`,
@@ -244,25 +244,22 @@ const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontSize: 13,
-                color: colors.secondaryText,
-                fontWeight: 500,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {file.text}
-            </div>
-            <div
-              style={{
-                fontSize: 10.5,
-                color: colors.mutedText,
+                fontSize: 10,
+                color: colors.normalText,
                 fontFamily: "'DM Mono', monospace",
-                marginTop: 1,
+                marginBottom: 2,
               }}
             >
               {file.date ? dayjs(file.date).format('DD.MM.YYYY') : 'Без даты'}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: colors.secondaryText,
+                fontWeight: 500,
+              }}
+            >
+              {file.text}
             </div>
           </div>
           {!readOnly && (
