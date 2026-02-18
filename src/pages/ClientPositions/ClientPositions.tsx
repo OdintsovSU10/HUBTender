@@ -59,6 +59,9 @@ const ClientPositions: React.FC = () => {
     copiedNotePositionId,
     selectedTargetIds,
     isBulkPasting,
+    isDeleteSelectionMode,
+    selectedDeleteIds,
+    isBulkDeleting,
     handleCopyPosition,
     handlePastePosition,
     handleToggleSelection,
@@ -66,7 +69,10 @@ const ClientPositions: React.FC = () => {
     handleCopyNote,
     handlePasteNote,
     handleBulkPasteNote,
-    handleDeleteBoqItems,
+    handleStartDeleteSelection,
+    handleToggleDeleteSelection,
+    handleCancelDeleteSelection,
+    handleBulkDeleteBoqItems,
     handleExportToExcel,
     handleDeleteAdditionalPosition,
   } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
@@ -344,9 +350,13 @@ const ClientPositions: React.FC = () => {
           onCopyNote={handleCopyNote}
           onPasteNote={(positionId, event) => handlePasteNote(positionId, event, selectedTenderId)}
           onBulkPasteNote={() => handleBulkPasteNote(selectedTenderId)}
-          onDeleteBoqItems={(positionId, positionName, event) =>
-            handleDeleteBoqItems(positionId, positionName, selectedTenderId, event)
-          }
+          isDeleteSelectionMode={isDeleteSelectionMode}
+          selectedDeleteIds={selectedDeleteIds}
+          isBulkDeleting={isBulkDeleting}
+          onStartDeleteSelection={(positionId, event) => handleStartDeleteSelection(positionId, event)}
+          onToggleDeleteSelection={handleToggleDeleteSelection}
+          onCancelDeleteSelection={handleCancelDeleteSelection}
+          onBulkDeleteBoqItems={() => handleBulkDeleteBoqItems(selectedTenderId)}
           onDeleteAdditionalPosition={(positionId, positionName, event) =>
             handleDeleteAdditionalPosition(positionId, positionName, selectedTenderId, event)
           }

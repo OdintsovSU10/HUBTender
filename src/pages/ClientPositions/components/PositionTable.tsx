@@ -44,7 +44,13 @@ interface PositionTableProps {
   onCopyNote: (positionId: string, noteValue: string | null, event: React.MouseEvent) => void;
   onPasteNote: (positionId: string, event: React.MouseEvent) => void;
   onBulkPasteNote: () => void;
-  onDeleteBoqItems: (positionId: string, positionName: string, event: React.MouseEvent) => void;
+  isDeleteSelectionMode?: boolean;
+  selectedDeleteIds?: Set<string>;
+  isBulkDeleting?: boolean;
+  onStartDeleteSelection: (positionId: string, event: React.MouseEvent) => void;
+  onToggleDeleteSelection?: (positionId: string, event: React.MouseEvent) => void;
+  onCancelDeleteSelection?: () => void;
+  onBulkDeleteBoqItems?: () => void;
   onDeleteAdditionalPosition: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onExportToExcel: () => void;
   onMassImport?: () => void;
@@ -77,7 +83,13 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onCopyNote,
   onPasteNote,
   onBulkPasteNote,
-  onDeleteBoqItems,
+  isDeleteSelectionMode = false,
+  selectedDeleteIds = new Set(),
+  isBulkDeleting = false,
+  onStartDeleteSelection,
+  onToggleDeleteSelection,
+  onCancelDeleteSelection,
+  onBulkDeleteBoqItems,
   onDeleteAdditionalPosition,
   onExportToExcel,
   onMassImport,
@@ -281,56 +293,51 @@ export const PositionTable: React.FC<PositionTableProps> = ({
 
             {/* СПРАВА: Кнопки действий */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, alignSelf: 'center' }}>
-              {/* Кнопка "Вставить работы и материалы" */}
-              {isLeaf && copiedPositionId && copiedPositionId !== record.id && (
-                <Tooltip
-                  title={selectedTargetIds.has(record.id) ? "Отменить выбор для вставки" : "Выбрать для вставки"}
-                  {...tooltipColor}
-                >
-                  <Tag
-                    color={selectedTargetIds.has(record.id) ? 'warning' : 'success'}
-                    style={{
-                      cursor: readOnly ? 'not-allowed' : 'pointer',
-                      margin: 0,
-                      opacity: readOnly ? 0.5 : 1,
-                      pointerEvents: readOnly ? 'none' : 'auto',
-                      backgroundColor: selectedTargetIds.has(record.id) ? '#faad14' : undefined,
-                      borderColor: selectedTargetIds.has(record.id) ? '#faad14' : undefined,
-                      color: selectedTargetIds.has(record.id) ? '#fff' : undefined,
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSelection(record.id, e);
-                    }}
-                  >
-                    <CheckOutlined />
-                  </Tag>
-                </Tooltip>
-              )}
+              {/* Теги выбора для вставки работ/примечания */}
+              {(() => {
+                const isTarget = selectedTargetIds.has(record.id);
+                const targetStyle = {
+                  cursor: readOnly ? 'not-allowed' : 'pointer', margin: 0,
+                  opacity: readOnly ? 0.5 : 1, pointerEvents: readOnly ? 'none' as const : 'auto' as const,
+                  backgroundColor: isTarget ? '#faad14' : undefined,
+                  borderColor: isTarget ? '#faad14' : undefined,
+                  color: isTarget ? '#fff' : undefined,
+                };
+                const handleClick = (e: React.MouseEvent) => { e.stopPropagation(); onToggleSelection(record.id, e); };
+                return (
+                  <>
+                    {isLeaf && copiedPositionId && copiedPositionId !== record.id && (
+                      <Tooltip title={isTarget ? 'Отменить выбор для вставки' : 'Выбрать для вставки'} {...tooltipColor}>
+                        <Tag color={isTarget ? 'warning' : 'success'} style={targetStyle} onClick={handleClick}>
+                          <CheckOutlined />
+                        </Tag>
+                      </Tooltip>
+                    )}
+                    {copiedNotePositionId && copiedNotePositionId !== record.id && (
+                      <Tooltip title={isTarget ? 'Отменить выбор для вставки примечания' : 'Выбрать для вставки примечания'} {...tooltipColor}>
+                        <Tag color={isTarget ? 'warning' : 'lime'} style={targetStyle} onClick={handleClick}>
+                          <FileAddOutlined />
+                        </Tag>
+                      </Tooltip>
+                    )}
+                  </>
+                );
+              })()}
 
-              {/* Кнопка "Выбрать для вставки примечания ГП" */}
-              {copiedNotePositionId && copiedNotePositionId !== record.id && (
-                <Tooltip
-                  title={selectedTargetIds.has(record.id) ? "Отменить выбор для вставки примечания" : "Выбрать для вставки примечания"}
-                  {...tooltipColor}
-                >
+              {/* Тег выбора для массового удаления */}
+              {isLeaf && isDeleteSelectionMode && (
+                <Tooltip title={selectedDeleteIds.has(record.id) ? 'Отменить выбор' : 'Выбрать для удаления'} {...tooltipColor}>
                   <Tag
-                    color={selectedTargetIds.has(record.id) ? 'warning' : 'lime'}
+                    color={selectedDeleteIds.has(record.id) ? 'error' : 'default'}
                     style={{
-                      cursor: readOnly ? 'not-allowed' : 'pointer',
-                      margin: 0,
-                      opacity: readOnly ? 0.5 : 1,
-                      pointerEvents: readOnly ? 'none' : 'auto',
-                      backgroundColor: selectedTargetIds.has(record.id) ? '#faad14' : undefined,
-                      borderColor: selectedTargetIds.has(record.id) ? '#faad14' : undefined,
-                      color: selectedTargetIds.has(record.id) ? '#fff' : undefined,
+                      cursor: 'pointer', margin: 0,
+                      backgroundColor: selectedDeleteIds.has(record.id) ? '#ff4d4f' : undefined,
+                      borderColor: selectedDeleteIds.has(record.id) ? '#ff4d4f' : undefined,
+                      color: selectedDeleteIds.has(record.id) ? '#fff' : undefined,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSelection(record.id, e);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); onToggleDeleteSelection?.(record.id, e); }}
                   >
-                    <FileAddOutlined />
+                    <DeleteOutlined />
                   </Tag>
                 </Tooltip>
               )}
@@ -344,29 +351,13 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                       {/* Скопировать работы и материалы */}
                       {copiedPositionId !== record.id && (
                         <Tooltip title="Скопировать работы и материалы" {...tooltipColor}>
-                          <Tag
-                            color="blue"
-                            style={{ cursor: 'pointer', margin: 0 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCopyPosition(record.id, e);
-                            }}
-                          >
+                          <Tag color="blue" style={{ cursor: 'pointer', margin: 0 }} onClick={(e) => { e.stopPropagation(); onCopyPosition(record.id, e); }}>
                             <CopyOutlined />
                           </Tag>
                         </Tooltip>
                       )}
-
-                      {/* Скопировать примечание ГП */}
                       <Tooltip title="Скопировать примечание ГП" {...tooltipColor}>
-                        <Tag
-                          color="purple"
-                          style={{ cursor: 'pointer', margin: 0 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCopyNote(record.id, record.manual_note, e);
-                          }}
-                        >
+                        <Tag color="purple" style={{ cursor: 'pointer', margin: 0 }} onClick={(e) => { e.stopPropagation(); onCopyNote(record.id, record.manual_note, e); }}>
                           <FileTextOutlined />
                         </Tag>
                       </Tooltip>
@@ -378,46 +369,21 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                     {/* Добавить ДОП работу (для НЕ-ДОП позиций) */}
                     {!record.is_additional && (
                       <Tooltip title="Добавить ДОП работу" {...tooltipColor}>
-                        <Tag
-                          color="success"
-                          style={{ cursor: 'pointer', margin: 0 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenAdditionalModal(record.id, e);
-                          }}
-                        >
+                        <Tag color="success" style={{ cursor: 'pointer', margin: 0 }} onClick={(e) => { e.stopPropagation(); onOpenAdditionalModal(record.id, e); }}>
                           <PlusOutlined />
                         </Tag>
                       </Tooltip>
                     )}
-
-                    {/* Удалить ДОП работу (для ДОП позиций) */}
                     {record.is_additional && (
                       <Tooltip title="Удалить ДОП работу" {...tooltipColor}>
-                        <Tag
-                          color="error"
-                          style={{ cursor: 'pointer', margin: 0 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteAdditionalPosition(record.id, record.work_name, e);
-                          }}
-                        >
+                        <Tag color="error" style={{ cursor: 'pointer', margin: 0 }} onClick={(e) => { e.stopPropagation(); onDeleteAdditionalPosition(record.id, record.work_name, e); }}>
                           <DeleteOutlined />
                         </Tag>
                       </Tooltip>
                     )}
-
-                    {/* Удалить работы и материалы (только для листовых) */}
                     {isLeaf && (
                       <Tooltip title="Удалить работы и материалы" {...tooltipColor}>
-                        <Tag
-                          color="orange"
-                          style={{ cursor: 'pointer', margin: 0 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteBoqItems(record.id, record.work_name, e);
-                          }}
-                        >
+                        <Tag color="orange" style={{ cursor: 'pointer', margin: 0 }} onClick={(e) => { e.stopPropagation(); onStartDeleteSelection(record.id, e); }}>
                           <ClearOutlined />
                         </Tag>
                       </Tooltip>
@@ -426,20 +392,11 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                 </div>
               )}
 
-              {/* Кнопка троеточия */}
               <Tooltip title="Действия" {...tooltipColor}>
                 <Tag
                   color="default"
-                  style={{
-                    cursor: readOnly ? 'not-allowed' : 'pointer',
-                    margin: 0,
-                    opacity: readOnly ? 0.5 : 1,
-                    pointerEvents: readOnly ? 'none' : 'auto'
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpandedPositionId(isExpanded ? null : record.id);
-                  }}
+                  style={{ cursor: readOnly ? 'not-allowed' : 'pointer', margin: 0, opacity: readOnly ? 0.5 : 1, pointerEvents: readOnly ? 'none' : 'auto' }}
+                  onClick={(e) => { e.stopPropagation(); setExpandedPositionId(isExpanded ? null : record.id); }}
                 >
                   <MoreOutlined />
                 </Tag>
@@ -467,7 +424,10 @@ export const PositionTable: React.FC<PositionTableProps> = ({
     onToggleSelection,
     onCopyNote,
     onPasteNote,
-    onDeleteBoqItems,
+    isDeleteSelectionMode,
+    selectedDeleteIds,
+    onToggleDeleteSelection,
+    onStartDeleteSelection,
   ]);
 
   return (
@@ -518,6 +478,16 @@ export const PositionTable: React.FC<PositionTableProps> = ({
               Вставить примечание ({selectedTargetIds.size})
             </Button>
           )}
+          {isDeleteSelectionMode && (
+            <>
+              {selectedDeleteIds.size > 0 && (
+                <Button type="primary" danger icon={<ClearOutlined />} onClick={onBulkDeleteBoqItems} loading={isBulkDeleting} disabled={loading}>
+                  Удалить работы и материалы ({selectedDeleteIds.size})
+                </Button>
+              )}
+              <Button onClick={onCancelDeleteSelection}>Отменить выбор</Button>
+            </>
+          )}
           <Button
             icon={<UploadOutlined />}
             onClick={onMassImport}
@@ -539,6 +509,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
         loading={loading}
         rowClassName={(record) => {
           if (copiedPositionId === record.id) return 'copied-row';
+          if (isDeleteSelectionMode && selectedDeleteIds.has(record.id)) return 'delete-selected-row';
           return '';
         }}
         onRow={(record, index) => {
@@ -561,6 +532,9 @@ export const PositionTable: React.FC<PositionTableProps> = ({
             style: {
               cursor: isLeaf ? 'pointer' : 'default',
               opacity: (showAllPositions && isFilterActive && !tempSelectedPositionIds.has(record.id)) ? 0.5 : 1,
+              backgroundColor: (isDeleteSelectionMode && selectedDeleteIds.has(record.id))
+                ? (currentTheme === 'dark' ? 'rgba(255, 77, 79, 0.15)' : 'rgba(255, 77, 79, 0.08)')
+                : undefined,
             },
           };
         }}

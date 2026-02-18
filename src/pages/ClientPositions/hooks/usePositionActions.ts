@@ -17,6 +17,9 @@ export const usePositionActions = (
   const [copiedNotePositionId, setCopiedNotePositionId] = useState<string | null>(null);
   const [selectedTargetIds, setSelectedTargetIds] = useState<Set<string>>(new Set());
   const [isBulkPasting, setIsBulkPasting] = useState(false);
+  const [isDeleteSelectionMode, setIsDeleteSelectionMode] = useState(false);
+  const [selectedDeleteIds, setSelectedDeleteIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Обновление позиции в БД
   const handleUpdatePosition = async (
@@ -68,7 +71,9 @@ export const usePositionActions = (
   const handleCopyPosition = (positionId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     setCopiedPositionId(positionId);
-    setSelectedTargetIds(new Set()); // Очистить выбранные строки
+    setSelectedTargetIds(new Set());
+    setIsDeleteSelectionMode(false);
+    setSelectedDeleteIds(new Set());
     message.success('Позиция скопирована в буфер обмена');
   };
 
@@ -192,7 +197,9 @@ export const usePositionActions = (
 
     setCopiedNoteValue(noteValue);
     setCopiedNotePositionId(positionId);
-    setSelectedTargetIds(new Set()); // Очистить выбранные строки
+    setSelectedTargetIds(new Set());
+    setIsDeleteSelectionMode(false);
+    setSelectedDeleteIds(new Set());
     message.success('Примечание ГП скопировано в буфер обмена');
   };
 
@@ -278,54 +285,95 @@ export const usePositionActions = (
     }
   };
 
-  // Удаление всех работ и материалов
-  const handleDeleteBoqItems = async (
-    positionId: string,
-    positionName: string,
-    selectedTenderId: string | null,
-    event: React.MouseEvent
-  ) => {
+  // Вход в режим массового удаления работ и материалов
+  const handleStartDeleteSelection = (positionId: string, event: React.MouseEvent) => {
     event.stopPropagation();
+    // Сбрасываем режимы копирования
+    setCopiedPositionId(null);
+    setCopiedNoteValue(null);
+    setCopiedNotePositionId(null);
+    setSelectedTargetIds(new Set());
+    // Включаем режим удаления с первой выбранной позицией
+    setIsDeleteSelectionMode(true);
+    setSelectedDeleteIds(new Set([positionId]));
+  };
+
+  // Toggle выбора строки для массового удаления
+  const handleToggleDeleteSelection = (positionId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setSelectedDeleteIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(positionId)) {
+        newSet.delete(positionId);
+      } else {
+        newSet.add(positionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Отмена режима массового удаления
+  const handleCancelDeleteSelection = () => {
+    setIsDeleteSelectionMode(false);
+    setSelectedDeleteIds(new Set());
+  };
+
+  // Массовое удаление работ и материалов из выбранных позиций
+  const handleBulkDeleteBoqItems = async (selectedTenderId: string | null) => {
+    if (selectedDeleteIds.size === 0) return;
+
+    const count = selectedDeleteIds.size;
 
     Modal.confirm({
-      title: 'Удалить все работы и материалы?',
-      content: `Вы уверены, что хотите удалить все работы и материалы из позиции "${positionName}"? Это действие нельзя отменить.`,
+      title: 'Удалить работы и материалы?',
+      content: `Вы уверены, что хотите удалить все работы и материалы из ${count} ${pluralize(count, 'позиции', 'позиций', 'позиций')}? Это действие нельзя отменить.`,
       okText: 'Удалить',
       cancelText: 'Отмена',
       okButtonProps: { danger: true },
       rootClassName: currentTheme === 'dark' ? 'dark-modal' : '',
       onOk: async () => {
+        setIsBulkDeleting(true);
         setLoading(true);
         try {
-          // 1. Удалить все boq_items
-          const { error: deleteError } = await supabase
-            .from('boq_items')
-            .delete()
-            .eq('client_position_id', positionId);
+          const positionIds = Array.from(selectedDeleteIds);
+          const batchSize = 100;
 
-          if (deleteError) throw deleteError;
+          // 1. Удалить boq_items батчами
+          for (let i = 0; i < positionIds.length; i += batchSize) {
+            const batch = positionIds.slice(i, i + batchSize);
+            const { error } = await supabase
+              .from('boq_items')
+              .delete()
+              .in('client_position_id', batch);
+            if (error) throw error;
+          }
 
-          // 2. Обнулить totals позиции
-          const { error: updateError } = await supabase
-            .from('client_positions')
-            .update({
-              total_material: 0,
-              total_works: 0,
-            })
-            .eq('id', positionId);
+          // 2. Обнулить totals батчами
+          for (let i = 0; i < positionIds.length; i += batchSize) {
+            const batch = positionIds.slice(i, i + batchSize);
+            const { error } = await supabase
+              .from('client_positions')
+              .update({ total_material: 0, total_works: 0 })
+              .in('id', batch);
+            if (error) throw error;
+          }
 
-          if (updateError) throw updateError;
+          // 3. Сброс состояния и обновление таблицы
+          setSelectedDeleteIds(new Set());
+          setIsDeleteSelectionMode(false);
 
-          // 3. Обновить таблицу
           if (selectedTenderId) {
             await fetchClientPositions(selectedTenderId);
           }
 
-          message.success('Все работы и материалы успешно удалены');
+          message.success(
+            `Работы и материалы удалены из ${count} ${pluralize(count, 'позиции', 'позиций', 'позиций')}`
+          );
         } catch (error: any) {
-          console.error('Ошибка удаления работ и материалов:', error);
+          console.error('Ошибка массового удаления:', error);
           message.error('Ошибка удаления: ' + error.message);
         } finally {
+          setIsBulkDeleting(false);
           setLoading(false);
         }
       },
@@ -388,6 +436,9 @@ export const usePositionActions = (
     copiedNotePositionId,
     selectedTargetIds,
     isBulkPasting,
+    isDeleteSelectionMode,
+    selectedDeleteIds,
+    isBulkDeleting,
     handleUpdatePosition,
     handleCopyPosition,
     handlePastePosition,
@@ -396,7 +447,10 @@ export const usePositionActions = (
     handleCopyNote,
     handlePasteNote,
     handleBulkPasteNote,
-    handleDeleteBoqItems,
+    handleStartDeleteSelection,
+    handleToggleDeleteSelection,
+    handleCancelDeleteSelection,
+    handleBulkDeleteBoqItems,
     handleExportToExcel,
     handleDeleteAdditionalPosition,
   };
