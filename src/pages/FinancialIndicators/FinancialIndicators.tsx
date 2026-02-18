@@ -44,6 +44,7 @@ const FinancialIndicators: React.FC = () => {
     spTotal,
     customerTotal,
     isVatInConstructor,
+    vatCoefficient,
     loadTenders,
     fetchFinancialIndicators,
   } = useFinancialData();
@@ -373,6 +374,7 @@ const FinancialIndicators: React.FC = () => {
                     formatNumber={formatNumber}
                     selectedTenderId={selectedTenderId}
                     isVatInConstructor={isVatInConstructor}
+                    vatCoefficient={vatCoefficient}
                   />
                 ),
               },

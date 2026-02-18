@@ -16,6 +16,7 @@ export const useFinancialData = () => {
     customerTotal,
     loading: calculationsLoading,
     isVatInConstructor,
+    vatCoefficient,
     fetchFinancialIndicators,
   } = useFinancialCalculations();
 
@@ -26,6 +27,7 @@ export const useFinancialData = () => {
     spTotal,
     customerTotal,
     isVatInConstructor,
+    vatCoefficient,
     loadTenders,
     fetchFinancialIndicators,
   };

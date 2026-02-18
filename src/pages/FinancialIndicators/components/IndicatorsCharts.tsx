@@ -13,6 +13,7 @@ interface IndicatorsChartsProps {
   formatNumber: (value: number | undefined) => string;
   selectedTenderId: string | null;
   isVatInConstructor: boolean;
+  vatCoefficient: number;
 }
 
 interface CategoryBreakdown {
@@ -36,6 +37,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
   formatNumber,
   selectedTenderId,
   isVatInConstructor,
+  vatCoefficient,
 }) => {
   const { theme: currentTheme } = useTheme();
   const [selectedIndicator, setSelectedIndicator] = useState<number | null>(null);
@@ -74,16 +76,10 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
       );
 
       // Прямые затраты: строки 2-7 (Субподряд, СУ-10, Запас на сдачу, СМ, МБП+ГСМ, Гарантия)
-      let directCosts = baseData
+      // НДС уже включён в total_cost каждой строки (если isVatInConstructor)
+      const directCosts = baseData
         .filter(d => d.row_number >= 2 && d.row_number <= 7)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
-
-      // Если НДС в конструкторе, добавляем НДС к прямым затратам
-      const vatRow = data.find(d => d.row_number === 17);
-      const vatCost = vatRow?.total_cost || 0;
-      if (isVatInConstructor && vatCost > 0) {
-        directCosts += vatCost;
-      }
 
       // Наценки: строки 8-15
       const markups = baseData
@@ -127,27 +123,15 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         '#52c41a', // Служба механизации
         '#faad14', // МБП+ГСМ
         '#722ed1', // Гарантийный период
-        '#fa8c16', // НДС (оранжевый)
       ];
 
-      // Создаем массив с цветами
+      // НДС уже включён в total_cost каждой строки (если isVatInConstructor)
       const items = directCostsData.map((d, idx) => ({
         label: d.indicator_name,
         value: d.total_cost || 0,
         color: colors[idx] || '#1890ff',
         originalIndex: idx,
       }));
-
-      // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 17);
-      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
-        items.push({
-          label: 'НДС',
-          value: vatRow.total_cost || 0,
-          color: colors[6],
-          originalIndex: -1, // Специальное значение для НДС
-        });
-      }
 
       // Сортируем по убыванию стоимости
       items.sort((a, b) => b.value - a.value);
@@ -466,7 +450,8 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         const costCategory = detailCategory?.cost_category;
         const categoryObj = Array.isArray(costCategory) ? costCategory[0] : costCategory;
 
-        const amount = item.total_amount || 0;
+        const vatMultiplier = (isVatInConstructor && vatCoefficient > 0) ? (1 + vatCoefficient / 100) : 1;
+        const amount = (item.total_amount || 0) * vatMultiplier;
         const isWork = item.boq_item_type === 'раб' || item.boq_item_type === 'суб-раб' || item.boq_item_type === 'раб-комп.';
 
         // Для строки 4 (запас на сдачу) группируем по виду затрат
@@ -543,72 +528,125 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
     }
   };
 
-  // Загрузка справочной информации
+  // Загрузка справочной информации (коммерческие стоимости из затрат на строительство)
   const fetchReferenceInfo = async () => {
     if (!selectedTenderId) return;
 
     try {
-      // Получаем все boq_items для текущего тендера с категориями затрат
-      const { data: boqItems, error } = await supabase
-        .from('boq_items')
-        .select(`
-          boq_item_type,
-          quantity,
-          total_amount,
-          detail_cost_category:detail_cost_categories(
-            id,
-            name,
-            cost_category:cost_categories(id, name)
-          ),
-          client_position:client_positions!inner(tender_id)
-        `)
-        .eq('client_position.tender_id', selectedTenderId);
+      // 1. Загружаем detail_cost_categories с именами категорий
+      const { data: categories, error: catError } = await supabase
+        .from('detail_cost_categories')
+        .select('id, cost_categories(name)');
 
-      if (error) throw error;
-      if (!boqItems || boqItems.length === 0) return;
+      if (catError) throw catError;
 
-      let monolithVolume = 0;
-      let monolithCost = 0;
-      let visVolume = 0;
-      let visCost = 0;
-      let facadeVolume = 0;
-      let facadeCost = 0;
+      // Маппинг detail_cost_category_id → cost_category name
+      const detailToCategoryName = new Map<string, string>();
+      (categories || []).forEach((cat: any) => {
+        const name = cat.cost_categories?.name || '';
+        if (name) detailToCategoryName.set(cat.id, name);
+      });
 
-      boqItems.forEach(item => {
-        const detailCategory = Array.isArray(item.detail_cost_category) ? item.detail_cost_category[0] : item.detail_cost_category;
-        const costCategory = detailCategory?.cost_category;
-        const categoryObj = Array.isArray(costCategory) ? costCategory[0] : costCategory;
-        const categoryName = categoryObj?.name || '';
+      // 2. Загружаем ВСЕ объёмы из construction_cost_volumes (и group, и detail)
+      const { data: volumes, error: volError } = await supabase
+        .from('construction_cost_volumes')
+        .select('detail_cost_category_id, group_key, volume')
+        .eq('tender_id', selectedTenderId);
 
-        const quantity = item.quantity || 0;
-        const totalAmount = item.total_amount || 0;
+      if (volError) throw volError;
 
-        // Монолитные работы (м³)
-        if (categoryName === 'МОНОЛИТ') {
-          monolithVolume += quantity;
-          monolithCost += totalAmount;
-        }
-        // ВИСы (м²) - три категории
-        else if (
-          categoryName === 'ВИС / Электрические системы' ||
-          categoryName === 'ВИС / Механические системы' ||
-          categoryName === 'ВИС / Слаботочные системы'
-        ) {
-          visVolume += quantity;
-          visCost += totalAmount;
-        }
-        // Фасады (м²)
-        else if (categoryName === 'ФАСАДНЫЕ РАБОТЫ') {
-          facadeVolume += quantity;
-          facadeCost += totalAmount;
+      const groupVolumes = new Map<string, number>();
+      const detailVolumes = new Map<string, number>();
+
+      (volumes || []).forEach((v: any) => {
+        if (v.group_key) {
+          groupVolumes.set(v.group_key, v.volume || 0);
+        } else if (v.detail_cost_category_id) {
+          detailVolumes.set(v.detail_cost_category_id, v.volume || 0);
         }
       });
 
-      setReferenceInfo({
-        monolithPerM3: monolithVolume > 0 ? monolithCost / monolithVolume : 0,
-        visPerM2: visVolume > 0 ? visCost / visVolume : 0,
-        facadePerM2: facadeVolume > 0 ? facadeCost / facadeVolume : 0,
-      });
+      // Агрегируем detail-level объёмы по категориям (фоллбэк если нет group volume)
+      const aggregatedVolumes = new Map<string, number>();
+      for (const [detailId, volume] of detailVolumes.entries()) {
+        const categoryName = detailToCategoryName.get(detailId);
+        if (categoryName) {
+          aggregatedVolumes.set(categoryName, (aggregatedVolumes.get(categoryName) || 0) + volume);
+        }
+      }
+
+      // Получаем объём категории: сначала group volume, иначе сумма detail volumes
+      const getCategoryVolume = (categoryName: string): number => {
+        const groupVol = groupVolumes.get(`category-${categoryName}`);
+        if (groupVol && groupVol > 0) return groupVol;
+        return aggregatedVolumes.get(categoryName) || 0;
+      };
+
+      // 3. Загружаем boq_items со стоимостями (батчинг)
+      const targetCategories = new Set([
+        'МОНОЛИТНЫЕ РАБОТЫ',
+        'ВИС / Механические инженерные системы',
+        'ВИС / Электрические системы',
+        'ВИС / Слаботочные системы, автоматика и диспетчеризация',
+        'ФАСАДНЫЕ РАБОТЫ',
+      ]);
+
+      // Коммерческие и базовые стоимости по категориям
+      const commercialCostByCategory = new Map<string, number>();
+      const baseCostByCategory = new Map<string, number>();
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('boq_items')
+          .select('detail_cost_category_id, total_amount, total_commercial_material_cost, total_commercial_work_cost, client_positions!inner(tender_id)')
+          .eq('client_positions.tender_id', selectedTenderId)
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          data.forEach((item: any) => {
+            const categoryName = detailToCategoryName.get(item.detail_cost_category_id) || '';
+            if (!targetCategories.has(categoryName)) return;
+
+            const commercialCost = (item.total_commercial_material_cost || 0) + (item.total_commercial_work_cost || 0);
+            commercialCostByCategory.set(categoryName, (commercialCostByCategory.get(categoryName) || 0) + commercialCost);
+
+            const baseCost = item.total_amount || 0;
+            baseCostByCategory.set(categoryName, (baseCostByCategory.get(categoryName) || 0) + baseCost);
+          });
+          from += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // 4. Рассчитываем цену за единицу КП
+      // Используем коммерческие стоимости, если они заполнены, иначе базовые
+      // Если НДС в конструкторе — умножаем стоимость на (1 + НДС%)
+      const refVatMultiplier = (isVatInConstructor && vatCoefficient > 0) ? (1 + vatCoefficient / 100) : 1;
+      const getCostPerUnit = (categoryName: string): number => {
+        const commercial = commercialCostByCategory.get(categoryName) || 0;
+        const base = baseCostByCategory.get(categoryName) || 0;
+        const cost = (commercial > 0 ? commercial : base) * refVatMultiplier;
+        const volume = getCategoryVolume(categoryName);
+        return volume > 0 ? cost / volume : 0;
+      };
+
+      const monolithPerM3 = getCostPerUnit('МОНОЛИТНЫЕ РАБОТЫ');
+
+      const visPerM2 =
+        getCostPerUnit('ВИС / Механические инженерные системы') +
+        getCostPerUnit('ВИС / Электрические системы') +
+        getCostPerUnit('ВИС / Слаботочные системы, автоматика и диспетчеризация');
+
+      const facadePerM2 = getCostPerUnit('ФАСАДНЫЕ РАБОТЫ');
+
+      setReferenceInfo({ monolithPerM3, visPerM2, facadePerM2 });
     } catch (error) {
       console.error('Ошибка загрузки справочной информации:', error);
     }
@@ -847,15 +885,9 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     if (currentLevel.type === 'root') {
       // Корневой уровень: Прямые затраты и Наценки
-      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
+      // НДС уже включён в total_cost каждой строки (если isVatInConstructor)
+      const directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
-
-      // Если НДС в конструкторе, добавляем его к прямым затратам
-      const vatRow = data.find(d => d.row_number === 17);
-      const vatCost = vatRow?.total_cost || 0;
-      if (isVatInConstructor && vatCost > 0) {
-        directCosts += vatCost;
-      }
 
       const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 8 && d.row_number <= 15)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
@@ -879,24 +911,14 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         'rgba(82, 196, 26, 0.6)',   // Служба механизации
         'rgba(250, 173, 20, 0.6)',  // МБП+ГСМ
         'rgba(114, 46, 209, 0.6)',  // Гарантийный период
-        'rgba(250, 140, 22, 0.6)',  // НДС (оранжевый)
       ];
 
+      // НДС уже включён в total_cost каждой строки (если isVatInConstructor)
       barItems = directCostsData.map((d, idx) => ({
         label: d.indicator_name,
         cost: d.total_cost || 0,
         color: colors[idx] || 'rgba(24, 144, 255, 0.6)',
       }));
-
-      // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 17);
-      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
-        barItems.push({
-          label: 'НДС',
-          cost: vatRow.total_cost || 0,
-          color: colors[5],
-        });
-      }
 
       barItems.sort((a, b) => b.cost - a.cost); // Сортируем по убыванию стоимости
     } else if (currentLevel.type === 'markups') {
@@ -1108,15 +1130,9 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
 
     if (currentLevel.type === 'root') {
       // Корневой уровень: показываем Прямые затраты и Наценки
-      let directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
+      // НДС уже включён в total_cost каждой строки (если isVatInConstructor)
+      const directCosts = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 2 && d.row_number <= 7)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
-
-      // Если НДС в конструкторе, добавляем его к прямым затратам
-      const vatRow = data.find(d => d.row_number === 17);
-      const vatCost = vatRow?.total_cost || 0;
-      if (isVatInConstructor && vatCost > 0) {
-        directCosts += vatCost;
-      }
 
       const markups = data.filter(d => !d.is_header && !d.is_total && d.row_number >= 8 && d.row_number <= 15)
         .reduce((sum, d) => sum + (d.total_cost || 0), 0);
@@ -1146,17 +1162,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
           price_per_m2: totalAreaM2 > 0 ? (d.total_cost || 0) / totalAreaM2 : 0,
         }));
 
-      // Если НДС в конструкторе, добавляем его как отдельный элемент
-      const vatRow = data.find(d => d.row_number === 17);
-      if (isVatInConstructor && vatRow && (vatRow.total_cost || 0) > 0) {
-        items.push({
-          key: items.length,
-          indicator_name: 'НДС',
-          amount: vatRow.total_cost || 0,
-          price_per_m2: totalAreaM2 > 0 ? (vatRow.total_cost || 0) / totalAreaM2 : 0,
-        });
-      }
-
+      // НДС уже включён в total_cost каждой строки (если isVatInConstructor)
       return items.sort((a, b) => b.amount - a.amount);
     } else if (currentLevel.type === 'markups') {
       // Детализация наценок

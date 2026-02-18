@@ -43,6 +43,7 @@ export const useFinancialCalculations = () => {
   const [spTotal, setSpTotal] = useState<number>(0);
   const [customerTotal, setCustomerTotal] = useState<number>(0);
   const [isVatInConstructor, setIsVatInConstructor] = useState<boolean>(false);
+  const [vatCoefficient, setVatCoefficient] = useState<number>(0);
 
   const fetchFinancialIndicators = useCallback(async (selectedTenderId: string | null) => {
     if (!selectedTenderId) return;
@@ -80,6 +81,7 @@ export const useFinancialCalculations = () => {
 
       // Извлечение ключей параметров из JSONB поля sequences тактики наценок
       const sequenceParameterKeys = new Set<string>();
+      const sequenceNumberValues = new Set<number>();
       if (tactic?.sequences) {
         console.log('=== Извлечение параметров из sequences ===');
         console.log('Загружена тактика наценок:', tactic.name);
@@ -89,14 +91,14 @@ export const useFinancialCalculations = () => {
         Object.values(tactic.sequences).forEach((sequenceArray: any) => {
           if (Array.isArray(sequenceArray)) {
             sequenceArray.forEach((step: any) => {
-              // Проверяем все возможные operandXKey (от 1 до 5)
               for (let i = 1; i <= 5; i++) {
                 const keyField = `operand${i}Key`;
                 const typeField = `operand${i}Type`;
 
-                // Добавляем ключ только если это параметр наценки (не 'step' и не 'number')
                 if (step[typeField] === 'markup' && step[keyField]) {
                   sequenceParameterKeys.add(step[keyField]);
+                } else if (step[typeField] === 'number' && step[keyField]) {
+                  sequenceNumberValues.add(parseFloat(step[keyField]));
                 }
               }
             });
@@ -104,6 +106,7 @@ export const useFinancialCalculations = () => {
         });
 
         console.log('Извлечено ключей параметров из sequences:', Array.from(sequenceParameterKeys));
+        console.log('Числовые значения в sequences:', Array.from(sequenceNumberValues));
       }
 
       const { data: tenderMarkupPercentages, error: percentagesError } = await supabase
@@ -343,10 +346,6 @@ export const useFinancialCalculations = () => {
         p.label.toLowerCase().includes('ндс')
       );
 
-      // Проверка, входит ли НДС в конструктор тактики наценок
-      const isVatInConstructor = vatParam ? sequenceParameterIds.has(vatParam.id) : false;
-      setIsVatInConstructor(isVatInConstructor);
-
       // Получение коэффициентов
       const mechanizationCoeff = mechanizationParam
         ? (percentagesMap.get(mechanizationParam.id) ?? mechanizationParam.default_value)
@@ -407,50 +406,21 @@ export const useFinancialCalculations = () => {
       const vatCoeff = vatParam
         ? (percentagesMap.get(vatParam.id) ?? vatParam.default_value)
         : 0;
+      setVatCoefficient(vatCoeff);
 
-      // Коррекция прямых затрат при наличии НДС в конструкторе наценок
-      // Если НДС есть в конструкторе, прямые затраты из BOQ включают НДС
-      // Необходимо разделить на (1 + НДС%) чтобы получить базу без НДС
-      if (isVatInConstructor && vatCoeff > 0) {
-        const vatDivisor = 1 + (vatCoeff / 100);
-
-        console.log('=== Коррекция прямых затрат (вычет НДС из ПЗ) ===');
-        console.log('НДС в конструкторе:', isVatInConstructor);
-        console.log('НДС коэффициент:', vatCoeff);
-        console.log('Делитель (1 + НДС%):', vatDivisor);
-        console.log('Прямые затраты ДО коррекции:');
-        console.log('  Субподряд работы:', subcontractWorks);
-        console.log('  Субподряд материалы:', subcontractMaterials);
-        console.log('  Работы СУ-10:', works);
-        console.log('  Материалы СУ-10:', materials);
-        console.log('  Работы комп.:', worksComp);
-        console.log('  Материалы комп.:', materialsComp);
-        console.log('  Субподряд работы для роста:', subcontractWorksForGrowth);
-        console.log('  Субподряд материалы для роста:', subcontractMaterialsForGrowth);
-
-        // Корректируем все компоненты прямых затрат
-        subcontractWorks = subcontractWorks / vatDivisor;
-        subcontractMaterials = subcontractMaterials / vatDivisor;
-        subcontractWorksForGrowth = subcontractWorksForGrowth / vatDivisor;
-        subcontractMaterialsForGrowth = subcontractMaterialsForGrowth / vatDivisor;
-        works = works / vatDivisor;
-        materials = materials / vatDivisor;
-        materialsComp = materialsComp / vatDivisor;
-        worksComp = worksComp / vatDivisor;
-
-        console.log('Прямые затраты ПОСЛЕ коррекции:');
-        console.log('  Субподряд работы:', subcontractWorks);
-        console.log('  Субподряд материалы:', subcontractMaterials);
-        console.log('  Работы СУ-10:', works);
-        console.log('  Материалы СУ-10:', materials);
-        console.log('  Работы комп.:', worksComp);
-        console.log('  Материалы комп.:', materialsComp);
-        console.log('  Субподряд работы для роста:', subcontractWorksForGrowth);
-        console.log('  Субподряд материалы для роста:', subcontractMaterialsForGrowth);
-        console.log('=================================================');
+      // Проверка, входит ли НДС в конструктор тактики наценок
+      // НДС может быть: 1) как ключ параметра 'nds_22' в sequences, или
+      // 2) как числовой множитель (1 + vatCoeff/100) в шагах sequences
+      let isVatInConstructor = sequenceParameterKeys.has('nds_22');
+      if (!isVatInConstructor && vatCoeff > 0) {
+        const expectedVatMultiplier = 1 + vatCoeff / 100;
+        isVatInConstructor = [...sequenceNumberValues].some(
+          v => Math.abs(v - expectedVatMultiplier) < 0.001
+        );
       }
+      setIsVatInConstructor(isVatInConstructor);
 
-      // Итоговые значения прямых затрат после возможной коррекции НДС
+      // Итоговые значения прямых затрат (без коррекции — total_amount в BOQ это базовая стоимость)
       const subcontractTotal = subcontractWorks + subcontractMaterials;
       const su10Total = works + materials; // Без comp-элементов
       const reserveForDeliveryTotal = materialsComp + worksComp; // Запас на сдачу объекта
@@ -827,6 +797,19 @@ export const useFinancialCalculations = () => {
         },
       ];
 
+      // Если НДС в конструкторе — умножаем каждую строку (1-15) на (1 + НДС%)
+      // Строка 16 (ИТОГО) уже включает НДС (grandTotal), строка 17 — справочная
+      if (isVatInConstructor && vatCoeff > 0) {
+        const vatMultiplier = 1 + vatCoeff / 100;
+        tableData.forEach(row => {
+          if (row.row_number >= 1 && row.row_number <= 15) {
+            row.total_cost = (row.total_cost || 0) * vatMultiplier;
+            row.sp_cost = (row.sp_cost || 0) * vatMultiplier;
+            row.customer_cost = (row.customer_cost || 0) * vatMultiplier;
+          }
+        });
+      }
+
       setData(tableData);
       setSpTotal(areaSp);
       setCustomerTotal(areaClient);
@@ -848,6 +831,7 @@ export const useFinancialCalculations = () => {
     customerTotal,
     loading,
     isVatInConstructor,
+    vatCoefficient,
     fetchFinancialIndicators,
   };
 };
