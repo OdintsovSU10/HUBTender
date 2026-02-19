@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
+import { Tag } from 'antd';
 import type { TenderRegistryWithRelations } from '../../../lib/supabase';
 import { getStatusDotColor, formatArea } from '../utils/design';
+
+const SCOPE_COLOR_MAP: Record<string, string> = {
+  'генподряд': 'orange',
+  'коробка': 'lime',
+  'монолит': 'blue',
+  'монолит подземной части': 'red',
+  'монолит+нулевой цикл': 'purple',
+};
 import dayjs from 'dayjs';
 
 // Цветовые схемы для темной и светлой темы
@@ -139,14 +148,13 @@ export const TenderGridRow: React.FC<TenderGridRowProps> = ({
       </div>
 
       {/* Объем строительства */}
-      <div
-        style={{
-          fontSize: 11,
-          color: colors.mutedText,
-          textAlign: 'center',
-        }}
-      >
-        {(tender.construction_scope as any)?.name || '—'}
+      <div style={{ textAlign: 'center' }}>
+        {(() => {
+          const scopeName = (tender.construction_scope as any)?.name;
+          if (!scopeName) return <span style={{ fontSize: 11, color: colors.mutedText }}>—</span>;
+          const color = SCOPE_COLOR_MAP[scopeName.toLowerCase()] || 'default';
+          return <Tag color={color} style={{ margin: 0, fontSize: 11 }}>{scopeName}</Tag>;
+        })()}
       </div>
 
       {/* Общая стоимость */}

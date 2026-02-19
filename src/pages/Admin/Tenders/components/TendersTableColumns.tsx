@@ -64,13 +64,15 @@ export const getTendersTableColumns = (params: GetColumnsParams): ColumnsType<Te
         if (!constructionScope) return <Text type="secondary">—</Text>;
 
         const colorMap: Record<string, string> = {
-          'генподряд': 'cyan',
-          'коробка': 'orange',
-          'монолит': 'red',
+          'генподряд': 'orange',
+          'коробка': 'lime',
+          'монолит': 'blue',
+          'монолит подземной части': 'red',
+          'монолит+нулевой цикл': 'purple',
         };
 
         return (
-          <Tag color={colorMap[constructionScope] || 'default'} style={{ margin: 0 }}>
+          <Tag color={colorMap[constructionScope.toLowerCase()] || 'default'} style={{ margin: 0 }}>
             {constructionScope}
           </Tag>
         );
