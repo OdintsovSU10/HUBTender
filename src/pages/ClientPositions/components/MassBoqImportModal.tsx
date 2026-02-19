@@ -414,8 +414,37 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
                         />
                       }
                       type="error"
+                      style={{ marginBottom: 8 }}
                     />
                   )}
+
+                  {/* Прочие ошибки (отсутствующие поля, неверные типы, ошибки привязки) */}
+                  {(() => {
+                    const otherErrors = validationResult.errors.filter(
+                      e => !['position_not_found', 'missing_nomenclature', 'missing_cost'].includes(e.type)
+                    );
+                    if (otherErrors.length === 0) return null;
+                    return (
+                      <Alert
+                        message={`Прочие ошибки (${otherErrors.length})`}
+                        description={
+                          <List
+                            size="small"
+                            dataSource={otherErrors.slice(0, 50)}
+                            renderItem={item => (
+                              <List.Item>
+                                <Text type="danger">
+                                  Строка {item.rowIndex}: {item.message}
+                                </Text>
+                              </List.Item>
+                            )}
+                            footer={otherErrors.length > 50 ? <Text type="secondary">...и ещё {otherErrors.length - 50} ошибок</Text> : undefined}
+                          />
+                        }
+                        type="error"
+                      />
+                    );
+                  })()}
                 </Panel>
               </Collapse>
             )}
