@@ -2,235 +2,20 @@ import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { message } from 'antd';
 import { supabase } from '../../../lib/supabase';
-
-// ===========================
-// ТИПЫ И ИНТЕРФЕЙСЫ
-// ===========================
-
-interface ParsedBoqItem {
-  rowIndex: number;
-
-  // Идентификация позиции
-  positionNumber: string;
-  matchedPositionId?: string;
-
-  // Основные поля
-  boq_item_type: 'раб' | 'суб-раб' | 'раб-комп.' | 'мат' | 'суб-мат' | 'мат-комп.';
-  material_type?: 'основн.' | 'вспомогат.';
-
-  // Наименование (для поиска в номенклатуре)
-  nameText: string;
-  unit_code: string;
-
-  // Найденные ID из номенклатуры
-  work_name_id?: string;
-  material_name_id?: string;
-
-  // Привязка к работе
-  bindToWork: boolean;
-  parent_work_item_id?: string;
-  tempId?: string;
-
-  // Количество и коэффициенты
-  base_quantity?: number;
-  quantity?: number;
-  conversion_coefficient?: number;
-  consumption_coefficient?: number;
-
-  // Финансовые поля
-  currency_type: 'RUB' | 'USD' | 'EUR' | 'CNY';
-  delivery_price_type?: 'в цене' | 'не в цене' | 'суммой';
-  delivery_amount?: number;
-  unit_rate?: number;
-
-  // Затрата на строительство
-  costCategoryText: string;
-  detail_cost_category_id?: string;
-
-  // Дополнительно
-  quote_link?: string;
-  description?: string;
-
-  // Сортировка
-  sort_number: number;
-}
-
-// Данные для обновления позиции заказчика
-interface PositionUpdateData {
-  positionNumber: string;
-  positionId?: string;
-  manualVolume?: number;
-  manualNote?: string;
-  itemsCount: number;
-}
-
-interface ValidationError {
-  rowIndex: number;
-  type: 'missing_nomenclature' | 'unit_mismatch' | 'missing_cost' | 'invalid_type' | 'missing_field' | 'binding_error' | 'position_not_found';
-  field: string;
-  message: string;
-  severity: 'error' | 'warning';
-}
-
-interface MissingNomenclatureGroup {
-  name: string;
-  unit: string;
-  rows: number[];
-}
-
-interface ValidationResult {
-  isValid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationError[];
-  missingNomenclature: {
-    works: MissingNomenclatureGroup[];
-    materials: MissingNomenclatureGroup[];
-  };
-  unknownCosts: Array<{ text: string; rows: number[] }>;
-  unmatchedPositions: Array<{ positionNumber: string; rows: number[] }>;
-}
-
-interface ClientPosition {
-  id: string;
-  position_number: number;
-  work_name: string;
-}
-
-// ===========================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ===========================
-
-const isWork = (type: string): boolean => {
-  return ['раб', 'суб-раб', 'раб-комп.'].includes(type);
-};
-
-const isMaterial = (type: string): boolean => {
-  return ['мат', 'суб-мат', 'мат-комп.'].includes(type);
-};
-
-const normalizeString = (str: string): string => {
-  return str.trim().replace(/\s+/g, ' ');
-};
-
-const parseNumber = (value: any): number | undefined => {
-  if (value === null || value === undefined || value === '') return undefined;
-  const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-  return isNaN(num) ? undefined : num;
-};
-
-const parseBoolean = (value: any): boolean => {
-  if (!value) return false;
-  const str = String(value).toLowerCase().trim();
-  return str === 'да' || str === 'yes' || str === 'true' || str === '1';
-};
-
-// Нормализация номера позиции для сравнения
-const normalizePositionNumber = (value: any): string => {
-  if (value === null || value === undefined || value === '') return '';
-
-  // Приводим к строке и убираем пробелы
-  let str = String(value).trim();
-
-  // Парсим как число и обратно в строку для нормализации (5.0 -> 5, 5.10 -> 5.1)
-  const num = parseFloat(str);
-  if (!isNaN(num)) {
-    // Если это целое число, возвращаем без дробной части
-    if (Number.isInteger(num)) {
-      return String(Math.floor(num));
-    }
-    // Иначе убираем лишние нули в конце
-    return String(num);
-  }
-
-  return str;
-};
-
-// Нормализация типа материала
-const normalizeMaterialType = (value: string | undefined): 'основн.' | 'вспомогат.' | undefined => {
-  if (!value) return undefined;
-
-  const original = String(value).trim();
-  const normalized = original.toLowerCase().replace(/\s+/g, '').replace(/\.$/, '');
-
-  if (normalized === 'основной' || normalized === 'основн' || normalized === 'осн') {
-    return 'основн.';
-  }
-  if (normalized === 'вспомогательный' || normalized === 'вспомогат' || normalized === 'вспом') {
-    return 'вспомогат.';
-  }
-  if (original === 'основн.' || original === 'вспомогат.') {
-    return original as 'основн.' | 'вспомогат.';
-  }
-
-  return undefined;
-};
-
-// Нормализация типа доставки
-const normalizeDeliveryPriceType = (value: string | undefined): 'в цене' | 'не в цене' | 'суммой' | undefined => {
-  if (!value) return undefined;
-
-  const original = String(value).trim();
-  const normalized = original.toLowerCase().replace(/\s+/g, ' ');
-
-  if (normalized === 'в цене' || normalized === 'вцене' || normalized === 'входит') {
-    return 'в цене';
-  }
-  if (normalized === 'не в цене' || normalized === 'невцене' || normalized === 'не входит' || normalized === 'невходит') {
-    return 'не в цене';
-  }
-  if (normalized === 'суммой' || normalized === 'доп. стоимость' || normalized === 'доп стоимость' || normalized === 'дополнительно') {
-    return 'суммой';
-  }
-  if (original === 'в цене' || original === 'не в цене' || original === 'суммой') {
-    return original as 'в цене' | 'не в цене' | 'суммой';
-  }
-
-  return undefined;
-};
-
-// Поиск ID затраты с fallback для многоуровневых названий со слэшами
-// В БД cost_categories.name и detail_cost_categories.name могут содержать слэши.
-// Например: category="ВИС / Слаботочные системы", detail="Пожарная сигнализация", location="Здание"
-// Пробуем все возможные комбинации разбиения строки на category/detail/location.
-const findCostCategoryId = (
-  text: string,
-  costCategoriesMap: Map<string, string>
-): string | undefined => {
-  if (!text) return undefined;
-
-  const parts = text.split(' / ').map(p => p.trim()).filter(p => p);
-  if (parts.length < 2) return undefined;
-
-  // Пробуем все возможные комбинации разбиения на category, detail, location
-  // categoryParts: сколько частей отдаём на category (минимум 1)
-  // locationParts: сколько частей отдаём на location (0 = пустая, или 1+)
-  // Остальное уходит в detail
-  for (let categoryParts = 1; categoryParts < parts.length; categoryParts++) {
-    const category = normalizeString(parts.slice(0, categoryParts).join(' / '));
-
-    // Вариант 1: location = последняя часть (или несколько частей)
-    for (let locationParts = 1; locationParts <= parts.length - categoryParts; locationParts++) {
-      const location = normalizeString(parts.slice(parts.length - locationParts).join(' / '));
-      const detail = normalizeString(parts.slice(categoryParts, parts.length - locationParts).join(' / '));
-
-      if (!detail) continue;
-
-      const key = `${category}|${detail}|${location}`;
-      const costId = costCategoriesMap.get(key);
-      if (costId) return costId;
-    }
-
-    // Вариант 2: пустая location (всё после category = detail)
-    const fullDetail = normalizeString(parts.slice(categoryParts).join(' / '));
-    if (fullDetail) {
-      const keyEmptyLocation = `${category}|${fullDetail}|`;
-      const costIdEmptyLocation = costCategoriesMap.get(keyEmptyLocation);
-      if (costIdEmptyLocation) return costIdEmptyLocation;
-    }
-  }
-
-  return undefined;
-};
+import {
+  ParsedBoqItem,
+  PositionUpdateData,
+  ValidationResult,
+  ClientPosition,
+  isWork,
+  isMaterial,
+  normalizeString,
+  normalizePositionNumber,
+  parseExcelData,
+  validateBoqData,
+  processWorkBindings,
+  calculateTotalAmount,
+} from '../utils';
 
 // ===========================
 // ОСНОВНОЙ ХУК
@@ -258,7 +43,6 @@ export const useMassBoqImport = () => {
 
   const loadNomenclature = async (tenderId: string) => {
     try {
-      // Параллельная загрузка всех справочников
       const [worksResult, materialsResult, costsResult, positionsResult] = await Promise.all([
         supabase.from('work_names').select('id, name, unit').order('name'),
         supabase.from('material_names').select('id, name, unit').order('name'),
@@ -277,34 +61,29 @@ export const useMassBoqImport = () => {
       if (costsResult.error) throw costsResult.error;
       if (positionsResult.error) throw positionsResult.error;
 
-      // Создание Map для работ
       const worksMap = new Map<string, string>();
       worksResult.data?.forEach((w: any) => {
-        const key = `${normalizeString(w.name)}|${w.unit}`;
-        worksMap.set(key, w.id);
+        worksMap.set(`${normalizeString(w.name)}|${w.unit}`, w.id);
       });
 
-      // Создание Map для материалов
       const materialsMap = new Map<string, string>();
       materialsResult.data?.forEach((m: any) => {
-        const key = `${normalizeString(m.name)}|${m.unit}`;
-        materialsMap.set(key, m.id);
+        materialsMap.set(`${normalizeString(m.name)}|${m.unit}`, m.id);
       });
 
-      // Создание Map для затрат
       const costsMap = new Map<string, string>();
       costsResult.data?.forEach((c: any) => {
         const costCategoryName = c.cost_categories?.name || '';
-        const key = `${normalizeString(costCategoryName)}|${normalizeString(c.name)}|${normalizeString(c.location)}`;
-        costsMap.set(key, c.id);
+        costsMap.set(
+          `${normalizeString(costCategoryName)}|${normalizeString(c.name)}|${normalizeString(c.location)}`,
+          c.id
+        );
       });
 
-      // Логирование затрат с "ВИС" для отладки
       console.log('[MassBoqImport] Затраты ВИС в БД:',
         Array.from(costsMap.keys()).filter(k => k.toLowerCase().startsWith('вис')).slice(0, 30)
       );
 
-      // Создание Map для позиций заказчика (ключ - нормализованный номер позиции)
       const positionsMap = new Map<string, ClientPosition>();
       positionsResult.data?.forEach((p: any) => {
         const normalizedNum = normalizePositionNumber(p.position_number);
@@ -315,7 +94,6 @@ export const useMassBoqImport = () => {
         });
       });
 
-      // Логирование позиций для отладки
       console.log('[MassBoqImport] Первые 20 позиций в БД:',
         Array.from(positionsMap.entries()).slice(0, 20).map(([key, val]) =>
           `${key} (raw: ${val.position_number})`
@@ -356,142 +134,24 @@ export const useMassBoqImport = () => {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1 });
 
-          // Пропускаем заголовок
           const rows = jsonData.slice(1);
-
-          const parsed: ParsedBoqItem[] = [];
-          const posUpdates = new Map<string, PositionUpdateData>();
-
-          // Допустимые типы BOQ элементов
-          const validBoqTypes = ['раб', 'суб-раб', 'раб-комп.', 'мат', 'суб-мат', 'мат-комп.'];
-
-          // Текущий номер позиции (наследуется от родительской строки)
-          let currentPositionNumber = '';
-
-          rows.forEach((row: unknown, index: number) => {
-            if (!Array.isArray(row)) return;
-
-            const hasData = row.some(cell => cell !== undefined && cell !== null && cell !== '');
-            if (!hasData) return;
-
-            const cells = row as any[];
-            const rowNum = index + 2;
-
-            // Номер позиции из колонки 1 (вторая колонка в Excel)
-            const rowPositionNumber = normalizePositionNumber(cells[1]);
-
-            // Тип элемента BOQ из колонки 4
-            const boqType = cells[4] ? String(cells[4]).trim() : '';
-            const isValidBoqType = validBoqTypes.includes(boqType);
-
-            // Если есть номер позиции - это строка заголовка позиции
-            // Запоминаем номер позиции для последующих строк BOQ
-            if (rowPositionNumber) {
-              currentPositionNumber = rowPositionNumber;
-
-              // Создаем/обновляем данные позиции
-              const existing = posUpdates.get(currentPositionNumber) || {
-                positionNumber: currentPositionNumber,
-                itemsCount: 0,
-              };
-
-              // Количество ГП из колонки 8 (индекс 8)
-              const manualVolume = parseNumber(cells[8]);
-              if (manualVolume !== undefined) {
-                existing.manualVolume = manualVolume;
-              }
-
-              // Примечание ГП из колонки 19 (индекс 19)
-              const manualNote = cells[19] ? String(cells[19]).trim() : undefined;
-              if (manualNote) {
-                existing.manualNote = manualNote;
-              }
-
-              posUpdates.set(currentPositionNumber, existing);
-
-              // Если это строка-заголовок без типа BOQ - пропускаем её как элемент BOQ
-              if (!isValidBoqType) {
-                return;
-              }
-            }
-
-            // Пропускаем строки без валидного типа BOQ
-            if (!isValidBoqType) {
-              return;
-            }
-
-            // Используем унаследованный номер позиции
-            const effectivePositionNumber = rowPositionNumber || currentPositionNumber;
-
-            if (!effectivePositionNumber) {
-              console.warn(`[MassBoqImport] Строка ${rowNum}: пропущена - нет номера позиции`);
-              return;
-            }
-
-            // Парсинг элемента BOQ
-            const item: ParsedBoqItem = {
-              rowIndex: rowNum,
-              positionNumber: effectivePositionNumber,
-
-              boq_item_type: boqType as any,
-              material_type: normalizeMaterialType(cells[5]),
-              nameText: cells[6] ? normalizeString(String(cells[6])) : '',
-              unit_code: cells[7] ? String(cells[7]).trim() : '',
-
-              bindToWork: parseBoolean(cells[3]),
-
-              conversion_coefficient: parseNumber(cells[9]),
-              consumption_coefficient: parseNumber(cells[10]),
-              base_quantity: parseNumber(cells[11]),
-              quantity: parseNumber(cells[11]),
-
-              currency_type: cells[12] ? String(cells[12]).trim() as any : 'RUB',
-              delivery_price_type: normalizeDeliveryPriceType(cells[13]),
-              delivery_amount: parseNumber(cells[14]),
-              unit_rate: parseNumber(cells[15]),
-
-              costCategoryText: cells[2] ? String(cells[2]).trim() : '',
-
-              quote_link: cells[17] ? String(cells[17]).trim() : undefined,
-              description: cells[19] ? String(cells[19]).trim() : undefined,
-
-              sort_number: index,
-            };
-
-            parsed.push(item);
-
-            // Обновляем счетчик элементов для позиции
-            const existing = posUpdates.get(effectivePositionNumber) || {
-              positionNumber: effectivePositionNumber,
-              itemsCount: 0,
-            };
-            existing.itemsCount++;
-            posUpdates.set(effectivePositionNumber, existing);
-          });
+          const { parsed, posUpdates } = parseExcelData(rows);
 
           setParsedData(parsed);
           setPositionUpdates(posUpdates);
 
-          console.log('=== ПАРСИНГ EXCEL (МАССОВЫЙ) ЗАВЕРШЁН ===');
-          console.log(`Всего элементов BOQ: ${parsed.length}`);
-          console.log(`Уникальных позиций: ${posUpdates.size}`);
+          const positionOnlyCount = Array.from(posUpdates.values()).filter(
+            p => p.itemsCount === 0 && (p.manualVolume !== undefined || p.manualNote !== undefined)
+          ).length;
 
-          // Логирование первых 10 строк для отладки
-          console.log('[MassBoqImport] Первые 10 строк из Excel:');
-          rows.slice(0, 10).forEach((row: any, idx: number) => {
-            const cells = row as any[];
-            console.log(`  Строка ${idx + 2}: col1="${cells[1]}", col4="${cells[4]}", col6="${cells[6]?.toString().substring(0, 30)}..."`);
-          });
-
-          // Группировка по позициям для отладки
-          const byPosition = new Map<string, number>();
-          parsed.forEach(item => {
-            const count = byPosition.get(item.positionNumber) || 0;
-            byPosition.set(item.positionNumber, count + 1);
-          });
-          console.log('Элементов по позициям:', Object.fromEntries(byPosition));
-
-          message.success(`Файл обработан: ${parsed.length} элементов BOQ в ${posUpdates.size} позициях`);
+          const parts: string[] = [];
+          if (parsed.length > 0) {
+            parts.push(`${parsed.length} элементов BOQ`);
+          }
+          if (positionOnlyCount > 0) {
+            parts.push(`${positionOnlyCount} позиций с данными ГП`);
+          }
+          message.success(`Файл обработан: ${parts.join(', ')} в ${posUpdates.size} позициях`);
           resolve(true);
         } catch (error) {
           console.error('Ошибка парсинга Excel:', error);
@@ -510,309 +170,23 @@ export const useMassBoqImport = () => {
   };
 
   // ===========================
-  // ВАЛИДАЦИЯ
+  // ВАЛИДАЦИЯ (обёртка)
   // ===========================
 
   const validateParsedData = (data: ParsedBoqItem[]): ValidationResult => {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationError[] = [];
-    const missingWorksMap = new Map<string, MissingNomenclatureGroup>();
-    const missingMaterialsMap = new Map<string, MissingNomenclatureGroup>();
-    const unknownCostsMap = new Map<string, number[]>();
-    const unmatchedPositionsMap = new Map<string, number[]>();
-
-    const validBoqTypes = ['раб', 'суб-раб', 'раб-комп.', 'мат', 'суб-мат', 'мат-комп.'];
-    const validMaterialTypes = ['основн.', 'вспомогат.'];
-    const validCurrencies = ['RUB', 'USD', 'EUR', 'CNY'];
-    const validDeliveryTypes = ['в цене', 'не в цене', 'суммой'];
-
-    data.forEach((item) => {
-      const row = item.rowIndex;
-
-      // 1. Проверка номера позиции и сопоставление
-      if (!item.positionNumber) {
-        errors.push({
-          rowIndex: row,
-          type: 'missing_field',
-          field: 'positionNumber',
-          message: 'Отсутствует номер позиции',
-          severity: 'error',
-        });
-      } else {
-        const position = clientPositionsMap.get(item.positionNumber);
-        if (!position) {
-          // Группируем несопоставленные позиции
-          if (!unmatchedPositionsMap.has(item.positionNumber)) {
-            unmatchedPositionsMap.set(item.positionNumber, []);
-          }
-          unmatchedPositionsMap.get(item.positionNumber)!.push(row);
-
-          errors.push({
-            rowIndex: row,
-            type: 'position_not_found',
-            field: 'positionNumber',
-            message: `Позиция "${item.positionNumber}" не найдена в тендере`,
-            severity: 'error',
-          });
-        } else {
-          item.matchedPositionId = position.id;
-        }
-      }
-
-      // 2. Проверка обязательных полей
-      if (!item.nameText) {
-        errors.push({
-          rowIndex: row,
-          type: 'missing_field',
-          field: 'nameText',
-          message: 'Отсутствует наименование',
-          severity: 'error',
-        });
-      }
-
-      if (!item.unit_code) {
-        errors.push({
-          rowIndex: row,
-          type: 'missing_field',
-          field: 'unit_code',
-          message: 'Отсутствует единица измерения',
-          severity: 'error',
-        });
-      }
-
-      if (!item.costCategoryText || item.costCategoryText.trim() === '') {
-        errors.push({
-          rowIndex: row,
-          type: 'missing_field',
-          field: 'costCategoryText',
-          message: 'Отсутствует затрата на строительство',
-          severity: 'error',
-        });
-      }
-
-      // 3. Проверка типов
-      if (!validBoqTypes.includes(item.boq_item_type)) {
-        errors.push({
-          rowIndex: row,
-          type: 'invalid_type',
-          field: 'boq_item_type',
-          message: `Недопустимый тип элемента: "${item.boq_item_type}"`,
-          severity: 'error',
-        });
-      }
-
-      if (isMaterial(item.boq_item_type) && item.material_type && !validMaterialTypes.includes(item.material_type)) {
-        errors.push({
-          rowIndex: row,
-          type: 'invalid_type',
-          field: 'material_type',
-          message: `Недопустимый тип материала: "${item.material_type}"`,
-          severity: 'error',
-        });
-      }
-
-      if (!validCurrencies.includes(item.currency_type)) {
-        errors.push({
-          rowIndex: row,
-          type: 'invalid_type',
-          field: 'currency_type',
-          message: `Недопустимая валюта: "${item.currency_type}"`,
-          severity: 'error',
-        });
-      }
-
-      if (item.delivery_price_type && !validDeliveryTypes.includes(item.delivery_price_type)) {
-        errors.push({
-          rowIndex: row,
-          type: 'invalid_type',
-          field: 'delivery_price_type',
-          message: `Недопустимый тип доставки: "${item.delivery_price_type}"`,
-          severity: 'error',
-        });
-      }
-
-      // 4. Проверка номенклатуры
-      if (isWork(item.boq_item_type)) {
-        const key = `${normalizeString(item.nameText)}|${item.unit_code}`;
-        const workId = workNamesMap.get(key);
-
-        if (!workId) {
-          errors.push({
-            rowIndex: row,
-            type: 'missing_nomenclature',
-            field: 'work_name',
-            message: `Работа "${item.nameText}" [${item.unit_code}] отсутствует в номенклатуре`,
-            severity: 'error',
-          });
-
-          const groupKey = `${item.nameText}|${item.unit_code}`;
-          if (!missingWorksMap.has(groupKey)) {
-            missingWorksMap.set(groupKey, { name: item.nameText, unit: item.unit_code, rows: [] });
-          }
-          missingWorksMap.get(groupKey)!.rows.push(row);
-        } else {
-          item.work_name_id = workId;
-        }
-      }
-
-      if (isMaterial(item.boq_item_type)) {
-        const key = `${normalizeString(item.nameText)}|${item.unit_code}`;
-        const materialId = materialNamesMap.get(key);
-
-        if (!materialId) {
-          errors.push({
-            rowIndex: row,
-            type: 'missing_nomenclature',
-            field: 'material_name',
-            message: `Материал "${item.nameText}" [${item.unit_code}] отсутствует в номенклатуре`,
-            severity: 'error',
-          });
-
-          const groupKey = `${item.nameText}|${item.unit_code}`;
-          if (!missingMaterialsMap.has(groupKey)) {
-            missingMaterialsMap.set(groupKey, { name: item.nameText, unit: item.unit_code, rows: [] });
-          }
-          missingMaterialsMap.get(groupKey)!.rows.push(row);
-        } else {
-          item.material_name_id = materialId;
-        }
-      }
-
-      // 5. Проверка затраты на строительство (с поддержкой многоуровневых названий со слэшами)
-      if (item.costCategoryText) {
-        const costId = findCostCategoryId(item.costCategoryText, costCategoriesMap);
-
-        if (!costId) {
-          errors.push({
-            rowIndex: row,
-            type: 'missing_cost',
-            field: 'detail_cost_category_id',
-            message: `Затрата "${item.costCategoryText}" не найдена в БД`,
-            severity: 'error',
-          });
-
-          if (!unknownCostsMap.has(item.costCategoryText)) {
-            unknownCostsMap.set(item.costCategoryText, []);
-          }
-          unknownCostsMap.get(item.costCategoryText)!.push(row);
-        } else {
-          item.detail_cost_category_id = costId;
-        }
-      }
+    const result = validateBoqData(data, positionUpdates, {
+      clientPositionsMap,
+      workNamesMap,
+      materialNamesMap,
+      costCategoriesMap,
     });
-
-    const result: ValidationResult = {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
-      missingNomenclature: {
-        works: Array.from(missingWorksMap.values()),
-        materials: Array.from(missingMaterialsMap.values()),
-      },
-      unknownCosts: Array.from(unknownCostsMap.entries()).map(([text, rows]) => ({ text, rows })),
-      unmatchedPositions: Array.from(unmatchedPositionsMap.entries()).map(([positionNumber, rows]) => ({ positionNumber, rows })),
-    };
-
     setValidationResult(result);
-
-    console.log('[MassBoqImport] Результат валидации:', {
-      isValid: result.isValid,
-      errorsCount: errors.length,
-      unmatchedPositions: result.unmatchedPositions.length,
-    });
-
     return result;
   };
 
   // ===========================
-  // ОБРАБОТКА ПРИВЯЗОК
+  // ЗАГРУЗКА КУРСОВ ВАЛЮТ
   // ===========================
-
-  const processWorkBindings = (data: ParsedBoqItem[]): ValidationError[] => {
-    const errors: ValidationError[] = [];
-
-    // Группируем по позициям для правильной обработки привязок
-    const byPosition = new Map<string, ParsedBoqItem[]>();
-    data.forEach(item => {
-      const posId = item.matchedPositionId || item.positionNumber;
-      if (!byPosition.has(posId)) {
-        byPosition.set(posId, []);
-      }
-      byPosition.get(posId)!.push(item);
-    });
-
-    // Обрабатываем привязки внутри каждой позиции
-    byPosition.forEach((items, posId) => {
-      let lastWork: ParsedBoqItem | null = null;
-
-      items.forEach((item) => {
-        if (isWork(item.boq_item_type)) {
-          lastWork = item;
-          item.tempId = `work_${item.rowIndex}`;
-        } else if (item.bindToWork) {
-          if (!lastWork) {
-            errors.push({
-              rowIndex: item.rowIndex,
-              type: 'binding_error',
-              field: 'parent_work_item_id',
-              message: 'Материал с привязкой, но работа не найдена выше в этой позиции',
-              severity: 'error',
-            });
-          } else {
-            item.parent_work_item_id = lastWork.tempId;
-
-            const workQty = lastWork.quantity || 0;
-            const convCoef = item.conversion_coefficient || 1;
-            const consCoef = item.consumption_coefficient || 1;
-            item.quantity = workQty * convCoef * consCoef;
-          }
-        } else {
-          const baseQty = item.base_quantity || 0;
-          const consCoef = item.consumption_coefficient || 1;
-          item.quantity = baseQty * consCoef;
-        }
-      });
-    });
-
-    return errors;
-  };
-
-  // ===========================
-  // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАСЧЕТА
-  // ===========================
-
-  const getCurrencyRate = (currency: string, rates?: { usd: number; eur: number; cny: number }): number => {
-    const actualRates = rates || currencyRates;
-    switch (currency) {
-      case 'USD': return actualRates.usd;
-      case 'EUR': return actualRates.eur;
-      case 'CNY': return actualRates.cny;
-      case 'RUB':
-      default: return 1;
-    }
-  };
-
-  const calculateTotalAmount = (item: ParsedBoqItem, rates?: { usd: number; eur: number; cny: number }): number => {
-    const rate = getCurrencyRate(item.currency_type || 'RUB', rates);
-    const unitRate = item.unit_rate || 0;
-    const quantity = item.quantity || 0;
-
-    if (isWork(item.boq_item_type)) {
-      return quantity * unitRate * rate;
-    } else {
-      const unitPriceInRub = unitRate * rate;
-      let deliveryPrice = 0;
-
-      if (item.delivery_price_type === 'не в цене') {
-        deliveryPrice = unitPriceInRub * 0.03;
-      } else if (item.delivery_price_type === 'суммой') {
-        deliveryPrice = item.delivery_amount || 0;
-      }
-
-      const consumptionCoeff = !item.parent_work_item_id ? (item.consumption_coefficient || 1) : 1;
-      return quantity * consumptionCoeff * (unitPriceInRub + deliveryPrice);
-    }
-  };
 
   const loadCurrencyRates = async (tenderId: string): Promise<{ usd: number; eur: number; cny: number }> => {
     const { data: tender, error } = await supabase
@@ -844,9 +218,16 @@ export const useMassBoqImport = () => {
       setUploading(true);
       setUploadProgress(0);
 
-      const rates = await loadCurrencyRates(tenderId);
+      // Собираем position-only обновления (позиции без BOQ-элементов, но с данными ГП)
+      const positionOnlyUpdates: Array<{ positionId: string; data: PositionUpdateData }> = [];
+      positionUpdates.forEach((posData) => {
+        if (posData.itemsCount > 0) return;
+        if (posData.manualVolume === undefined && posData.manualNote === undefined) return;
+        if (!posData.positionId) return;
+        positionOnlyUpdates.push({ positionId: posData.positionId, data: posData });
+      });
 
-      // Группируем элементы по позициям
+      // Группируем BOQ-элементы по позициям
       const byPosition = new Map<string, ParsedBoqItem[]>();
       data.forEach(item => {
         if (!item.matchedPositionId) return;
@@ -856,12 +237,17 @@ export const useMassBoqImport = () => {
         byPosition.get(item.matchedPositionId)!.push(item);
       });
 
-      const totalPositions = byPosition.size;
-      let processedPositions = 0;
+      const totalOperations = byPosition.size + positionOnlyUpdates.length;
+      let processedOperations = 0;
 
-      // Обрабатываем каждую позицию
+      // Загружаем курсы валют только если есть BOQ-элементы
+      let rates = currencyRates;
+      if (data.length > 0) {
+        rates = await loadCurrencyRates(tenderId);
+      }
+
+      // Обрабатываем позиции с BOQ-элементами
       for (const [positionId, items] of byPosition) {
-        // Получаем максимальный sort_number для этой позиции
         const { data: existingItems } = await supabase
           .from('boq_items')
           .select('sort_number')
@@ -870,11 +256,8 @@ export const useMassBoqImport = () => {
           .limit(1);
 
         const maxSortNumber = existingItems?.[0]?.sort_number ?? -1;
-
-        // Map для привязки материалов к работам
         const workIdMap = new Map<string, string>();
 
-        // Вставляем элементы
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           const actualSortNumber = maxSortNumber + 1 + i;
@@ -950,16 +333,47 @@ export const useMassBoqImport = () => {
             .eq('id', positionId);
         }
 
-        processedPositions++;
-        setUploadProgress(Math.round((processedPositions / totalPositions) * 100));
+        processedOperations++;
+        setUploadProgress(Math.round((processedOperations / totalOperations) * 100));
+      }
+
+      // Обрабатываем position-only обновления (позиции без BOQ, только данные ГП)
+      for (const { positionId, data: posData } of positionOnlyUpdates) {
+        const updateData: any = {};
+        if (posData.manualVolume !== undefined) {
+          updateData.manual_volume = posData.manualVolume;
+        }
+        if (posData.manualNote !== undefined) {
+          updateData.manual_note = posData.manualNote;
+        }
+
+        const { error } = await supabase
+          .from('client_positions')
+          .update(updateData)
+          .eq('id', positionId);
+
+        if (error) {
+          throw new Error(`Позиция ${posData.positionNumber} (данные ГП): ${error.message}`);
+        }
+
+        processedOperations++;
+        setUploadProgress(Math.round((processedOperations / totalOperations) * 100));
       }
 
       console.log('[MassBoqImport] Импорт завершён:', {
-        positions: totalPositions,
-        items: data.length,
+        boqPositions: byPosition.size,
+        boqItems: data.length,
+        positionOnlyUpdates: positionOnlyUpdates.length,
       });
 
-      message.success(`Импортировано ${data.length} элементов в ${totalPositions} позиций`);
+      const msgParts: string[] = [];
+      if (data.length > 0) {
+        msgParts.push(`${data.length} элементов в ${byPosition.size} позиций`);
+      }
+      if (positionOnlyUpdates.length > 0) {
+        msgParts.push(`обновлено ${positionOnlyUpdates.length} позиций (данные ГП)`);
+      }
+      message.success(`Импортировано: ${msgParts.join(', ')}`);
       return true;
     } catch (error: any) {
       console.error('Ошибка импорта:', error);
@@ -982,7 +396,6 @@ export const useMassBoqImport = () => {
     setUploadProgress(0);
   };
 
-  // Получение статистики по позициям
   const getPositionStats = () => {
     const stats = new Map<string, {
       positionNumber: string;

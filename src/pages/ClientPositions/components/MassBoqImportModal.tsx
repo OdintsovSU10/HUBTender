@@ -106,6 +106,10 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
   const positionStats = getPositionStats();
   const matchedCount = positionStats.filter(p => p.matched).length;
   const unmatchedCount = positionStats.filter(p => !p.matched).length;
+  const positionOnlyCount = positionStats.filter(
+    p => p.matched && p.itemsCount === 0 && (p.manualVolume !== undefined || p.manualNote !== undefined)
+  ).length;
+  const hasDataToImport = parsedData.length > 0 || positionOnlyCount > 0;
 
   // Кнопки футера
   const getFooterButtons = () => {
@@ -127,10 +131,17 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
           key="import"
           type="primary"
           onClick={handleValidate}
-          disabled={hasErrors || parsedData.length === 0}
+          disabled={hasErrors || !hasDataToImport}
           loading={uploading}
         >
-          {hasErrors ? 'Исправьте ошибки' : `Импортировать ${parsedData.length} элементов`}
+          {hasErrors
+            ? 'Исправьте ошибки'
+            : parsedData.length > 0 && positionOnlyCount > 0
+              ? `Импортировать ${parsedData.length} элементов + ${positionOnlyCount} поз. ГП`
+              : parsedData.length > 0
+                ? `Импортировать ${parsedData.length} элементов`
+                : `Обновить ${positionOnlyCount} позиций (данные ГП)`
+          }
         </Button>,
       ];
     }
@@ -189,13 +200,16 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
                       <Text>Колонка 8: <Text code>Ед. изм.</Text></Text>
                     </List.Item>
                   </List>
-                  <Text strong style={{ marginTop: 8, display: 'block' }}>Дополнительные данные для позиций:</Text>
+                  <Text strong style={{ marginTop: 8, display: 'block' }}>Данные ГП для позиций (можно импортировать без работ/материалов):</Text>
                   <List size="small" style={{ marginTop: 4 }}>
                     <List.Item>
-                      <Text>Колонка 9: <Text code>Количество ГП</Text> — обновит manual_volume в позиции</Text>
+                      <Text>Колонка 12: <Text code>Количество ГП</Text> — обновит manual_volume в позиции</Text>
                     </List.Item>
                     <List.Item>
                       <Text>Колонка 20: <Text code>Примечание ГП</Text> — обновит manual_note в позиции</Text>
+                    </List.Item>
+                    <List.Item>
+                      <Text type="secondary">Достаточно указать номер позиции + количество/примечание ГП. Существующие значения будут перезаписаны.</Text>
                     </List.Item>
                   </List>
                 </div>
@@ -256,7 +270,7 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
               dataSource={positionStats}
               rowKey="positionNumber"
               size="small"
-              pagination={{ pageSize: 10 }}
+              pagination={{ defaultPageSize: 20, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'] }}
               style={{ marginBottom: 16 }}
               columns={[
                 {
@@ -282,6 +296,12 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
                   dataIndex: 'itemsCount',
                   width: 100,
                   align: 'center',
+                  render: (count: number, record: { manualVolume?: number; manualNote?: string }) => {
+                    if (count === 0 && (record.manualVolume !== undefined || record.manualNote !== undefined)) {
+                      return <Tag color="blue">только ГП</Tag>;
+                    }
+                    return count;
+                  },
                 },
                 {
                   title: 'Кол-во ГП',
@@ -408,7 +428,11 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
             <Alert
               type="info"
               message="Импорт данных"
-              description={`Импортируется ${parsedData.length} элементов в ${matchedCount} позиций`}
+              description={
+                parsedData.length > 0
+                  ? `Импортируется ${parsedData.length} элементов в ${matchedCount} позиций${positionOnlyCount > 0 ? ` + обновление ${positionOnlyCount} поз. ГП` : ''}`
+                  : `Обновляется ${positionOnlyCount} позиций (данные ГП)`
+              }
               showIcon
             />
             {uploading && (
