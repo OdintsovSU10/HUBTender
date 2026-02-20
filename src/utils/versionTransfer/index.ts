@@ -14,3 +14,4 @@ export * from './createNewVersion';
 export * from './transferPositionData';
 export * from './copyBoqItems';
 export * from './handleAdditionalPositions';
+export * from './copyCostVolumes';

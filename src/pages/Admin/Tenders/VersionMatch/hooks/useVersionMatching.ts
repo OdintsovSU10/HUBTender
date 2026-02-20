@@ -13,6 +13,7 @@ import {
   transferPositionData,
   transferAdditionalPositions,
   copyBoqItems,
+  copyCostVolumes,
 } from '../../../../../utils/versionTransfer';
 import { matchReducer, initialMatchState, type MatchPair, type VersionMatchState } from '../types';
 
@@ -275,6 +276,13 @@ export function useVersionMatching({
         if (allErrors.length > 0) {
           console.warn('Ошибки при копировании boq_items:', allErrors);
         }
+      }
+
+      // 3.6. Копировать объёмы затрат на строительство
+      const costVolumesResult = await copyCostVolumes(sourceTender.id, newTenderId);
+      console.log(`Скопировано объёмов затрат: ${costVolumesResult.copied}`);
+      if (costVolumesResult.errors.length > 0) {
+        console.warn('Ошибки при копировании объёмов затрат:', costVolumesResult.errors);
       }
 
       // 4. Обработать дополнительные работы
