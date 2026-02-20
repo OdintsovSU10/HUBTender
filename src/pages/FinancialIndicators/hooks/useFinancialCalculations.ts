@@ -155,11 +155,14 @@ export const useFinancialCalculations = () => {
       // Загрузка исключений роста субподряда для текущего тендера
       const { data: exclusions } = await supabase
         .from('subcontract_growth_exclusions')
-        .select('detail_cost_category_id')
+        .select('detail_cost_category_id, exclusion_type')
         .eq('tender_id', selectedTenderId);
 
-      const excludedCategoryIds = new Set(
-        exclusions?.map(e => e.detail_cost_category_id) || []
+      const excludedWorksCategories = new Set(
+        exclusions?.filter(e => e.exclusion_type === 'works').map(e => e.detail_cost_category_id) || []
+      );
+      const excludedMaterialsCategories = new Set(
+        exclusions?.filter(e => e.exclusion_type === 'materials').map(e => e.detail_cost_category_id) || []
       );
 
       // Расчет прямых затрат
@@ -182,20 +185,19 @@ export const useFinancialCalculations = () => {
         totalCommercialMaterial += item.total_commercial_material_cost || 0;
         totalCommercialWork += item.total_commercial_work_cost || 0;
         const categoryId = item.detail_cost_category_id;
-        const isExcludedFromGrowth = categoryId && excludedCategoryIds.has(categoryId);
         const itemType = item.boq_item_type?.trim();
 
         switch (itemType) {
           case 'суб-раб':
-            subcontractWorks += baseCost; // Всегда включаем в общую сумму
-            if (!isExcludedFromGrowth) {
-              subcontractWorksForGrowth += baseCost; // Включаем в базу для роста только если не исключено
+            subcontractWorks += baseCost;
+            if (!(categoryId && excludedWorksCategories.has(categoryId))) {
+              subcontractWorksForGrowth += baseCost;
             }
             break;
           case 'суб-мат':
-            subcontractMaterials += baseCost; // Всегда включаем в общую сумму
-            if (!isExcludedFromGrowth) {
-              subcontractMaterialsForGrowth += baseCost; // Включаем в базу для роста только если не исключено
+            subcontractMaterials += baseCost;
+            if (!(categoryId && excludedMaterialsCategories.has(categoryId))) {
+              subcontractMaterialsForGrowth += baseCost;
             }
             break;
           case 'раб':
