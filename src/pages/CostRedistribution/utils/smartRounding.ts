@@ -38,7 +38,9 @@ function compensateError(
   const sortedItems = [...items].sort((a, b) => b.fractionalPart - a.fractionalPart);
 
   let remainingError = totalError;
-  const errorSign = totalError > 0 ? 1 : -1;
+  // Если ошибка > 0 (округление завысило итог), нужно УМЕНЬШИТЬ цены (-1)
+  // Если ошибка < 0 (округление занизило итог), нужно УВЕЛИЧИТЬ цены (+1)
+  const errorSign = totalError > 0 ? -1 : 1;
   const adjustmentStep = 5; // Шаг компенсации (кратно 5)
 
   for (const item of sortedItems) {
@@ -52,7 +54,7 @@ function compensateError(
     if (maxAdjustment >= adjustmentStep) {
       const adjustment = maxAdjustment * errorSign;
       adjustments.set(item.index, item.roundedPrice + adjustment);
-      remainingError -= adjustment * item.quantity;
+      remainingError += adjustment * item.quantity;
     }
   }
 

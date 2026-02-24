@@ -79,14 +79,18 @@ export function useSaveResults() {
           throw deleteError;
         }
 
-        // Вставляем новые результаты
-        const { error: insertError } = await supabase
-          .from('cost_redistribution_results')
-          .insert(records);
+        // Вставляем новые результаты батчами по 500 записей
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < records.length; i += BATCH_SIZE) {
+          const batch = records.slice(i, i + BATCH_SIZE);
+          const { error: insertError } = await supabase
+            .from('cost_redistribution_results')
+            .insert(batch);
 
-        if (insertError) {
-          console.error('Ошибка вставки новых результатов:', insertError);
-          throw insertError;
+          if (insertError) {
+            console.error(`Ошибка вставки батча ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError);
+            throw insertError;
+          }
         }
 
         console.log('✅ Результаты успешно сохранены');
