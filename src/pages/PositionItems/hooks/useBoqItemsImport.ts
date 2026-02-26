@@ -698,10 +698,8 @@ export const useBoqItemsImport = () => {
           item.quantity = workQty * convCoef * consCoef;
         }
       } else {
-        // Независимый материал: base_quantity * коэфф.расхода
-        const baseQty = item.base_quantity || 0;
-        const consCoef = item.consumption_coefficient || 1;
-        item.quantity = baseQty * consCoef;
+        // Независимый материал: quantity = base_quantity (коэфф.расхода применяется при расчёте стоимости)
+        item.quantity = item.base_quantity || 0;
       }
     });
 
