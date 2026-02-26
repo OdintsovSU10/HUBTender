@@ -301,9 +301,7 @@ export const processWorkBindings = (data: ParsedBoqItem[]): ValidationError[] =>
           item.quantity = workQty * convCoef * consCoef;
         }
       } else {
-        const baseQty = item.base_quantity || 0;
-        const consCoef = item.consumption_coefficient || 1;
-        item.quantity = baseQty * consCoef;
+        item.quantity = item.base_quantity || 0;
       }
     });
   });
