@@ -52,6 +52,7 @@ interface PositionTableProps {
   onCancelDeleteSelection?: () => void;
   onBulkDeleteBoqItems?: () => void;
   onDeleteAdditionalPosition: (positionId: string, positionName: string, event: React.MouseEvent) => void;
+  onClearPositionBoqItems: (positionId: string, positionName: string, event: React.MouseEvent) => void;
   onExportToExcel: () => void;
   onMassImport?: () => void;
   tempSelectedPositionIds?: Set<string>;
@@ -91,6 +92,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onCancelDeleteSelection,
   onBulkDeleteBoqItems,
   onDeleteAdditionalPosition,
+  onClearPositionBoqItems,
   onExportToExcel,
   onMassImport,
   isFilterActive = false,
@@ -388,6 +390,13 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                         </Tag>
                       </Tooltip>
                     )}
+                    {!isLeaf && counts.works + counts.materials > 0 && (
+                      <Tooltip title="Удалить работы и материалы" {...tooltipColor}>
+                        <Tag color="orange" style={{ cursor: 'pointer', margin: 0 }} onClick={(e) => { e.stopPropagation(); onClearPositionBoqItems(record.id, record.work_name, e); }}>
+                          <ClearOutlined />
+                        </Tag>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               )}
@@ -428,6 +437,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
     selectedDeleteIds,
     onToggleDeleteSelection,
     onStartDeleteSelection,
+    onClearPositionBoqItems,
   ]);
 
   return (

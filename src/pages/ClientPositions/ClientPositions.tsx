@@ -73,6 +73,7 @@ const ClientPositions: React.FC = () => {
     handleToggleDeleteSelection,
     handleCancelDeleteSelection,
     handleBulkDeleteBoqItems,
+    handleClearPositionBoqItems,
     handleExportToExcel,
     handleDeleteAdditionalPosition,
   } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
@@ -359,6 +360,9 @@ const ClientPositions: React.FC = () => {
           onBulkDeleteBoqItems={() => handleBulkDeleteBoqItems(selectedTenderId)}
           onDeleteAdditionalPosition={(positionId, positionName, event) =>
             handleDeleteAdditionalPosition(positionId, positionName, selectedTenderId, event)
+          }
+          onClearPositionBoqItems={(positionId, positionName, event) =>
+            handleClearPositionBoqItems(positionId, positionName, selectedTenderId, event)
           }
           onExportToExcel={() => handleExportToExcel(selectedTender)}
           onMassImport={() => setMassImportModalOpen(true)}

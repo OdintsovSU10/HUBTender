@@ -380,6 +380,52 @@ export const usePositionActions = (
     });
   };
 
+  // Очистка работ и материалов у одной позиции (для нелистовых)
+  const handleClearPositionBoqItems = async (
+    positionId: string,
+    positionName: string,
+    selectedTenderId: string | null,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation();
+
+    Modal.confirm({
+      title: 'Удалить работы и материалы?',
+      content: `Удалить все работы и материалы из позиции "${positionName}"? Это действие нельзя отменить.`,
+      okText: 'Удалить',
+      cancelText: 'Отмена',
+      okButtonProps: { danger: true },
+      rootClassName: currentTheme === 'dark' ? 'dark-modal' : '',
+      onOk: async () => {
+        setLoading(true);
+        try {
+          const { error: boqError } = await supabase
+            .from('boq_items')
+            .delete()
+            .eq('client_position_id', positionId);
+          if (boqError) throw boqError;
+
+          const { error: updateError } = await supabase
+            .from('client_positions')
+            .update({ total_material: 0, total_works: 0 })
+            .eq('id', positionId);
+          if (updateError) throw updateError;
+
+          if (selectedTenderId) {
+            await fetchClientPositions(selectedTenderId);
+          }
+
+          message.success('Работы и материалы удалены');
+        } catch (error: any) {
+          console.error('Ошибка очистки позиции:', error);
+          message.error('Ошибка очистки: ' + error.message);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
+
   // Удаление ДОП работы
   const handleDeleteAdditionalPosition = async (
     positionId: string,
@@ -451,6 +497,7 @@ export const usePositionActions = (
     handleToggleDeleteSelection,
     handleCancelDeleteSelection,
     handleBulkDeleteBoqItems,
+    handleClearPositionBoqItems,
     handleExportToExcel,
     handleDeleteAdditionalPosition,
   };
