@@ -120,10 +120,6 @@ export function smartRoundPositions(positions: PositionWithCommercialCost[]): Ro
   const totalMaterialError = materialItems.reduce((sum, item) => sum + item.error, 0);
   const totalWorkError = workItems.reduce((sum, item) => sum + item.error, 0);
 
-  console.log('🔄 Округление:');
-  console.log(`  Материалы: ошибка ${totalMaterialError.toFixed(2)} руб`);
-  console.log(`  Работы: ошибка ${totalWorkError.toFixed(2)} руб`);
-
   // Компенсируем ошибку
   const materialAdjustments = compensateError(materialItems, totalMaterialError);
   const workAdjustments = compensateError(workItems, totalWorkError);

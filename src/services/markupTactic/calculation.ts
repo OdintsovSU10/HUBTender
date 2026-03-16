@@ -341,15 +341,12 @@ function filterVATFromSequence(
 ): { filtered: MarkupStep[]; vatCoefficient: number } {
   // Ищем параметр НДС по ключу nds_22
   const vatKey = 'nds_22';
-  const vatCoefficient = markupParameters.get(vatKey) || 0;
+  const vatParamValue = markupParameters.get(vatKey) || 0;
 
-  // Если НДС не найден, возвращаем исходную последовательность
-  if (!vatCoefficient) {
-    return { filtered: sequence, vatCoefficient: 0 };
-  }
-
-  // Находим индексы шагов с НДС
+  // Находим индексы шагов с НДС и определяем коэффициент
   const removedIndices: number[] = [];
+  let vatCoefficient = 0;
+
   sequence.forEach((step, index) => {
     const operandKeys = [
       step.operand1Key,
@@ -359,13 +356,40 @@ function filterVATFromSequence(
       step.operand5Key
     ].filter(Boolean);
 
-    if (operandKeys.includes(vatKey)) {
+    // Вариант 1: шаг ссылается на параметр nds_22
+    if (operandKeys.includes(vatKey) && vatParamValue > 0) {
       removedIndices.push(index);
+      vatCoefficient = vatParamValue;
+      return;
+    }
+
+    // Вариант 2: шаг с числовым множителем НДС (operand1Type="number", имя содержит "НДС")
+    const stepName = ((step as any).name || '').toLowerCase();
+    if (stepName.includes('ндс') || stepName.includes('nds') || stepName.includes('vat')) {
+      // Извлекаем коэффициент НДС из числового операнда
+      const operandTypes = [
+        { key: step.operand1Key, type: (step as any).operand1Type },
+        { key: step.operand2Key, type: (step as any).operand2Type },
+        { key: step.operand3Key, type: (step as any).operand3Type },
+        { key: step.operand4Key, type: (step as any).operand4Type },
+        { key: step.operand5Key, type: (step as any).operand5Type },
+      ];
+
+      for (const op of operandTypes) {
+        if (op.type === 'number' && op.key != null) {
+          const numValue = typeof op.key === 'number' ? op.key : parseFloat(String(op.key));
+          if (!isNaN(numValue) && numValue > 1 && numValue < 2) {
+            // Числовой множитель вида 1.22 → коэффициент 22%
+            vatCoefficient = Math.round((numValue - 1) * 100);
+            removedIndices.push(index);
+            break;
+          }
+        }
+      }
     }
   });
 
-  // Если шагов с НДС не найдено в последовательности, НЕ применяем НДС отдельно
-  // Это значит что тактика не предусматривает НДС в расчете
+  // Если шагов с НДС не найдено, не применяем НДС отдельно
   if (removedIndices.length === 0) {
     return { filtered: sequence, vatCoefficient: 0 };
   }
@@ -374,7 +398,7 @@ function filterVATFromSequence(
   const filtered = sequence.filter((_, index) => !removedIndices.includes(index));
 
   // Пересчитываем baseIndex для оставшихся шагов
-  const result = filtered.map((step, newIndex) => {
+  const result = filtered.map((step) => {
     let newBaseIndex = step.baseIndex;
 
     if (newBaseIndex >= 0) {
@@ -427,47 +451,10 @@ export function calculateTypeCoefficient(
 const typeCoefficientsCache = new Map<string, number>();
 
 /**
- * Структура для диагностики аномалий
- */
-export interface AnomalyDiagnostic {
-  itemId: string;
-  itemType: string;
-  detailCategoryId?: string | null;
-  base: number;
-  commercial: number;
-  coefficient: number;
-  expectedCoefficient: number;
-  cacheKey: string;
-  isExcluded: boolean;
-  vatCoefficient: number;
-  reason: string;
-}
-
-/**
- * Массив для сбора аномалий во время расчёта
- */
-const anomaliesDiagnostics: AnomalyDiagnostic[] = [];
-
-/**
  * Сбрасывает кэш коэффициентов (вызывать в начале пересчёта)
  */
 export function resetTypeCoefficientsCache(): void {
   typeCoefficientsCache.clear();
-  anomaliesDiagnostics.length = 0;
-}
-
-/**
- * Возвращает все кэшированные коэффициенты для логирования
- */
-export function getCachedCoefficients(): Map<string, number> {
-  return new Map(typeCoefficientsCache);
-}
-
-/**
- * Возвращает собранные аномалии для диагностики
- */
-export function getAnomaliesDiagnostics(): AnomalyDiagnostic[] {
-  return [...anomaliesDiagnostics];
 }
 
 /**
@@ -531,7 +518,8 @@ export function calculateBoqItemCost(
       pricingDistribution
     );
 
-    // Применяем НДС ОТДЕЛЬНО к материалам и работам
+    // Применяем НДС к обоим столбцам независимо
+    // Каждый столбец получает свой НДС, не перетекая в другой
     if (vatCoefficient > 0) {
       const vatMultiplier = 1 + (vatCoefficient / 100);
       materialCost = materialCost * vatMultiplier;
@@ -544,42 +532,6 @@ export function calculateBoqItemCost(
       ? totalCommercialCost / baseAmount
       : 1;
 
-    // Диагностика аномалий для суб-типов
-    if (['суб-мат', 'суб-раб'].includes(item.boq_item_type) && baseAmount > 0) {
-      // Получаем ожидаемый коэффициент для нормальных (неисключённых) элементов
-      const normalCacheKey = `${item.boq_item_type}_norm_${vatCoefficient}`;
-      const expectedCoeff = typeCoefficientsCache.get(normalCacheKey) || coefficientWithoutVAT * (1 + vatCoefficient / 100);
-
-      // Если коэффициент отличается от ожидаемого более чем на 0.001
-      if (Math.abs(markupCoefficient - expectedCoeff) > 0.001) {
-        let reason = 'Неизвестная причина';
-
-        if (isExcluded) {
-          reason = `Исключён из роста субподряда (категория: ${item.detail_cost_category_id})`;
-        } else if (markupCoefficient === 0) {
-          reason = 'Нулевая коммерческая стоимость (не был рассчитан)';
-        } else if (markupCoefficient < expectedCoeff * 0.9) {
-          reason = `Коэффициент слишком низкий (возможно исключение или ошибка данных)`;
-        } else if (markupCoefficient > expectedCoeff * 1.1) {
-          reason = `Коэффициент слишком высокий (возможно старые данные или другая тактика)`;
-        }
-
-        anomaliesDiagnostics.push({
-          itemId: item.id,
-          itemType: item.boq_item_type,
-          detailCategoryId: item.detail_cost_category_id,
-          base: baseAmount,
-          commercial: totalCommercialCost,
-          coefficient: markupCoefficient,
-          expectedCoefficient: expectedCoeff,
-          cacheKey,
-          isExcluded,
-          vatCoefficient,
-          reason
-        });
-      }
-    }
-
     return {
       materialCost,
       workCost,
@@ -590,64 +542,6 @@ export function calculateBoqItemCost(
     console.error(`Ошибка расчета элемента ${item.id}:`, error);
     return null;
   }
-}
-
-/**
- * Выводит сводку по аномалиям в консоль
- */
-export function printAnomaliesSummary(): void {
-  if (anomaliesDiagnostics.length === 0) {
-    console.log('\n✅ АНОМАЛИЙ НЕ ОБНАРУЖЕНО - все суб-типы имеют ожидаемые коэффициенты');
-    return;
-  }
-
-  console.log('\n=== 🔍 ДИАГНОСТИКА АНОМАЛИЙ ===');
-  console.log(`Обнаружено ${anomaliesDiagnostics.length} элементов с отклонениями:\n`);
-
-  // Группируем по причинам
-  const byReason: Record<string, AnomalyDiagnostic[]> = {};
-  anomaliesDiagnostics.forEach(a => {
-    if (!byReason[a.reason]) {
-      byReason[a.reason] = [];
-    }
-    byReason[a.reason].push(a);
-  });
-
-  // Выводим сводку по причинам
-  Object.entries(byReason).forEach(([reason, items]) => {
-    const totalBase = items.reduce((sum, i) => sum + i.base, 0);
-    console.log(`📋 ${reason}:`);
-    console.log(`   Элементов: ${items.length}`);
-    console.log(`   Сумма базовой стоимости: ${totalBase.toLocaleString('ru-RU')}`);
-
-    // Показываем первые 5 элементов как примеры
-    console.log('   Примеры:');
-    items.slice(0, 5).forEach(item => {
-      console.log(`   - ${item.itemType} | база: ${item.base.toLocaleString('ru-RU')} | коэфф: ${item.coefficient.toFixed(4)} (ожид: ${item.expectedCoefficient.toFixed(4)})`);
-      if (item.detailCategoryId) {
-        console.log(`     категория: ${item.detailCategoryId}`);
-      }
-    });
-    if (items.length > 5) {
-      console.log(`   ... и ещё ${items.length - 5} элементов\n`);
-    }
-    console.log('');
-  });
-
-  // Сводка по исключениям
-  const excludedItems = anomaliesDiagnostics.filter(a => a.isExcluded);
-  if (excludedItems.length > 0) {
-    const excludedCategories = new Set(excludedItems.map(a => a.detailCategoryId).filter(Boolean));
-    console.log('📌 ИСКЛЮЧЁННЫЕ КАТЕГОРИИ:');
-    excludedCategories.forEach(catId => {
-      const catItems = excludedItems.filter(a => a.detailCategoryId === catId);
-      const catBase = catItems.reduce((sum, i) => sum + i.base, 0);
-      console.log(`   - ${catId}: ${catItems.length} элементов, база: ${catBase.toLocaleString('ru-RU')}`);
-    });
-    console.log('');
-  }
-
-  console.log('===================================\n');
 }
 
 /**
