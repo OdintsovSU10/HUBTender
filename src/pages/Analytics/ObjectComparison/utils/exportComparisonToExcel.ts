@@ -89,7 +89,7 @@ function buildExportData(
     '',
     'Материалы', 'Работы', 'Итого', 'Мат/ед.', 'Раб/ед.', 'Итого/ед.',
     'Материалы', 'Работы', 'Итого', 'Мат/ед.', 'Раб/ед.', 'Итого/ед.',
-    'Материалы', 'Материалы %', 'Работы', 'Работы %', 'Итого', 'Итого %',
+    'Материалы', 'Работы', 'Итого', 'Мат/ед.', 'Раб/ед.', 'Итого/ед.',
   ]);
   rowTypes.push('subheader');
 
@@ -111,11 +111,11 @@ function buildExportData(
       row.tender2_work_per_unit || '',
       row.tender2_total_per_unit || '',
       row.diff_materials,
-      row.diff_materials_percent,
       row.diff_works,
-      row.diff_works_percent,
       row.diff_total,
-      row.diff_total_percent,
+      row.diff_mat_per_unit || '',
+      row.diff_work_per_unit || '',
+      row.diff_total_per_unit || '',
     ]);
     rowTypes.push(type);
   }
@@ -133,11 +133,9 @@ function buildExportData(
     totalRow.tender2_total,
     '', '', '',
     totalRow.diff_materials,
-    totalRow.diff_materials_percent,
     totalRow.diff_works,
-    totalRow.diff_works_percent,
     totalRow.diff_total,
-    totalRow.diff_total_percent,
+    '', '', '',
   ]);
   rowTypes.push('total');
 
@@ -194,12 +192,7 @@ function configureWorksheet(ws: XLSX.WorkSheet, rowTypes: RowType[]): void {
 
       let numFmt;
       if (C >= 1 && rowType !== 'header' && rowType !== 'subheader') {
-        // Percent columns: 14, 16, 18
-        if (C === 14 || C === 16 || C === 18) {
-          numFmt = '0.0"%"';
-        } else {
-          numFmt = '#,##0';
-        }
+        numFmt = '#,##0';
       }
 
       let font: any = {};
