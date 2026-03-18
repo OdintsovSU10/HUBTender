@@ -81,6 +81,7 @@ function buildExportData(
     tender1Label, '', '', '', '', '',
     tender2Label, '', '', '', '', '',
     'Разница', '', '', '', '', '',
+    'Примечание',
   ]);
   rowTypes.push('header');
 
@@ -90,6 +91,7 @@ function buildExportData(
     'Материалы', 'Работы', 'Итого', 'Мат/ед.', 'Раб/ед.', 'Итого/ед.',
     'Материалы', 'Работы', 'Итого', 'Мат/ед.', 'Раб/ед.', 'Итого/ед.',
     'Материалы', 'Работы', 'Итого', 'Мат/ед.', 'Раб/ед.', 'Итого/ед.',
+    '',
   ]);
   rowTypes.push('subheader');
 
@@ -116,6 +118,7 @@ function buildExportData(
       row.diff_mat_per_unit || '',
       row.diff_work_per_unit || '',
       row.diff_total_per_unit || '',
+      row.note || '',
     ]);
     rowTypes.push(type);
   }
@@ -136,6 +139,7 @@ function buildExportData(
     totalRow.diff_works,
     totalRow.diff_total,
     '', '', '',
+    '',
   ]);
   rowTypes.push('total');
 
@@ -147,7 +151,8 @@ function configureWorksheet(ws: XLSX.WorkSheet, rowTypes: RowType[]): void {
     { wch: 45 },
     { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
-    { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 12 },
+    { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 30 },
   ];
 
   ws['!merges'] = [
@@ -155,6 +160,7 @@ function configureWorksheet(ws: XLSX.WorkSheet, rowTypes: RowType[]): void {
     { s: { r: 0, c: 1 }, e: { r: 0, c: 6 } },
     { s: { r: 0, c: 7 }, e: { r: 0, c: 12 } },
     { s: { r: 0, c: 13 }, e: { r: 0, c: 18 } },
+    { s: { r: 0, c: 19 }, e: { r: 1, c: 19 } },
   ];
 
   const beigeHeaderFill = { fgColor: { rgb: 'F5F5DC' } };

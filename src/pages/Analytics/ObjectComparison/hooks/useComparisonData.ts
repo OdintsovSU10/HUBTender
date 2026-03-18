@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import { supabase, type Tender } from '../../../../lib/supabase';
 import type { CostType, ComparisonRow } from '../types';
@@ -106,6 +106,26 @@ async function fetchBoqItems(tenderId: string) {
   return items;
 }
 
+type NotesMap = Map<string, string>;
+
+async function fetchNotes(tenderId1: string, tenderId2: string): Promise<NotesMap> {
+  const { data, error } = await supabase
+    .from('comparison_notes')
+    .select('cost_category_name, detail_category_key, note')
+    .eq('tender_id_1', tenderId1)
+    .eq('tender_id_2', tenderId2);
+
+  if (error) throw error;
+
+  const map = new Map<string, string>();
+  for (const row of (data || [])) {
+    // Main category: key = "main__CategoryName", detail: key = detailKey
+    const key = row.detail_category_key || `main__${row.cost_category_name}`;
+    if (row.note) map.set(key, row.note);
+  }
+  return map;
+}
+
 interface CategoryAccum {
   mainCategory: string;
   detailName: string;
@@ -167,7 +187,8 @@ function buildHierarchy(
   items1: any[],
   items2: any[],
   costType: CostType,
-  volumes?: VolumeMaps
+  volumes?: VolumeMaps,
+  notes?: NotesMap
 ): ComparisonRow[] {
   // detail rows keyed by detailKey
   const detailRows = new Map<string, ComparisonRow>();
@@ -223,6 +244,10 @@ function buildHierarchy(
       // Skip zero-cost details
       if (detail.tender1_total === 0 && detail.tender2_total === 0) continue;
 
+      // Attach note and mainCategoryName
+      detail.mainCategoryName = mainCat;
+      if (notes) detail.note = notes.get(dk) || null;
+
       // Accumulate to main
       mainRow.tender1_materials += detail.tender1_materials;
       mainRow.tender1_works += detail.tender1_works;
@@ -247,6 +272,8 @@ function buildHierarchy(
     }
 
     calcDiffs(mainRow);
+    mainRow.mainCategoryName = mainCat;
+    if (notes) mainRow.note = notes.get(`main__${mainCat}`) || null;
     mainRow.children = children;
     result.push(mainRow);
   }
@@ -268,6 +295,7 @@ export function useComparisonData() {
   const [rawItems1, setRawItems1] = useState<any[] | null>(null);
   const [rawItems2, setRawItems2] = useState<any[] | null>(null);
   const [volumeMaps, setVolumeMaps] = useState<VolumeMaps | null>(null);
+  const [notesMap, setNotesMap] = useState<NotesMap>(new Map());
 
   useEffect(() => {
     fetchTenders();
@@ -276,10 +304,10 @@ export function useComparisonData() {
   // Rebuild hierarchy when costType changes and we have cached data
   useEffect(() => {
     if (rawItems1 && rawItems2) {
-      const data = buildHierarchy(rawItems1, rawItems2, costType, volumeMaps || undefined);
+      const data = buildHierarchy(rawItems1, rawItems2, costType, volumeMaps || undefined, notesMap);
       setComparisonData(data);
     }
-  }, [costType, rawItems1, rawItems2, volumeMaps]);
+  }, [costType, rawItems1, rawItems2, volumeMaps, notesMap]);
 
   const fetchTendersData = async () => {
     try {
@@ -316,12 +344,13 @@ export function useComparisonData() {
       setTender1Info(t1);
       setTender2Info(t2);
 
-      // Load BOQ items and volumes for both tenders in parallel
-      const [items1, items2, vol1, vol2] = await Promise.all([
+      // Load BOQ items, volumes and notes for both tenders in parallel
+      const [items1, items2, vol1, vol2, loadedNotes] = await Promise.all([
         fetchBoqItems(selectedTender1),
         fetchBoqItems(selectedTender2),
         fetchVolumes(selectedTender1),
         fetchVolumes(selectedTender2),
+        fetchNotes(selectedTender1, selectedTender2),
       ]);
 
       const vols: VolumeMaps = {
@@ -329,13 +358,14 @@ export function useComparisonData() {
         detail2: vol2.detailMap, group2: vol2.groupMap,
       };
 
-      // Cache raw items and volumes
+      // Cache raw items, volumes and notes
       setRawItems1(items1);
       setRawItems2(items2);
       setVolumeMaps(vols);
+      setNotesMap(loadedNotes);
 
       // Build comparison with current costType
-      const data = buildHierarchy(items1, items2, costType, vols);
+      const data = buildHierarchy(items1, items2, costType, vols, loadedNotes);
       setComparisonData(data);
       message.success('Данные успешно загружены');
     } catch (error: any) {
@@ -344,6 +374,44 @@ export function useComparisonData() {
       setLoading(false);
     }
   };
+
+  // Save note to DB (upsert)
+  const saveNote = useCallback(async (
+    categoryName: string,
+    detailKey: string | null,
+    note: string
+  ) => {
+    if (!selectedTender1 || !selectedTender2) return;
+
+    try {
+      const row: any = {
+        tender_id_1: selectedTender1,
+        tender_id_2: selectedTender2,
+        cost_category_name: categoryName,
+        detail_category_key: detailKey,
+        note,
+      };
+
+      const { error } = await supabase
+        .from('comparison_notes')
+        .upsert(row, {
+          onConflict: 'tender_id_1,tender_id_2,cost_category_name,detail_category_key',
+        });
+
+      if (error) throw error;
+
+      // Update local cache
+      const mapKey = detailKey || `main__${categoryName}`;
+      setNotesMap(prev => {
+        const next = new Map(prev);
+        if (note) next.set(mapKey, note);
+        else next.delete(mapKey);
+        return next;
+      });
+    } catch (error: any) {
+      message.error('Ошибка сохранения примечания: ' + error.message);
+    }
+  }, [selectedTender1, selectedTender2]);
 
   // Totals
   const totalStats = comparisonData.reduce(
@@ -369,5 +437,6 @@ export function useComparisonData() {
     costType, setCostType,
     loadComparisonData,
     totalStats, diffPercent,
+    saveNote,
   };
 }

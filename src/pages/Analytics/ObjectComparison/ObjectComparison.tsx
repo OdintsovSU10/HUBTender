@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Typography, Select, Table, Space, Statistic, Row, Col, Button, Spin, Segmented } from 'antd';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Card, Typography, Select, Table, Space, Statistic, Row, Col, Button, Spin, Segmented, Input } from 'antd';
 import { BarChartOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -54,6 +54,7 @@ const ObjectComparison: React.FC = () => {
     costType, setCostType,
     loadComparisonData,
     totalStats, diffPercent,
+    saveNote,
   } = useComparisonData();
 
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
@@ -62,6 +63,12 @@ const ObjectComparison: React.FC = () => {
   const t1Label = tenderLabel(tender1Info, 'Тендер 1');
   const t2Label = tenderLabel(tender2Info, 'Тендер 2');
   const isDetailed = viewMode === 'detailed';
+
+  const handleNoteBlur = useCallback((record: ComparisonRow, value: string) => {
+    const categoryName = record.is_main_category ? record.category : (record.mainCategoryName || '');
+    const detailKey = record.is_main_category ? null : record.key;
+    saveNote(categoryName, detailKey, value);
+  }, [saveNote]);
 
   const columns: ColumnsType<ComparisonRow> = useMemo(() => {
     const categoryCol = {
@@ -210,15 +217,33 @@ const ObjectComparison: React.FC = () => {
       render: (v: number) => <DiffPerUnitCell value={v} />,
     });
 
+    const noteCol = {
+      title: <div style={{ textAlign: 'center' }}>Примечание</div>,
+      dataIndex: 'note',
+      key: 'note',
+      width: 200,
+      render: (_: any, record: ComparisonRow) => (
+        <Input.TextArea
+          defaultValue={record.note || ''}
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          onBlur={(e) => handleNoteBlur(record, e.target.value)}
+          placeholder="—"
+          variant="borderless"
+          style={{ padding: '2px 4px', fontSize: '13px' }}
+        />
+      ),
+    };
+
     return [
       categoryCol,
       { title: <div style={{ textAlign: 'center' }}>{t1Label}</div>, children: t1Children },
       { title: <div style={{ textAlign: 'center' }}>{t2Label}</div>, children: t2Children },
       { title: <div style={{ textAlign: 'center' }}>Разница</div>, children: diffChildren },
+      noteCol,
     ];
-  }, [isDetailed, t1Label, t2Label]);
+  }, [isDetailed, t1Label, t2Label, handleNoteBlur]);
 
-  const scrollX = isDetailed ? 2700 : 1200;
+  const scrollX = isDetailed ? 2900 : 1400;
 
   const comparisonCardTitle = (
     <Row justify="space-between" align="middle">

@@ -29,5 +29,7 @@ export interface ComparisonRow {
   diff_total_per_unit: number;
   volume1: number;
   volume2: number;
+  note?: string | null;
+  mainCategoryName?: string;
   children?: ComparisonRow[];
 }
