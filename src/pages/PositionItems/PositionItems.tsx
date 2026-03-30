@@ -211,7 +211,7 @@ const PositionItems: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {position.is_additional && <Tag color="orange">ДОП</Tag>}
               <Title level={4} style={{ margin: 0 }}>
-                {position.position_number}. {position.work_name}
+                {position.position_number}. {position.item_no ? `${position.item_no} ` : ''}{position.work_name}
               </Title>
             </div>
 
