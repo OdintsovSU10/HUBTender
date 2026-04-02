@@ -131,7 +131,7 @@ export function useVersionMatching({
             newPosition: newPos,
             score: match.score,
             matchType: match.matchType,
-            transferData: match.matchType === 'auto', // Автоматически включаем перенос для точных совпадений
+            transferData: match.matchType === 'auto' || match.matchType === 'low_confidence', // Включаем перенос для точных и низкоуверенных совпадений
             isAdditional: false,
           });
         }
