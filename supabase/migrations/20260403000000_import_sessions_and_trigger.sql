@@ -1,44 +1,62 @@
--- Migration: Сессии импорта BOQ и автоматический аудит через DB триггер
+-- Migration: BOQ import sessions and automatic audit via DB trigger
 -- Date: 2026-04-03
 
 -- ============================================================
--- 1. Таблица import_sessions (сессии импорта из Excel)
+-- 1. import_sessions table (Excel import sessions)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.import_sessions (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
   tender_id uuid REFERENCES public.tenders(id) ON DELETE CASCADE,
   file_name text,
   items_count integer NOT NULL DEFAULT 0,
   positions_snapshot jsonb,
   imported_at timestamptz NOT NULL DEFAULT now(),
   cancelled_at timestamptz,
-  cancelled_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+  cancelled_by uuid REFERENCES public.users(id) ON DELETE SET NULL
 );
 
-COMMENT ON TABLE public.import_sessions IS 'Сессии массового импорта BOQ из Excel с возможностью отката';
-COMMENT ON COLUMN public.import_sessions.positions_snapshot IS 'Snapshot состояния client_positions до импорта (manual_volume, manual_note) для восстановления при отмене';
-COMMENT ON COLUMN public.import_sessions.items_count IS 'Количество вставленных boq_items в рамках сессии';
-COMMENT ON COLUMN public.import_sessions.cancelled_at IS 'Дата и время отмены импорта (NULL = активная сессия)';
-COMMENT ON COLUMN public.import_sessions.cancelled_by IS 'Кто отменил импорт';
+COMMENT ON TABLE public.import_sessions IS 'Bulk BOQ import sessions from Excel with rollback support';
+COMMENT ON COLUMN public.import_sessions.positions_snapshot IS 'Snapshot of client_positions state before import (manual_volume, manual_note) for restoration on cancellation';
+COMMENT ON COLUMN public.import_sessions.items_count IS 'Number of boq_items inserted within this session';
+COMMENT ON COLUMN public.import_sessions.cancelled_at IS 'Cancellation timestamp (NULL = active session)';
+COMMENT ON COLUMN public.import_sessions.cancelled_by IS 'User who cancelled the import';
 
-CREATE INDEX idx_import_sessions_user_id ON public.import_sessions(user_id);
-CREATE INDEX idx_import_sessions_tender_id ON public.import_sessions(tender_id);
-CREATE INDEX idx_import_sessions_imported_at ON public.import_sessions(imported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_import_sessions_user_id ON public.import_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_import_sessions_tender_id ON public.import_sessions(tender_id);
+CREATE INDEX IF NOT EXISTS idx_import_sessions_imported_at ON public.import_sessions(imported_at DESC);
 
 ALTER TABLE public.import_sessions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "import_sessions_select" ON public.import_sessions
-  FOR SELECT TO authenticated USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'import_sessions' AND policyname = 'import_sessions_select'
+  ) THEN
+    CREATE POLICY "import_sessions_select" ON public.import_sessions
+      FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "import_sessions_insert" ON public.import_sessions
-  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'import_sessions' AND policyname = 'import_sessions_insert'
+  ) THEN
+    CREATE POLICY "import_sessions_insert" ON public.import_sessions
+      FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+  END IF;
+END $$;
 
-CREATE POLICY "import_sessions_update" ON public.import_sessions
-  FOR UPDATE TO authenticated USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'import_sessions' AND policyname = 'import_sessions_update'
+  ) THEN
+    CREATE POLICY "import_sessions_update" ON public.import_sessions
+      FOR UPDATE TO authenticated USING (true);
+  END IF;
+END $$;
 
 -- ============================================================
--- 2. Добавляем import_session_id в boq_items
+-- 2. Add import_session_id column to boq_items
 -- ============================================================
 ALTER TABLE public.boq_items
   ADD COLUMN IF NOT EXISTS import_session_id uuid REFERENCES public.import_sessions(id) ON DELETE SET NULL;
@@ -48,8 +66,8 @@ CREATE INDEX IF NOT EXISTS idx_boq_items_import_session
   WHERE import_session_id IS NOT NULL;
 
 -- ============================================================
--- 3. Обновляем триггер-функцию: теперь использует auth.uid()
---    (предыдущая версия использовала app.current_user_id)
+-- 3. Update trigger function: now uses auth.uid() from JWT
+--    (previous version used app.current_user_id session variable)
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.log_boq_items_changes()
 RETURNS TRIGGER
@@ -63,14 +81,14 @@ DECLARE
   v_old_val jsonb;
   v_new_val jsonb;
 BEGIN
-  -- Получаем user_id напрямую из JWT через auth.uid()
+  -- Resolve user_id directly from JWT via auth.uid()
   BEGIN
     v_user_id := auth.uid();
   EXCEPTION WHEN OTHERS THEN
     v_user_id := NULL;
   END;
 
-  -- Для UPDATE вычисляем список измененных полей
+  -- For UPDATE: compute list of changed fields
   IF TG_OP = 'UPDATE' THEN
     v_changed_fields := ARRAY[]::text[];
 
@@ -84,7 +102,7 @@ BEGIN
       END IF;
     END LOOP;
 
-    -- Если нет реальных изменений — пропускаем запись в аудит
+    -- No real changes — skip audit entry
     IF array_length(v_changed_fields, 1) IS NULL THEN
       RETURN NEW;
     END IF;
@@ -111,7 +129,7 @@ END;
 $$;
 
 -- ============================================================
--- 4. Вешаем триггер на boq_items (автоматический аудит)
+-- 4. Attach audit trigger to boq_items
 -- ============================================================
 DROP TRIGGER IF EXISTS trg_boq_items_audit ON public.boq_items;
 CREATE TRIGGER trg_boq_items_audit
@@ -119,11 +137,11 @@ CREATE TRIGGER trg_boq_items_audit
   FOR EACH ROW EXECUTE FUNCTION public.log_boq_items_changes();
 
 -- ============================================================
--- 5. Упрощаем RPC-функции: убираем ручные вставки в audit
---    (теперь триггер делает это автоматически)
+-- 5. Simplify RPC functions: remove manual audit inserts
+--    (the trigger now handles audit automatically)
 -- ============================================================
 
--- insert_boq_item_with_audit: просто INSERT, триггер запишет в audit
+-- insert_boq_item_with_audit: plain INSERT, trigger writes audit
 CREATE OR REPLACE FUNCTION public.insert_boq_item_with_audit(p_user_id uuid, p_data jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -178,7 +196,7 @@ BEGIN
 END;
 $$;
 
--- update_boq_item_with_audit: просто UPDATE, триггер запишет в audit
+-- update_boq_item_with_audit: plain UPDATE, trigger writes audit
 CREATE OR REPLACE FUNCTION public.update_boq_item_with_audit(p_user_id uuid, p_item_id uuid, p_data jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -218,7 +236,7 @@ BEGIN
 END;
 $$;
 
--- delete_boq_item_with_audit: просто DELETE, триггер запишет в audit
+-- delete_boq_item_with_audit: plain DELETE, trigger writes audit
 CREATE OR REPLACE FUNCTION public.delete_boq_item_with_audit(p_user_id uuid, p_item_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
