@@ -107,6 +107,12 @@ export const normalizeString = (str: string): string => {
   return str.trim().replace(/\s+/g, ' ');
 };
 
+// Нормализация для сравнения при сопоставлении: регистронезависимо + без двойных пробелов.
+// Используется только для ключей поиска — исходные данные не изменяются.
+export const normalizeForLookup = (str: string): string => {
+  return normalizeString(str).toLowerCase();
+};
+
 export const parseNumber = (value: any): number | undefined => {
   if (value === null || value === undefined || value === '') return undefined;
   const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);

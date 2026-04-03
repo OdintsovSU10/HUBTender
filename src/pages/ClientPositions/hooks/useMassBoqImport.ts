@@ -10,6 +10,7 @@ import {
   isWork,
   isMaterial,
   normalizeString,
+  normalizeForLookup,
   normalizePositionNumber,
   parseExcelData,
   validateBoqData,
@@ -66,12 +67,12 @@ export const useMassBoqImport = () => {
 
       const worksMap = new Map<string, string>();
       worksResult.data?.forEach((w: any) => {
-        worksMap.set(`${normalizeString(w.name)}|${w.unit}`, w.id);
+        worksMap.set(`${normalizeForLookup(w.name)}|${w.unit}`, w.id);
       });
 
       const materialsMap = new Map<string, string>();
       materialsResult.data?.forEach((m: any) => {
-        materialsMap.set(`${normalizeString(m.name)}|${m.unit}`, m.id);
+        materialsMap.set(`${normalizeForLookup(m.name)}|${m.unit}`, m.id);
       });
 
       const costsMap = new Map<string, string>();
