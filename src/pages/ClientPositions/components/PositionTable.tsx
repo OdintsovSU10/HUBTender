@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, Table, Typography, Tag, Space, Button } from 'antd';
 import {
   CheckOutlined,
@@ -76,6 +76,7 @@ interface PositionTableProps {
   onClearFilter?: () => void;
   showAllPositions?: boolean;
   onToggleShowAll?: () => void;
+  tableScrollY?: number;
 }
 
 export const PositionTable: React.FC<PositionTableProps> = ({
@@ -135,14 +136,10 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   onClearFilter,
   showAllPositions = false,
   onToggleShowAll,
+  tableScrollY = 600,
 }) => {
   // Состояние для отслеживания открытой позиции
   const [expandedPositionId, setExpandedPositionId] = useState<string | null>(null);
-
-  // Стабильный коллбэк — не зависит ни от каких значений
-  const handleToggleExpanded = useCallback((id: string) => {
-    setExpandedPositionId(prev => prev === id ? null : id);
-  }, []);
 
   const columns: ColumnsType<ClientPosition> = useMemo(() => [
     {
@@ -356,7 +353,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
               onClearPositionBoqItems={onClearPositionBoqItems}
               onStartLevelChange={onStartLevelChange}
               onStartPositionDeleteSelection={onStartPositionDeleteSelection}
-              onToggleExpanded={handleToggleExpanded}
+              onToggleExpanded={() => setExpandedPositionId(isExpanded ? null : record.id)}
             />
           </div>
         );
@@ -487,7 +484,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
           </Button>
         </Space>
       }
-      style={{ marginTop: 24 }}
+      style={{ marginTop: 24, position: 'sticky', top: 0, zIndex: 10 }}
     >
       <Table
         columns={columns}
@@ -531,8 +528,8 @@ export const PositionTable: React.FC<PositionTableProps> = ({
           };
         }}
         pagination={false}
-        scroll={{ x: 1200 }}
-        sticky
+        scroll={{ x: 1200, y: tableScrollY }}
+        virtual
         size="small"
       />
     </Card>

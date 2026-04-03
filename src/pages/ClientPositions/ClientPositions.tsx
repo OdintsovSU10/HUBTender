@@ -39,6 +39,8 @@ const ClientPositions: React.FC = () => {
   const [tempSelectedPositionIds, setTempSelectedPositionIds] = useState<Set<string>>(new Set());
   const [massImportModalOpen, setMassImportModalOpen] = useState(false);
   const [showAllPositions, setShowAllPositions] = useState(false);
+  const [tableScrollY, setTableScrollY] = useState(600);
+
   // Hooks
   const {
     tenders,
@@ -49,9 +51,7 @@ const ClientPositions: React.FC = () => {
     loading,
     setLoading,
     positionCounts,
-    setPositionCounts,
     totalSum,
-    setTotalSum,
     leafPositionIndices,
     fetchClientPositions,
   } = useClientPositions();
@@ -86,7 +86,7 @@ const ClientPositions: React.FC = () => {
     handleCancelLevelChange,
     handleBulkLevelChange,
     clearAllModes,
-  } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme, positionCounts, setPositionCounts, setTotalSum);
+  } = usePositionActions(clientPositions, setClientPositions, setLoading, fetchClientPositions, currentTheme);
 
   const {
     isPositionDeleteMode,
@@ -168,8 +168,19 @@ const ClientPositions: React.FC = () => {
     return clientPositions.filter(pos => selectedPositionIds.has(pos.id));
   }, [clientPositions, isFilterActive, selectedPositionIds, showAllPositions]);
 
+  // Высота tbody: viewport - nav(64) - cardHeader(56) - cardBodyPadding(48) - thead(40) - небольшой запас(8)
+  // Card sticky — тулбар уходит при скролле, Card остаётся
+  useEffect(() => {
+    const update = () => {
+      setTableScrollY(Math.max(300, window.innerHeight - 64 - 56 - 48 - 40 - 8));
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
   // Обработка выбора наименования тендера
-  const handleTenderTitleChange = useCallback((title: string) => {
+  const handleTenderTitleChange = (title: string) => {
     setSelectedTenderTitle(title);
     // Автоматически выбираем последнюю версию нового тендера
     const versionsOfTitle = tenders
@@ -187,10 +198,10 @@ const ClientPositions: React.FC = () => {
       setSelectedVersion(null);
       setClientPositions([]);
     }
-  }, [tenders, shouldFilterArchived, fetchClientPositions, setSelectedTender, setClientPositions]);
+  };
 
   // Обработка выбора версии тендера
-  const handleVersionChange = useCallback((version: number) => {
+  const handleVersionChange = (version: number) => {
     setSelectedVersion(version);
     const tender = tenders.find(t => t.title === selectedTenderTitle && t.version === version);
     if (tender) {
@@ -198,7 +209,7 @@ const ClientPositions: React.FC = () => {
       setSelectedTenderId(tender.id);
       fetchClientPositions(tender.id);
     }
-  }, [tenders, selectedTenderTitle, fetchClientPositions, setSelectedTender]);
+  };
 
   // Автоматический выбор тендера из URL параметров
   useEffect(() => {
@@ -242,25 +253,25 @@ const ClientPositions: React.FC = () => {
 
 
   // Обработчик возврата к выбору
-  const handleBackToSelection = useCallback(() => {
+  const handleBackToSelection = () => {
     setSelectedTender(null);
     setSelectedTenderId(null);
     setSelectedTenderTitle(null);
     setSelectedVersion(null);
     setClientPositions([]);
-  }, [setSelectedTender, setClientPositions]);
+  };
 
   // Обработчик клика по карточке тендера
-  const handleTenderCardClick = useCallback((tender: Tender) => {
+  const handleTenderCardClick = (tender: Tender) => {
     setSelectedTenderTitle(tender.title);
     setSelectedVersion(tender.version || 1);
     setSelectedTender(tender);
     setSelectedTenderId(tender.id);
     fetchClientPositions(tender.id);
-  }, [fetchClientPositions, setSelectedTender]);
+  };
 
   // Обработчики фильтра
-  const handleToggleFilterCheckbox = useCallback((positionId: string) => {
+  const handleToggleFilterCheckbox = (positionId: string) => {
     const clickedIndex = clientPositions.findIndex(p => p.id === positionId);
     if (clickedIndex === -1) return;
 
@@ -299,23 +310,23 @@ const ClientPositions: React.FC = () => {
       }
       return newSet;
     });
-  }, [clientPositions]);
+  };
 
-  const handleApplyFilter = useCallback(async () => {
+  const handleApplyFilter = async () => {
     const positionIds = Array.from(tempSelectedPositionIds);
     await saveFilter(positionIds);
     setShowAllPositions(false);
-  }, [tempSelectedPositionIds, saveFilter]);
+  };
 
-  const handleClearFilter = useCallback(async () => {
+  const handleClearFilter = async () => {
     await clearFilter();
     setTempSelectedPositionIds(new Set());
     setShowAllPositions(false);
-  }, [clearFilter]);
+  };
 
-  const handleToggleShowAll = useCallback(() => {
+  const handleToggleShowAll = () => {
     setShowAllPositions(prev => !prev);
-  }, []);
+  };
 
   // Синхронизация tempSelectedPositionIds с загруженным фильтром
   useEffect(() => {
@@ -359,12 +370,12 @@ const ClientPositions: React.FC = () => {
           onVersionChange={handleVersionChange}
           onBackToSelection={handleBackToSelection}
         />
+
         <DeadlineBar selectedTender={selectedTender} currentTheme={currentTheme} />
       </div>
 
       {/* Таблица позиций заказчика */}
       {selectedTender && (
-        <div style={{ marginTop: 16 }}>
         <PositionTable
           clientPositions={displayedPositions}
           selectedTender={selectedTender}
@@ -426,8 +437,8 @@ const ClientPositions: React.FC = () => {
           onClearFilter={handleClearFilter}
           showAllPositions={showAllPositions}
           onToggleShowAll={handleToggleShowAll}
+          tableScrollY={tableScrollY}
         />
-        </div>
       )}
 
       {/* Модальное окно добавления доп работы */}
