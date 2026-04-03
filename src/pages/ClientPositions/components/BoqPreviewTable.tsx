@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Table, Tag, Typography } from 'antd';
+import { useTheme } from '../../../contexts/ThemeContext';
 import type { ParsedBoqItem, PositionUpdateData, ClientPosition } from '../utils/massBoqImportUtils';
 
 const { Text } = Typography;
@@ -27,8 +28,8 @@ const TYPE_TAG_COLORS: Record<string, string> = {
   'мат': 'blue', 'суб-мат': 'green', 'мат-комп.': 'cyan',
 };
 
-// Те же цвета что в Excel-экспорте
-const TYPE_ROW_COLORS: Record<string, string> = {
+// Светлая тема — те же цвета что в Excel-экспорте
+const ROW_COLORS_LIGHT: Record<string, string> = {
   'раб': '#FFE6CC',
   'суб-раб': '#E6D9F2',
   'раб-комп.': '#FFDDDD',
@@ -37,12 +38,27 @@ const TYPE_ROW_COLORS: Record<string, string> = {
   'мат-комп.': '#CCF2EF',
 };
 
+// Тёмная тема — насыщенные полупрозрачные оттенки
+const ROW_COLORS_DARK: Record<string, string> = {
+  'раб': 'rgba(255, 145, 40, 0.20)',
+  'суб-раб': 'rgba(160, 90, 230, 0.20)',
+  'раб-комп.': 'rgba(255, 75, 75, 0.20)',
+  'мат': 'rgba(60, 130, 255, 0.20)',
+  'суб-мат': 'rgba(50, 185, 80, 0.20)',
+  'мат-комп.': 'rgba(0, 195, 185, 0.20)',
+};
+
 export const BoqPreviewTable: React.FC<BoqPreviewTableProps> = ({
   parsedData,
   positionUpdates,
   clientPositionsMap,
   existingItemsByPosition,
 }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const rowColors = isDark ? ROW_COLORS_DARK : ROW_COLORS_LIGHT;
+  const groupHeaderBg = isDark ? 'rgba(255,255,255,0.07)' : '#f0f0f0';
+
   const rows = useMemo<PreviewRow[]>(() => {
     const result: PreviewRow[] = [];
 
@@ -51,7 +67,10 @@ export const BoqPreviewTable: React.FC<BoqPreviewTableProps> = ({
       if (!position) return;
 
       const existing = existingItemsByPosition.get(position.id) || [];
-      const incoming = parsedData.filter(item => item.matchedPositionId === position.id);
+      // Матчим по positionNumber через clientPositionsMap (matchedPositionId не заполнен до валидации)
+      const incoming = parsedData.filter(item =>
+        clientPositionsMap.get(item.positionNumber)?.id === position.id
+      );
 
       if (existing.length === 0 && incoming.length === 0) return;
 
@@ -62,7 +81,7 @@ export const BoqPreviewTable: React.FC<BoqPreviewTableProps> = ({
       });
 
       existing.forEach(item => {
-        const name = (item.work_names?.name || item.material_names?.name || '—');
+        const name = item.work_names?.name || item.material_names?.name || '—';
         result.push({
           key: `ex-${item.id}`,
           isGroupHeader: false,
@@ -166,8 +185,8 @@ export const BoqPreviewTable: React.FC<BoqPreviewTableProps> = ({
         pagination={{ defaultPageSize: 50, showSizeChanger: false, simple: true }}
         onRow={(row: PreviewRow) => ({
           style: row.isGroupHeader
-            ? { background: '#f0f0f0', fontWeight: 600 }
-            : { background: TYPE_ROW_COLORS[row.itemType || ''] || undefined },
+            ? { background: groupHeaderBg, fontWeight: 600 }
+            : { background: rowColors[row.itemType || ''] || undefined },
         })}
         scroll={{ x: 500 }}
         style={{ fontSize: 12 }}
