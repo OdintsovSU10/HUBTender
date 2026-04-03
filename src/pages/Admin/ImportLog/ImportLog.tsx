@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+  App,
   Card,
   Table,
   Tag,
   Button,
-  Modal,
   Typography,
   Space,
   Tooltip,
-  message,
   Select,
 } from 'antd';
 import {
@@ -45,6 +44,7 @@ interface ImportSessionRow {
 }
 
 const ImportLog: React.FC = () => {
+  const { modal, message } = App.useApp();
   const { user } = useAuth();
   const [sessions, setSessions] = useState<ImportSessionRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +134,7 @@ const ImportLog: React.FC = () => {
   }, [fetchSessions]);
 
   const handleCancel = (session: ImportSessionRow) => {
-    Modal.confirm({
+    modal.confirm({
       title: 'Отменить импорт?',
       content: (
         <Space direction="vertical" size={4}>
