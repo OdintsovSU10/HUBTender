@@ -34,6 +34,9 @@ export const useMassBoqImport = () => {
   const [costCategoriesMap, setCostCategoriesMap] = useState<Map<string, string>>(new Map());
   const [clientPositionsMap, setClientPositionsMap] = useState<Map<string, ClientPosition>>(new Map());
 
+  // Существующие BOQ items по позициям (для предпросмотра)
+  const [existingItemsByPosition, setExistingItemsByPosition] = useState<Map<string, any[]>>(new Map());
+
   // Курсы валют
   const [currencyRates, setCurrencyRates] = useState({ usd: 1, eur: 1, cny: 1 });
 
@@ -386,6 +389,26 @@ export const useMassBoqImport = () => {
   };
 
   // ===========================
+  // ЗАГРУЗКА СУЩЕСТВУЮЩИХ BOQ ITEMS (ПРЕДПРОСМОТР)
+  // ===========================
+
+  const loadExistingItems = async (positionIds: string[]) => {
+    if (positionIds.length === 0) return;
+    const { data } = await supabase
+      .from('boq_items')
+      .select('id, boq_item_type, quantity, total_amount, client_position_id, work_names(name), material_names(name)')
+      .in('client_position_id', positionIds)
+      .order('sort_number');
+
+    const map = new Map<string, any[]>();
+    data?.forEach((item: any) => {
+      if (!map.has(item.client_position_id)) map.set(item.client_position_id, []);
+      map.get(item.client_position_id)!.push(item);
+    });
+    setExistingItemsByPosition(map);
+  };
+
+  // ===========================
   // ДОБАВЛЕНИЕ В НОМЕНКЛАТУРУ
   // ===========================
 
@@ -433,6 +456,7 @@ export const useMassBoqImport = () => {
     setPositionUpdates(new Map());
     setValidationResult(null);
     setUploadProgress(0);
+    setExistingItemsByPosition(new Map());
   };
 
   const getPositionStats = () => {
@@ -468,6 +492,7 @@ export const useMassBoqImport = () => {
     uploading,
     uploadProgress,
     clientPositionsMap,
+    existingItemsByPosition,
 
     // Методы
     loadNomenclature,
@@ -476,6 +501,7 @@ export const useMassBoqImport = () => {
     processWorkBindings,
     insertBoqItems,
     addMissingToNomenclature,
+    loadExistingItems,
     reset,
     getPositionStats,
   };

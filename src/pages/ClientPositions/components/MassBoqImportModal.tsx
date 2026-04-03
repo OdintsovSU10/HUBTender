@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Steps, Button, Space, Progress, Alert, Upload, Table, Tag, Typography, Collapse, List } from 'antd';
 import { FileExcelOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { useMassBoqImport } from '../hooks/useMassBoqImport';
+import { BoqPreviewTable } from './BoqPreviewTable';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -26,15 +27,19 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
 
   const {
     parsedData,
+    positionUpdates,
     validationResult,
     uploading,
     uploadProgress,
+    clientPositionsMap,
+    existingItemsByPosition,
     loadNomenclature,
     parseExcelFile,
     validateParsedData,
     processWorkBindings,
     insertBoqItems,
     addMissingToNomenclature,
+    loadExistingItems,
     reset,
     getPositionStats,
   } = useMassBoqImport();
@@ -62,6 +67,16 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
       reset();
     }
   }, [open]);
+
+  // Загрузка существующих BOQ items при переходе на шаг 1
+  useEffect(() => {
+    if (currentStep === 1 && positionUpdates.size > 0) {
+      const ids = Array.from(positionUpdates.keys())
+        .map(posNum => clientPositionsMap.get(posNum)?.id)
+        .filter(Boolean) as string[];
+      loadExistingItems(ids);
+    }
+  }, [currentStep, positionUpdates]);
 
   // Обработка загрузки файла
   const handleFileUpload = async (file: File) => {
@@ -356,6 +371,18 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
                 },
               ]}
             />
+
+            {/* Предпросмотр: существующие и новые строки */}
+            <Collapse defaultActiveKey={['preview']} style={{ marginBottom: 16 }}>
+              <Panel header="Предпросмотр строк (существующие и новые)" key="preview">
+                <BoqPreviewTable
+                  parsedData={parsedData}
+                  positionUpdates={positionUpdates}
+                  clientPositionsMap={clientPositionsMap}
+                  existingItemsByPosition={existingItemsByPosition}
+                />
+              </Panel>
+            </Collapse>
 
             {/* Ошибки валидации */}
             {validationResult && !validationResult.isValid && (
