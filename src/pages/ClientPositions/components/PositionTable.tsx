@@ -218,7 +218,7 @@ export const PositionTable: React.FC<PositionTableProps> = ({
                 </Text>
               )
             )}
-            <Text>{record.work_name}</Text>
+            <Text style={{ fontWeight: 700, fontFamily: 'Georgia, "Times New Roman", serif' }}>{record.work_name}</Text>
           </div>
         );
       },
