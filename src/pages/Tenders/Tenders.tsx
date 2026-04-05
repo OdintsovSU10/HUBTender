@@ -148,7 +148,7 @@ const Tenders: React.FC = () => {
         >
           <Tabs
             activeKey={activeTab}
-            onChange={(key) => setActiveTab(key as 'current' | 'waiting' | 'archive')}
+            onChange={(key) => { setActiveTab(key as 'current' | 'waiting' | 'archive'); setCurrentPage(1); }}
             items={[
               {
                 key: 'current',

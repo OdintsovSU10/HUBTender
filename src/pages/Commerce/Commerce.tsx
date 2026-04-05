@@ -10,7 +10,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function Commerce() {
   const { user } = useAuth();
-  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+  // Архивные тендеры отображаются в фильтре для всех пользователей
+  const shouldFilterArchived = false;
 
   const {
     loading,

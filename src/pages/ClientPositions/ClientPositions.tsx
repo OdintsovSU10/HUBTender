@@ -101,8 +101,8 @@ const ClientPositions: React.FC = () => {
   // Хук фильтрации позиций и получение информации о пользователе
   const { user } = useAuth();
 
-  // Проверка роли для фильтрации архивных тендеров
-  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+  // Архивные тендеры отображаются в фильтре для всех пользователей
+  const shouldFilterArchived = false;
 
   // Роли с доступом к изменению уровня иерархии
   const canChangeLevel = ['administrator', 'developer', 'director', 'veduschiy_inzhener'].includes(user?.role_code || '');

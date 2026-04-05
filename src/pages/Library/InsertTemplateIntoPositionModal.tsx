@@ -42,7 +42,8 @@ const InsertTemplateIntoPositionModal: React.FC<InsertTemplateIntoPositionModalP
   onSuccess,
 }) => {
   const { user } = useAuth();
-  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+  // Архивные тендеры отображаются в фильтре для всех пользователей
+  const shouldFilterArchived = false;
 
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);

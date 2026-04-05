@@ -72,6 +72,8 @@ export async function createNewVersion(
     tz_link: sourceTender.tz_link,
     qa_form_link: sourceTender.qa_form_link,
     markup_tactic_id: sourceTender.markup_tactic_id,
+    housing_class: sourceTender.housing_class,
+    construction_scope: sourceTender.construction_scope,
   };
 
   const { data: newTender, error: tenderError } = await supabase

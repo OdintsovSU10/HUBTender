@@ -50,8 +50,8 @@ const Bsm: React.FC = () => {
   const [allItems, setAllItems] = useState<BoqItemData[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'materials' | 'works'>('all');
 
-  // Проверка роли для фильтрации архивных тендеров
-  const shouldFilterArchived = user?.role_code === 'engineer' || user?.role_code === 'moderator';
+  // Архивные тендеры отображаются в фильтре для всех пользователей
+  const shouldFilterArchived = false;
 
   // Fetch tenders
   const fetchTenders = async () => {

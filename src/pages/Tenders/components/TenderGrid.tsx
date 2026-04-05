@@ -71,6 +71,8 @@ export const TenderGrid: React.FC<TenderGridProps> = ({
     setDragOverId(null);
   };
 
+  const paginatedData = dataSource.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
@@ -116,7 +118,7 @@ export const TenderGrid: React.FC<TenderGridProps> = ({
 
       {/* Список тендеров */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {dataSource.map((tender) => (
+        {paginatedData.map((tender) => (
           <div
             key={tender.id}
             onDragEnter={() => handleDragEnter(tender)}
@@ -139,19 +141,17 @@ export const TenderGrid: React.FC<TenderGridProps> = ({
       </div>
 
       {/* Пагинация */}
-      {totalCount > pageSize && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16 }}>
-          <Pagination
-            current={currentPage}
-            pageSize={pageSize}
-            total={totalCount}
-            onChange={onPageChange}
-            showSizeChanger
-            showTotal={(total) => `Всего ${total} записей`}
-            pageSizeOptions={['10', '20', '50', '100']}
-          />
-        </div>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16 }}>
+        <Pagination
+          current={currentPage}
+          pageSize={pageSize}
+          total={totalCount}
+          onChange={onPageChange}
+          showSizeChanger
+          showTotal={(total) => `Всего ${total} записей`}
+          pageSizeOptions={['20', '50', '100']}
+        />
+      </div>
     </div>
   );
 };

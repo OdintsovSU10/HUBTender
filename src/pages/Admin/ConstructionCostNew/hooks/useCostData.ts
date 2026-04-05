@@ -40,8 +40,8 @@ export const useCostData = (userRole?: string) => {
   const [costType, setCostType] = useState<'base' | 'commercial'>('base');
   const [groupVolumes, setGroupVolumes] = useState<Map<string, number>>(new Map());
 
-  // Проверка роли для фильтрации архивных тендеров
-  const shouldFilterArchived = userRole === 'engineer' || userRole === 'moderator';
+  // Архивные тендеры отображаются в фильтре для всех пользователей
+  const shouldFilterArchived = false;
 
   const getTenderTitles = (): TenderOption[] => {
     const uniqueTitles = new Map<string, TenderOption>();

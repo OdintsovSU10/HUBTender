@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Table, Typography, Tag, Space, Button } from 'antd';
+import { Card, Table, Typography, Tag, Space, Button, Tooltip } from 'antd';
 import {
   CheckOutlined,
   DownloadOutlined,
@@ -244,7 +244,15 @@ export const PositionTable: React.FC<PositionTableProps> = ({
           {record.client_note && (
             <div>
               <Text type="secondary">Примечание: </Text>
-              <Text italic>{record.client_note}</Text>
+              <Tooltip
+                title={record.client_note}
+                color={currentTheme === 'dark' ? '#1f2937' : '#ffffff'}
+                overlayInnerStyle={{ color: currentTheme === 'dark' ? '#e5e7eb' : '#111827', maxWidth: 360 }}
+              >
+                <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', cursor: 'default', fontStyle: 'italic' }}>
+                  {record.client_note}
+                </div>
+              </Tooltip>
             </div>
           )}
         </div>
@@ -273,7 +281,19 @@ export const PositionTable: React.FC<PositionTableProps> = ({
             )}
             <div>
               <Text type="secondary">Примечание: </Text>
-              <Text>{record.manual_note || '-'}</Text>
+              {record.manual_note ? (
+                <Tooltip
+                  title={record.manual_note}
+                  color={currentTheme === 'dark' ? '#1f2937' : '#ffffff'}
+                  overlayInnerStyle={{ color: currentTheme === 'dark' ? '#e5e7eb' : '#111827', maxWidth: 360 }}
+                >
+                  <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', cursor: 'default' }}>
+                    {record.manual_note}
+                  </div>
+                </Tooltip>
+              ) : (
+                <Text>-</Text>
+              )}
             </div>
           </div>
         );
