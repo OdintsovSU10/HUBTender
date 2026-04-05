@@ -31,7 +31,9 @@ import {
   SwapOutlined,
   BuildOutlined,
   ImportOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
+import { NotesPopoverContent } from './NotesPopover';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -59,9 +61,15 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [calcValue, setCalcValue] = useState('0');
   const [calcOpen, setCalcOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const calcInputRef = useRef<any>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // tenderId доступен, когда пользователь находится на странице позиций заказчика
+  const currentTenderId = location.pathname === '/positions'
+    ? new URLSearchParams(location.search).get('tenderId')
+    : null;
   const { theme: currentTheme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
   const {
@@ -547,6 +555,34 @@ const MainLayout: React.FC<MainLayoutProps> = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            {/* Заметки к тендеру */}
+            <Popover
+              content={
+                <NotesPopoverContent
+                  tenderId={currentTenderId}
+                  userId={user?.id ?? null}
+                  roleCode={user?.role_code ?? ''}
+                  currentTheme={currentTheme}
+                />
+              }
+              title="Заметки к тендеру"
+              trigger="click"
+              open={notesOpen}
+              onOpenChange={setNotesOpen}
+              placement="bottomRight"
+              destroyTooltipOnHide
+            >
+              <MessageOutlined
+                style={{
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: currentTenderId ? '#10b981' : '#8c8c8c',
+                  fontWeight: 'bold',
+                }}
+              />
+            </Popover>
+
+            {/* Калькулятор */}
             <Popover
               content={
                 <div style={{ width: '300px' }}>

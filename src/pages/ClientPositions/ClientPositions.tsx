@@ -193,11 +193,13 @@ const ClientPositions: React.FC = () => {
       setSelectedTender(latest);
       setSelectedTenderId(latest.id);
       fetchClientPositions(latest.id);
+      setSearchParams({ tenderId: latest.id });
     } else {
       setSelectedTender(null);
       setSelectedTenderId(null);
       setSelectedVersion(null);
       setClientPositions([]);
+      setSearchParams({});
     }
   };
 
@@ -209,6 +211,7 @@ const ClientPositions: React.FC = () => {
       setSelectedTender(tender);
       setSelectedTenderId(tender.id);
       fetchClientPositions(tender.id);
+      setSearchParams({ tenderId: tender.id });
     }
   };
 
@@ -263,6 +266,7 @@ const ClientPositions: React.FC = () => {
     setSelectedTenderTitle(null);
     setSelectedVersion(null);
     setClientPositions([]);
+    setSearchParams({});
   };
 
   // Обработчик клика по карточке тендера
@@ -272,6 +276,7 @@ const ClientPositions: React.FC = () => {
     setSelectedTender(tender);
     setSelectedTenderId(tender.id);
     fetchClientPositions(tender.id);
+    setSearchParams({ tenderId: tender.id });
   };
 
   // Обработчики фильтра

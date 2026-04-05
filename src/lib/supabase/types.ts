@@ -1131,3 +1131,37 @@ export interface ProjectFull extends ProjectInsert {
   tender_name?: string;
   tender_number?: string;
 }
+
+// =============================================
+// TenderNote — заметки пользователей к тендеру
+// =============================================
+
+export interface TenderNoteInsert {
+  tender_id: string;
+  user_id: string;
+  note_text: string;
+}
+
+export interface TenderNote extends TenderNoteInsert {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** С данными автора (для отображения привилегированным ролям) */
+export interface TenderNoteFull extends TenderNote {
+  user_full_name: string;
+}
+
+/** Коды ролей, которые видят все заметки тендера:
+ *  Администратор, Разработчик, Руководитель, Ведущий инженер */
+export const NOTE_VIEWER_ROLES = [
+  'administrator',
+  'developer',
+  'director',
+  'senior_group',
+  'veduschiy_inzhener',
+] as const;
+
+export const canViewAllNotes = (roleCode: string): boolean =>
+  (NOTE_VIEWER_ROLES as readonly string[]).includes(roleCode);
