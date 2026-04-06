@@ -95,10 +95,12 @@ const Nomenclatures: React.FC = () => {
           currentPage={currentPage}
           pageSize={pageSize}
           showDuplicatesOnly={materials.showDuplicatesOnly}
+          duplicatesCount={materials.duplicatesCount}
           onDelete={materials.deleteMaterial}
           onSave={materials.saveMaterial}
           onPageChange={handlePageChange}
           onToggleDuplicates={materials.toggleDuplicatesFilter}
+          onDeleteDuplicates={materials.deleteAllDuplicates}
         />
       ),
     },
@@ -115,10 +117,12 @@ const Nomenclatures: React.FC = () => {
           currentPage={currentPage}
           pageSize={pageSize}
           showDuplicatesOnly={works.showDuplicatesOnly}
+          duplicatesCount={works.duplicatesCount}
           onDelete={works.deleteWork}
           onSave={works.saveWork}
           onPageChange={handlePageChange}
           onToggleDuplicates={works.toggleDuplicatesFilter}
+          onDeleteDuplicates={works.deleteAllDuplicates}
         />
       ),
     },

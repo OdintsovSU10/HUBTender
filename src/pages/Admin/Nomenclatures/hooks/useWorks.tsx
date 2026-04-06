@@ -207,6 +207,80 @@ export const useWorks = () => {
     return duplicateKeys;
   };
 
+  // Строит список пар {duplicateId, keeperId} для перепривязки
+  const buildRemapPairs = (): Array<{ duplicateId: string; keeperId: string }> => {
+    const groups = new Map<string, WorkRecord[]>();
+    for (const work of worksData) {
+      const key = `${normalizeName(work.name)}|${work.unit}`;
+      const group = groups.get(key);
+      if (group) {
+        group.push(work);
+      } else {
+        groups.set(key, [work]);
+      }
+    }
+    const pairs: Array<{ duplicateId: string; keeperId: string }> = [];
+    for (const group of groups.values()) {
+      if (group.length > 1) {
+        const keeperId = group[0].id;
+        for (const duplicate of group.slice(1)) {
+          pairs.push({ duplicateId: duplicate.id, keeperId });
+        }
+      }
+    }
+    return pairs;
+  };
+
+  const deleteAllDuplicates = () => {
+    const remapPairs = buildRemapPairs();
+    if (remapPairs.length === 0) {
+      message.info('Дублей не найдено');
+      return;
+    }
+    const theme = localStorage.getItem('tenderHub_theme') || 'light';
+    confirm({
+      title: 'Удаление дублей',
+      icon: <ExclamationCircleOutlined />,
+      content: `Будет удалено ${remapPairs.length} дублирующих записей работ. Связанные позиции BOQ и библиотека будут перепривязаны на оригинал. Продолжить?`,
+      okText: 'Удалить',
+      cancelText: 'Отмена',
+      okButtonProps: { danger: true },
+      rootClassName: theme === 'dark' ? 'dark-modal' : '',
+      onOk: async () => {
+        try {
+          // Перепривязываем все ссылки на дубли → на оригинал
+          for (const { duplicateId, keeperId } of remapPairs) {
+            const { error: boqError } = await supabase
+              .from('boq_items')
+              .update({ work_name_id: keeperId })
+              .eq('work_name_id', duplicateId);
+            if (boqError) throw boqError;
+
+            const { error: libError } = await supabase
+              .from('works_library')
+              .update({ work_name_id: keeperId })
+              .eq('work_name_id', duplicateId);
+            if (libError) throw libError;
+          }
+
+          // Удаляем освободившиеся дубли
+          const toDeleteIds = remapPairs.map((p) => p.duplicateId);
+          const { error: deleteError } = await supabase
+            .from('work_names')
+            .delete()
+            .in('id', toDeleteIds);
+          if (deleteError) throw deleteError;
+
+          message.success(`Удалено ${remapPairs.length} дублей`);
+          await loadWorks();
+        } catch (error: any) {
+          console.error('Ошибка удаления дублей:', error);
+          message.error(error.message || 'Ошибка удаления дублей');
+        }
+      },
+    });
+  };
+
   // Фильтрация данных
   const getFilteredData = (): WorkRecord[] => {
     if (!showDuplicatesOnly) {
@@ -226,11 +300,13 @@ export const useWorks = () => {
 
   return {
     worksData: getFilteredData(),
+    duplicatesCount: buildRemapPairs().length,
     loading,
     showDuplicatesOnly,
     loadWorks,
     saveWork,
     deleteWork,
     toggleDuplicatesFilter,
+    deleteAllDuplicates,
   };
 };
