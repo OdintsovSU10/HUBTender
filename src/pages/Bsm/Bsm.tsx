@@ -37,6 +37,8 @@ interface BoqItemData {
   quote_link?: string; // Ссылка на КП
   work_name_id?: string; // ID работы для UPDATE
   material_name_id?: string; // ID материала для UPDATE
+  detail_cost_category_id?: string;
+  expense_label: string; // "КатегорияЗатрат / Детализация / Локализация"
 }
 
 const Bsm: React.FC = () => {
@@ -49,6 +51,7 @@ const Bsm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [allItems, setAllItems] = useState<BoqItemData[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'materials' | 'works'>('all');
+  const [selectedExpense, setSelectedExpense] = useState<string | null>(null);
 
   // Архивные тендеры отображаются в фильтре для всех пользователей
   const shouldFilterArchived = false;
@@ -107,6 +110,7 @@ const Bsm: React.FC = () => {
   // Обработка выбора наименования тендера
   const handleTenderTitleChange = (title: string) => {
     setSelectedTenderTitle(title);
+    setSelectedExpense(null);
     // Автоматически выбираем последнюю версию нового тендера
     const versionsOfTitle = (shouldFilterArchived
       ? tenders.filter(t => t.title === title && !t.is_archived)
@@ -127,6 +131,7 @@ const Bsm: React.FC = () => {
   // Обработка выбора версии тендера
   const handleVersionChange = (version: number) => {
     setSelectedVersion(version);
+    setSelectedExpense(null);
     const tender = tenders.find(t => t.title === selectedTenderTitle && t.version === version);
     if (tender) {
       setSelectedTenderId(tender.id);
@@ -138,6 +143,18 @@ const Bsm: React.FC = () => {
   const fetchBoqItems = async (tenderId: string) => {
     setLoading(true);
     try {
+      // Загружаем справочник детальных категорий затрат
+      const { data: categories } = await supabase
+        .from('detail_cost_categories')
+        .select('id, name, location, cost_categories(name)');
+
+      const expenseMap = new Map<string, string>();
+      (categories || []).forEach((cat: any) => {
+        const catName = cat.cost_categories?.name || '';
+        const label = [catName, cat.name, cat.location].filter(Boolean).join(' / ');
+        expenseMap.set(cat.id, label);
+      });
+
       // Загружаем ВСЕ BOQ элементы с батчингом (Supabase лимит 1000 строк)
       let data: any[] = [];
       let from = 0;
@@ -157,6 +174,7 @@ const Bsm: React.FC = () => {
             work_name_id,
             material_name_id,
             quote_link,
+            detail_cost_category_id,
             work_names (
               name
             ),
@@ -179,12 +197,13 @@ const Bsm: React.FC = () => {
         }
       }
 
-      // Group by material/work and aggregate
+      // Group by material/work + затрата and aggregate
       const grouped = new Map<string, BoqItemData>();
 
       data?.forEach((item: any) => {
         const name = item.work_names?.name || item.material_names?.name || '—';
-        const key = `${item.boq_item_type}_${item.work_name_id || item.material_name_id}`;
+        const expenseKey = item.detail_cost_category_id || '';
+        const key = `${item.boq_item_type}_${item.work_name_id || item.material_name_id}_${expenseKey}`;
 
         if (grouped.has(key)) {
           const existing = grouped.get(key)!;
@@ -193,6 +212,9 @@ const Bsm: React.FC = () => {
           existing.usage_count += 1;
           // Не перезаписывать quote_link если уже есть
         } else {
+          const expenseLabel = item.detail_cost_category_id
+            ? (expenseMap.get(item.detail_cost_category_id) || '—')
+            : '—';
           grouped.set(key, {
             id: key,
             boq_item_type: item.boq_item_type,
@@ -206,6 +228,8 @@ const Bsm: React.FC = () => {
             quote_link: item.quote_link || '',
             work_name_id: item.work_name_id,
             material_name_id: item.material_name_id,
+            detail_cost_category_id: item.detail_cost_category_id,
+            expense_label: expenseLabel,
           });
         }
       });
@@ -447,7 +471,20 @@ const Bsm: React.FC = () => {
   const isMaterial = (type: BoqItemType) =>
     ['мат', 'суб-мат', 'мат-комп.'].includes(type);
 
-  // Filter items by type and search
+  // Уникальные затраты для фильтра (сортируем, '—' в конец)
+  const expenseOptions = (() => {
+    const unique = new Set<string>();
+    allItems.forEach(item => { if (item.expense_label) unique.add(item.expense_label); });
+    return Array.from(unique)
+      .sort((a, b) => {
+        if (a === '—') return 1;
+        if (b === '—') return -1;
+        return a.localeCompare(b, 'ru');
+      })
+      .map(label => ({ value: label, label }));
+  })();
+
+  // Filter items by type, expense and search
   const getFilteredItems = (filterType: 'all' | 'materials' | 'works') => {
     let filtered = allItems;
 
@@ -455,6 +492,10 @@ const Bsm: React.FC = () => {
       filtered = filtered.filter(item => isMaterial(item.boq_item_type));
     } else if (filterType === 'works') {
       filtered = filtered.filter(item => !isMaterial(item.boq_item_type));
+    }
+
+    if (selectedExpense) {
+      filtered = filtered.filter(item => item.expense_label === selectedExpense);
     }
 
     if (searchText) {
@@ -505,10 +546,25 @@ const Bsm: React.FC = () => {
       },
     },
     {
+      title: 'Затрата',
+      dataIndex: 'expense_label',
+      key: 'expense_label',
+      width: 240,
+      align: 'center' as const,
+      render: (label: string) => (
+        <span style={{ fontSize: 12, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          {label || '—'}
+        </span>
+      ),
+      sorter: (a: BoqItemData, b: BoqItemData) =>
+        (a.expense_label || '').localeCompare(b.expense_label || '', 'ru'),
+    },
+    {
       title: 'Наименование',
       dataIndex: 'name',
       key: 'name',
       width: 300,
+      onHeaderCell: () => ({ style: { textAlign: 'center' as const } }),
       render: (name: string) => (
         <div style={{ whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word' }}>
           {name}
@@ -607,6 +663,7 @@ const Bsm: React.FC = () => {
     const headers = [
       '№',
       'Тип',
+      'Затрата',
       'Наименование',
       'Количество',
       'Ед.изм.',
@@ -620,6 +677,7 @@ const Bsm: React.FC = () => {
     const data = filteredItems.map((item, index) => [
       index + 1,
       item.boq_item_type,
+      item.expense_label || '—',
       item.name,
       item.total_quantity,
       item.unit_code,
@@ -673,18 +731,18 @@ const Bsm: React.FC = () => {
           alignment: {
             wrapText: true,
             vertical: 'center',
-            horizontal: col === 2 ? 'left' : 'center', // Колонка 2 (Наименование) - по левому краю
+            horizontal: col === 3 ? 'left' : 'center', // Наименование(3) - по левому краю, остальные по центру
           },
         };
 
         ws[cellRef].s = baseStyle;
 
         // Установить числовой формат для числовых колонок
-        // Колонка 3 (Количество) - 2 знака после запятой
-        // Колонка 5 (Цена за ед.) - 2 знака после запятой с разделителем тысяч
-        // Колонка 6 (Сумма) - целое число с разделителем тысяч
-        // Колонка 7 (Кол-во позиций) - целое число
-        if (col === 3) {
+        // Колонка 4 (Количество) - 2 знака после запятой
+        // Колонка 6 (Цена за ед.) - 2 знака после запятой с разделителем тысяч
+        // Колонка 7 (Сумма) - целое число с разделителем тысяч
+        // Колонка 8 (Кол-во позиций) - целое число
+        if (col === 4) {
           ws[cellRef].z = '0.00';
           if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
             if (typeof ws[cellRef].v === 'number') {
@@ -697,7 +755,7 @@ const Bsm: React.FC = () => {
               }
             }
           }
-        } else if (col === 5) {
+        } else if (col === 6) {
           ws[cellRef].z = '# ##0.00';
           if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
             if (typeof ws[cellRef].v === 'number') {
@@ -710,7 +768,7 @@ const Bsm: React.FC = () => {
               }
             }
           }
-        } else if (col === 6) {
+        } else if (col === 7) {
           ws[cellRef].z = '# ##0';
           if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
             if (typeof ws[cellRef].v === 'number') {
@@ -723,7 +781,7 @@ const Bsm: React.FC = () => {
               }
             }
           }
-        } else if (col === 7) {
+        } else if (col === 8) {
           ws[cellRef].z = '0';
           if (ws[cellRef].v !== '' && ws[cellRef].v !== null && ws[cellRef].v !== undefined) {
             if (typeof ws[cellRef].v === 'number') {
@@ -744,6 +802,7 @@ const Bsm: React.FC = () => {
     ws['!cols'] = [
       { wch: 5 },   // №
       { wch: 12 },  // Тип
+      { wch: 35 },  // Затрата
       { wch: 40 },  // Наименование
       { wch: 12 },  // Количество
       { wch: 10 },  // Ед.изм.
@@ -971,8 +1030,21 @@ const Bsm: React.FC = () => {
                 >
                   Экспорт в Excel
                 </Button>
+                <Select
+                  placeholder="Фильтр по затрате..."
+                  style={{ width: 280 }}
+                  value={selectedExpense}
+                  onChange={(val) => setSelectedExpense(val)}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={expenseOptions}
+                />
                 <Input
-                  placeholder="Поиск..."
+                  placeholder="Поиск по наименованию..."
                   prefix={<SearchOutlined />}
                   style={{ width: 250 }}
                   value={searchText}
