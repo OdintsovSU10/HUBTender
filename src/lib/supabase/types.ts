@@ -994,6 +994,7 @@ export const PAGE_LABELS: Record<string, string> = {
   '/admin/markup': 'Проценты наценок',
   '/admin/markup_constructor': 'Конструктор наценок',
   '/admin/import-log': 'Журнал импортов строк',
+  '\admin\insurance': 'Страхование от судимостей',
   '/admin/insurance': 'Страхование от судимостей',
   '/users': 'Пользователи',
   '/settings': 'Настройки',
@@ -1032,6 +1033,7 @@ export const PAGES_STRUCTURE = [
       '/admin/markup',
       '/admin/markup_constructor',
       '/admin/import-log',
+      '/admin/insurance',
     ],
   },
   {

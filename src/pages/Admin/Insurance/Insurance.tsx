@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Card, Table, Select, InputNumber, Typography, Space,
-  Row, Col, Statistic, message, Button,
+  Card, Select, InputNumber, Typography, Space,
+  Row, Col, message, Button, Tag,
 } from 'antd';
 import { SafetyCertificateOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 import type { Tender } from '../../../lib/supabase';
+import { getVersionColorByTitle } from '../../../utils/versionColor';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -31,15 +33,7 @@ const DEFAULT_DATA: InsuranceFormData = {
   storage_area: 0,
 };
 
-interface CalcResult {
-  aptTotal: number;
-  parkingTotal: number;
-  storageTotal: number;
-  sumTotal: number;
-  insuranceTotal: number;
-}
-
-function calcInsurance(d: InsuranceFormData): CalcResult {
+function calcInsurance(d: InsuranceFormData) {
   const aptTotal = (d.apt_price_m2 || 0) * (d.apt_area || 0);
   const parkingTotal = (d.parking_price_m2 || 0) * (d.parking_area || 0);
   const storageTotal = (d.storage_price_m2 || 0) * (d.storage_area || 0);
@@ -50,20 +44,21 @@ function calcInsurance(d: InsuranceFormData): CalcResult {
 
 const numFmt = (v: number | string | undefined) =>
   String(v ?? '').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+// Parser for price fields: strip thousands separators
 const numParse = (v: string | undefined) =>
-  Number(String(v ?? '').replace(/\u00a0/g, '').replace(/\s/g, ''));
+  String(v ?? '').replace(/\u00a0/g, '').replace(/\s/g, '') as unknown as number;
+// Parser for area fields: additionally accept comma as decimal separator
+const areaParse = (v: string | undefined) =>
+  String(v ?? '').replace(/\u00a0/g, '').replace(/\s/g, '').replace(',', '.') as unknown as number;
+
 const fmt = (n: number) => Math.round(n).toLocaleString('ru-RU');
 
-interface TableRow {
-  key: string;
-  label: string;
-  priceField: keyof InsuranceFormData | null;
-  areaField: keyof InsuranceFormData | null;
-  total: number;
-  isTotal?: boolean;
-}
+const AREA_ONLY_ROLES = ['engineer', 'senior_group'];
 
 export default function Insurance() {
+  const { user } = useAuth();
+  const isAreaOnly = AREA_ONLY_ROLES.includes(user?.role_code || '');
+
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [selectedTenderTitle, setSelectedTenderTitle] = useState<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
@@ -155,76 +150,85 @@ export default function Insurance() {
 
   const { aptTotal, parkingTotal, storageTotal, sumTotal, insuranceTotal } = calcInsurance(formData);
 
-  const inputProps = (field: keyof InsuranceFormData) => ({
-    value: formData[field] as number,
-    onChange: (v: number | null) => handleChange(field, v),
-    disabled: !selectedTenderId,
-    min: 0,
-    precision: 2,
-    style: { width: '100%' },
-    formatter: numFmt,
-    parser: numParse,
-  });
+  // price fields: disabled for area-only roles
+  const numInput = (field: keyof InsuranceFormData) => (
+    <InputNumber
+      value={formData[field] as number}
+      onChange={(v) => handleChange(field, v as number | null)}
+      disabled={!selectedTenderId || isAreaOnly}
+      min={0}
+      precision={2}
+      style={{ width: '100%' }}
+      formatter={numFmt}
+      parser={numParse}
+    />
+  );
 
-  const pctProps = (field: keyof InsuranceFormData) => ({
-    ...inputProps(field),
-    max: 100,
-    precision: 4,
-    addonAfter: '%',
-    formatter: undefined as any,
-    parser: undefined as any,
-  });
+  // area fields: always editable (when tender selected)
+  const areaInput = (field: keyof InsuranceFormData) => (
+    <InputNumber
+      value={formData[field] as number}
+      onChange={(v) => handleChange(field, v as number | null)}
+      disabled={!selectedTenderId}
+      min={0}
+      precision={2}
+      style={{ width: '100%' }}
+      formatter={numFmt}
+      parser={areaParse}
+    />
+  );
 
-  const rows: TableRow[] = [
-    { key: 'apt', label: 'Квартиры', priceField: 'apt_price_m2', areaField: 'apt_area', total: aptTotal },
-    { key: 'parking', label: 'Паркинг', priceField: 'parking_price_m2', areaField: 'parking_area', total: parkingTotal },
-    { key: 'storage', label: 'Кладовки', priceField: 'storage_price_m2', areaField: 'storage_area', total: storageTotal },
-    { key: 'sum', label: 'Итого', priceField: null, areaField: null, total: sumTotal, isTotal: true },
-  ];
+  // pct fields: disabled for area-only roles
+  const pctInput = (field: keyof InsuranceFormData) => (
+    <InputNumber
+      value={formData[field] as number}
+      onChange={(v) => handleChange(field, v)}
+      disabled={!selectedTenderId || isAreaOnly}
+      min={0}
+      max={100}
+      precision={4}
+      addonAfter="%"
+      style={{ width: '100%' }}
+    />
+  );
 
-  const columns = [
-    {
-      title: 'Тип',
-      dataIndex: 'label',
-      key: 'label',
-      width: 130,
-      render: (v: string, row: TableRow) =>
-        row.isTotal ? <Text strong>{v}</Text> : <Text>{v}</Text>,
-    },
-    {
-      title: 'Цена за м², ₽',
-      key: 'price',
-      width: 200,
-      render: (_: any, row: TableRow) =>
-        row.priceField ? <InputNumber {...inputProps(row.priceField)} /> : null,
-    },
-    {
-      title: 'Площадь, м²',
-      key: 'area',
-      width: 200,
-      render: (_: any, row: TableRow) =>
-        row.areaField ? <InputNumber {...inputProps(row.areaField)} /> : null,
-    },
-    {
-      title: 'Итого, ₽',
-      key: 'total',
-      align: 'right' as const,
-      render: (_: any, row: TableRow) => (
-        <Text strong={row.isTotal}>{fmt(row.total)} ₽</Text>
-      ),
-    },
-  ];
+  const quickCards = tenders.filter(t => !t.is_archived).slice(0, 6);
+  const headerTags = tenders.slice(0, 8);
+
+  // Styles for the property table
+  const borderColor = '#d9d9d9';
+  const groupBorder = '2px solid #10b981';
+
+  const thBase: React.CSSProperties = {
+    padding: '8px 10px',
+    textAlign: 'center',
+    fontWeight: 600,
+    fontSize: 13,
+    background: 'rgba(0,0,0,0.04)',
+    borderBottom: `1px solid ${borderColor}`,
+    borderLeft: `1px solid ${borderColor}`,
+  };
+  const thGroup: React.CSSProperties = { ...thBase, borderLeft: groupBorder };
+  const thSub: React.CSSProperties = { ...thBase, fontWeight: 400, fontSize: 12 };
+  const thSubGroup: React.CSSProperties = { ...thSub, borderLeft: groupBorder };
+  const tdBase: React.CSSProperties = {
+    padding: '10px 10px',
+    textAlign: 'center',
+    borderLeft: `1px solid ${borderColor}`,
+    verticalAlign: 'middle',
+  };
+  const tdGroup: React.CSSProperties = { ...tdBase, borderLeft: groupBorder };
 
   if (!selectedTenderId) {
     return (
-      <Card bordered={false}>
-        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+      <Card bordered={false} style={{ height: '100%' }}>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
           <SafetyCertificateOutlined style={{ fontSize: 56, color: '#10b981', marginBottom: 16 }} />
           <Title level={3} style={{ marginBottom: 8 }}>Страхование от судимостей</Title>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 32, fontSize: 15 }}>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 24, fontSize: 15 }}>
             Выберите тендер для редактирования параметров страхования
           </Text>
-          <Space size="middle" wrap>
+          <Space size="middle" wrap style={{ justifyContent: 'center', display: 'flex', marginBottom: 32 }}>
             <Select
               placeholder="Наименование тендера"
               style={{ width: 400 }}
@@ -248,6 +252,60 @@ export default function Insurance() {
               />
             )}
           </Space>
+          {quickCards.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                Или выберите из списка:
+              </Text>
+              <Row gutter={[16, 16]} justify="center">
+                {quickCards.map(tender => (
+                  <Col key={tender.id}>
+                    <Card
+                      hoverable
+                      style={{
+                        width: 200,
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                      }}
+                      onClick={() => selectTender(tender.id, tender.title, tender.version || 1)}
+                    >
+                      <div style={{ marginBottom: 8 }}>
+                        <Tag color="#10b981">{tender.tender_number}</Tag>
+                      </div>
+                      <div style={{
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexWrap: 'nowrap',
+                        gap: 4,
+                      }}>
+                        <Text strong style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 140,
+                        }}>
+                          {tender.title}
+                        </Text>
+                        <Tag
+                          color={getVersionColorByTitle(tender.version, tender.title, tenders)}
+                          style={{ flexShrink: 0, margin: 0 }}
+                        >
+                          v{tender.version || 1}
+                        </Tag>
+                      </div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {tender.client_name}
+                      </Text>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          )}
         </div>
       </Card>
     );
@@ -258,7 +316,7 @@ export default function Insurance() {
       bordered={false}
       loading={loading}
       title={
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        <Space direction="vertical" size={6} style={{ width: '100%' }}>
           <Button
             icon={<ArrowLeftOutlined />}
             type="primary"
@@ -273,7 +331,7 @@ export default function Insurance() {
             Назад к выбору
           </Button>
           <Title level={4} style={{ margin: 0 }}>Страхование от судимостей</Title>
-          <Space>
+          <Space wrap>
             <Text type="secondary">Тендер:</Text>
             <Select
               showSearch
@@ -292,66 +350,114 @@ export default function Insurance() {
               style={{ width: 140 }}
             />
           </Space>
+          {headerTags.length > 0 && (
+            <Space size={4} wrap>
+              <Text type="secondary" style={{ fontSize: 11 }}>Быстрый выбор:</Text>
+              {headerTags.map(t => (
+                <Tag
+                  key={t.id}
+                  color={t.id === selectedTenderId ? 'green' : 'default'}
+                  style={{ cursor: 'pointer', fontSize: 12, margin: 0 }}
+                  onClick={() => selectTender(t.id, t.title, t.version || 1)}
+                >
+                  {t.title} v{t.version || 1}
+                </Tag>
+              ))}
+            </Space>
+          )}
         </Space>
       }
     >
-      {/* Проценты */}
-      <Row gutter={24} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} md={8} lg={6}>
+      {/* Проценты + Итог страхования */}
+      <Row gutter={16} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={8} lg={5} style={{ display: 'flex' }}>
           <Card
             size="small"
             title={<Text type="secondary" style={{ fontSize: 13 }}>% судебных квартир</Text>}
-            style={{ background: 'rgba(16,185,129,0.06)' }}
+            style={{ background: 'rgba(16,185,129,0.06)', flex: 1 }}
+            styles={{ body: { paddingTop: 8, paddingBottom: 8 } }}
           >
-            <InputNumber {...pctProps('judicial_pct')} style={{ width: '100%' }} />
+            {pctInput('judicial_pct')}
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={8} lg={6}>
+        <Col xs={24} sm={8} lg={5} style={{ display: 'flex' }}>
           <Card
             size="small"
             title={<Text type="secondary" style={{ fontSize: 13 }}>% от общей суммы</Text>}
-            style={{ background: 'rgba(16,185,129,0.06)' }}
+            style={{ background: 'rgba(16,185,129,0.06)', flex: 1 }}
+            styles={{ body: { paddingTop: 8, paddingBottom: 8 } }}
           >
-            <InputNumber {...pctProps('total_pct')} style={{ width: '100%' }} />
+            {pctInput('total_pct')}
           </Card>
         </Col>
-      </Row>
-
-      {/* Таблица параметров */}
-      <Table<TableRow>
-        bordered
-        size="middle"
-        dataSource={rows}
-        columns={columns}
-        pagination={false}
-        style={{ marginBottom: 24 }}
-        rowClassName={(r) => r.isTotal ? 'insurance-total-row' : ''}
-      />
-
-      {/* Итог страхования */}
-      <Row justify="end">
-        <Col>
+        <Col xs={24} sm={8} lg={5} style={{ display: 'flex' }}>
           <Card
-            style={{
-              background: 'rgba(16,185,129,0.10)',
-              border: '1px solid #10b981',
-              minWidth: 340,
-            }}
+            size="small"
+            title={
+              <Text style={{ fontSize: 13, fontWeight: 600, color: '#10b981' }}>
+                Итого страхование от судимостей
+              </Text>
+            }
+            style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid #10b981', flex: 1 }}
+            styles={{ body: { paddingTop: 8, paddingBottom: 8 } }}
           >
-            <Statistic
-              title={<span style={{ fontSize: 14, fontWeight: 600 }}>Итого страхование от судимостей</span>}
-              value={insuranceTotal}
-              precision={0}
-              valueStyle={{ color: '#10b981', fontSize: 28, fontWeight: 700 }}
-              formatter={(v) => fmt(Number(v))}
-              suffix="₽"
-            />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {fmt(sumTotal)} ₽ × {formData.judicial_pct}% × {formData.total_pct}%
+            <Text style={{ color: '#10b981', fontSize: 18, fontWeight: 700, display: 'block' }}>
+              {fmt(insuranceTotal)} ₽
+            </Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              {fmt(sumTotal)} × {formData.judicial_pct}% × {formData.total_pct}%
             </Text>
           </Card>
         </Col>
       </Row>
+
+      {/* Таблица параметров недвижимости — нативный <table> для стабильности инпутов */}
+      <div style={{ border: `1px solid ${borderColor}`, borderRadius: 8, overflow: 'auto', marginBottom: 24 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 900 }}>
+          <colgroup>
+            <col /><col /><col />
+            <col /><col /><col />
+            <col /><col /><col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th colSpan={3} style={thBase}>Квартиры</th>
+              <th colSpan={3} style={thGroup}>Паркинг</th>
+              <th colSpan={3} style={thGroup}>Кладовки</th>
+            </tr>
+            <tr>
+              <th style={thSub}>Цена за м², ₽</th>
+              <th style={thSub}>Площадь, м²</th>
+              <th style={thSub}>Итого, ₽</th>
+              <th style={thSubGroup}>Цена за м², ₽</th>
+              <th style={thSub}>Площадь, м²</th>
+              <th style={thSub}>Итого, ₽</th>
+              <th style={thSubGroup}>Цена за м², ₽</th>
+              <th style={thSub}>Площадь, м²</th>
+              <th style={thSub}>Итого, ₽</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={tdBase}>{numInput('apt_price_m2')}</td>
+              <td style={tdBase}>{areaInput('apt_area')}</td>
+              <td style={tdBase}>
+                <Text strong style={{ color: '#10b981' }}>{fmt(aptTotal)} ₽</Text>
+              </td>
+              <td style={tdGroup}>{numInput('parking_price_m2')}</td>
+              <td style={tdBase}>{areaInput('parking_area')}</td>
+              <td style={tdBase}>
+                <Text strong style={{ color: '#10b981' }}>{fmt(parkingTotal)} ₽</Text>
+              </td>
+              <td style={tdGroup}>{numInput('storage_price_m2')}</td>
+              <td style={tdBase}>{areaInput('storage_area')}</td>
+              <td style={tdBase}>
+                <Text strong style={{ color: '#10b981' }}>{fmt(storageTotal)} ₽</Text>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
