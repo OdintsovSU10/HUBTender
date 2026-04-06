@@ -157,7 +157,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 8 &&
-        d.row_number <= 15
+        d.row_number <= 16
       );
 
       // Находим строки прибыли и объединяем их
@@ -189,7 +189,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
           if (d.row_number === 11) return combinedOOZ;
           return d;
         })
-        .filter(Boolean);
+        .filter(d => d && (d.total_cost || 0) !== 0); // Скрываем нулевое страхование
 
       const colors = [
         '#13c2c2', // 1,6
@@ -198,6 +198,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         '#52c41a', // ООЗ (объединенная)
         '#faad14', // ОФЗ
         '#1890ff', // Прибыль (объединенная)
+        '#10b981', // Страхование от судимостей
       ];
 
       // Создаем массив с цветами и сортируем по убыванию стоимости
@@ -927,7 +928,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 8 &&
-        d.row_number <= 15
+        d.row_number <= 16
       );
 
       // Объединяем строки прибыли
@@ -955,7 +956,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
           if (d.row_number === 11) return combinedOOZ;
           return d;
         })
-        .filter(Boolean);
+        .filter(d => d && (d.total_cost || 0) !== 0); // Скрываем нулевое страхование
 
       const colors = [
         'rgba(19, 194, 194, 0.6)',  // 1,6
@@ -964,6 +965,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         'rgba(82, 196, 26, 0.6)',   // ООЗ (объединенная)
         'rgba(250, 173, 20, 0.6)',  // ОФЗ
         'rgba(24, 144, 255, 0.6)',  // Прибыль (объединенная)
+        'rgba(16, 185, 129, 0.6)',  // Страхование от судимостей
       ];
 
       barItems = filteredMarkups.map((d, idx) => ({
@@ -1170,7 +1172,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
         !d.is_header &&
         !d.is_total &&
         d.row_number >= 8 &&
-        d.row_number <= 15
+        d.row_number <= 16
       );
 
       // Объединяем строки прибыли
@@ -1198,7 +1200,7 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
           if (d.row_number === 11) return combinedOOZ;
           return d;
         })
-        .filter(Boolean);
+        .filter(d => d && (d.total_cost || 0) !== 0); // Скрываем нулевое страхование
 
       return filteredMarkups.map((d, idx) => ({
         key: idx,
@@ -1601,31 +1603,31 @@ export const IndicatorsCharts: React.FC<IndicatorsChartsProps> = ({
           maxRotation: currentLevel.type === 'indicator' && breakdownData.length > 0 ? 0 : 0,
           minRotation: 0,
           autoSkip: false,
-          callback: function(value: any, index: number) {
-            // Для детализации категорий затрат разбиваем на две строки
-            if (currentLevel.type === 'indicator' && breakdownData.length > 0) {
-              const label = this.getLabelForValue(value);
-              // Разбиваем длинные строки на части по 20 символов
-              if (label.length > 20) {
+          callback: function(value: any) {
+            const label = this.getLabelForValue(value);
+            const maxLen = currentLevel.type === 'markups' ? 14 : 20;
+            // Разбиваем длинные метки на несколько строк
+            if (
+              (currentLevel.type === 'indicator' && breakdownData.length > 0) ||
+              currentLevel.type === 'markups'
+            ) {
+              if (label.length > maxLen) {
                 const words = label.split(' ');
                 const lines: string[] = [];
                 let currentLine = '';
-
-                words.forEach(word => {
-                  if ((currentLine + ' ' + word).length > 20 && currentLine.length > 0) {
+                words.forEach((word: string) => {
+                  if ((currentLine + ' ' + word).length > maxLen && currentLine.length > 0) {
                     lines.push(currentLine);
                     currentLine = word;
                   } else {
                     currentLine = currentLine ? currentLine + ' ' + word : word;
                   }
                 });
-
                 if (currentLine) lines.push(currentLine);
                 return lines;
               }
-              return label;
             }
-            return this.getLabelForValue(value);
+            return label;
           }
         },
         grid: {
