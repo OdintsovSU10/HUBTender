@@ -7,7 +7,7 @@ import {
   MissingNomenclatureGroup,
   isWork,
   isMaterial,
-  normalizeForLookup,
+  buildNomenclatureLookupKey,
   findCostCategoryId,
 } from './massBoqImportUtils';
 
@@ -147,7 +147,7 @@ export const validateBoqData = (
 
     // 4. Проверка номенклатуры
     if (isWork(item.boq_item_type)) {
-      const key = `${normalizeForLookup(item.nameText)}|${item.unit_code}`;
+      const key = buildNomenclatureLookupKey(item.nameText, item.unit_code);
       const workId = workNamesMap.get(key);
 
       if (!workId) {
@@ -170,7 +170,7 @@ export const validateBoqData = (
     }
 
     if (isMaterial(item.boq_item_type)) {
-      const key = `${normalizeForLookup(item.nameText)}|${item.unit_code}`;
+      const key = buildNomenclatureLookupKey(item.nameText, item.unit_code);
       const materialId = materialNamesMap.get(key);
 
       if (!materialId) {

@@ -10,13 +10,42 @@ import {
   isWork,
   isMaterial,
   normalizeString,
-  normalizeForLookup,
+  buildNomenclatureLookupKey,
   normalizePositionNumber,
   parseExcelData,
   validateBoqData,
   processWorkBindings,
   calculateTotalAmount,
 } from '../utils';
+
+const PAGE_SIZE = 1000;
+
+const fetchAllPages = async <T>(
+  queryFactory: (from: number, to: number) => any
+): Promise<T[]> => {
+  const items: T[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await queryFactory(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    const batch = data || [];
+    items.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      break;
+    }
+
+    from += PAGE_SIZE;
+  }
+
+  return items;
+};
 
 // ===========================
 // ОСНОВНОЙ ХУК
@@ -52,38 +81,64 @@ export const useMassBoqImport = () => {
 
   const loadNomenclature = async (tenderId: string) => {
     try {
-      const [worksResult, materialsResult, costsResult, positionsResult, unitsResult] = await Promise.all([
-        supabase.from('work_names').select('id, name, unit').order('name'),
-        supabase.from('material_names').select('id, name, unit').order('name'),
-        supabase.from('detail_cost_categories').select(`
-          id, name, location,
-          cost_categories!inner(name)
-        `).order('name'),
-        supabase.from('client_positions')
-          .select('id, position_number, work_name')
-          .eq('tender_id', tenderId)
-          .order('position_number'),
-        supabase.from('units').select('code, name').eq('is_active', true).order('code'),
+      const [
+        worksData,
+        materialsData,
+        costsData,
+        positionsData,
+        unitsResult,
+      ] = await Promise.all([
+        fetchAllPages<any>((from, to) => (
+          supabase
+            .from('work_names')
+            .select('id, name, unit')
+            .order('name')
+            .range(from, to)
+        )),
+        fetchAllPages<any>((from, to) => (
+          supabase
+            .from('material_names')
+            .select('id, name, unit')
+            .order('name')
+            .range(from, to)
+        )),
+        fetchAllPages<any>((from, to) => (
+          supabase
+            .from('detail_cost_categories')
+            .select(`
+              id, name, location,
+              cost_categories!inner(name)
+            `)
+            .order('name')
+            .range(from, to)
+        )),
+        fetchAllPages<any>((from, to) => (
+          supabase
+            .from('client_positions')
+            .select('id, position_number, work_name')
+            .eq('tender_id', tenderId)
+            .order('position_number')
+            .range(from, to)
+        )),
+        supabase
+          .from('units')
+          .select('code, name')
+          .eq('is_active', true)
+          .order('code'),
       ]);
 
-      if (worksResult.error) throw worksResult.error;
-      if (materialsResult.error) throw materialsResult.error;
-      if (costsResult.error) throw costsResult.error;
-      if (positionsResult.error) throw positionsResult.error;
-      // units error is non-fatal
-
       const worksMap = new Map<string, string>();
-      worksResult.data?.forEach((w: any) => {
-        worksMap.set(`${normalizeForLookup(w.name)}|${w.unit}`, w.id);
+      worksData.forEach((w: any) => {
+        worksMap.set(buildNomenclatureLookupKey(w.name, w.unit), w.id);
       });
 
       const materialsMap = new Map<string, string>();
-      materialsResult.data?.forEach((m: any) => {
-        materialsMap.set(`${normalizeForLookup(m.name)}|${m.unit}`, m.id);
+      materialsData.forEach((m: any) => {
+        materialsMap.set(buildNomenclatureLookupKey(m.name, m.unit), m.id);
       });
 
       const costsMap = new Map<string, string>();
-      costsResult.data?.forEach((c: any) => {
+      costsData.forEach((c: any) => {
         const costCategoryName = c.cost_categories?.name || '';
         costsMap.set(
           `${normalizeString(costCategoryName)}|${normalizeString(c.name)}|${normalizeString(c.location)}`,
@@ -96,7 +151,7 @@ export const useMassBoqImport = () => {
       );
 
       const positionsMap = new Map<string, ClientPosition>();
-      positionsResult.data?.forEach((p: any) => {
+      positionsData.forEach((p: any) => {
         const normalizedNum = normalizePositionNumber(p.position_number);
         positionsMap.set(normalizedNum, {
           id: p.id,
@@ -491,24 +546,53 @@ export const useMassBoqImport = () => {
     try {
       setUploading(true);
 
-      if (works.length > 0) {
+      const existingWorkKeys = new Set(workNamesMap.keys());
+      const existingMaterialKeys = new Set(materialNamesMap.keys());
+
+      const uniqueWorksToInsert = Array.from(
+        new Map(
+          works.map((work) => [
+            buildNomenclatureLookupKey(work.name, work.unit),
+            { name: work.name, unit: work.unit },
+          ])
+        ).entries()
+      )
+        .filter(([key]) => !existingWorkKeys.has(key))
+        .map(([, value]) => value);
+
+      const uniqueMaterialsToInsert = Array.from(
+        new Map(
+          materials.map((material) => [
+            buildNomenclatureLookupKey(material.name, material.unit),
+            { name: material.name, unit: material.unit },
+          ])
+        ).entries()
+      )
+        .filter(([key]) => !existingMaterialKeys.has(key))
+        .map(([, value]) => value);
+
+      if (uniqueWorksToInsert.length > 0) {
         const { error } = await supabase
           .from('work_names')
-          .insert(works.map(w => ({ name: w.name, unit: w.unit })));
+          .insert(uniqueWorksToInsert);
         if (error) throw new Error(`Ошибка добавления работ: ${error.message}`);
       }
 
-      if (materials.length > 0) {
+      if (uniqueMaterialsToInsert.length > 0) {
         const { error } = await supabase
           .from('material_names')
-          .insert(materials.map(m => ({ name: m.name, unit: m.unit })));
+          .insert(uniqueMaterialsToInsert);
         if (error) throw new Error(`Ошибка добавления материалов: ${error.message}`);
       }
 
       await loadNomenclature(tenderId);
 
-      const total = works.length + materials.length;
-      message.success(`Добавлено в номенклатуру: ${total} записей`);
+      const total = uniqueWorksToInsert.length + uniqueMaterialsToInsert.length;
+      if (total > 0) {
+        message.success(`Добавлено в номенклатуру: ${total} записей. Теперь нажмите «Загрузить».`);
+      } else {
+        message.info('Подходящие записи уже есть в номенклатуре. Теперь нажмите «Загрузить».');
+      }
       return true;
     } catch (error: any) {
       message.error(error.message);

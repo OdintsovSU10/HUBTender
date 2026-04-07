@@ -113,6 +113,10 @@ export const normalizeForLookup = (str: string): string => {
   return normalizeString(str).toLowerCase();
 };
 
+export const buildNomenclatureLookupKey = (name: string, unit: string): string => {
+  return `${normalizeForLookup(name)}|${normalizeForLookup(unit)}`;
+};
+
 export const parseNumber = (value: any): number | undefined => {
   if (value === null || value === undefined || value === '') return undefined;
   const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);

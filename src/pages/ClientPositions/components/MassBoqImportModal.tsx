@@ -126,19 +126,8 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
   // Добавить отсутствующую номенклатуру и повторить валидацию
   const handleAddMissingToNomenclature = async () => {
     setAddingToNomenclature(true);
-    const success = await addMissingToNomenclature(tenderId);
+    await addMissingToNomenclature(tenderId);
     setAddingToNomenclature(false);
-    if (success) {
-      const validation = validateParsedData(parsedData);
-      const bindingErrors = processWorkBindings(parsedData);
-      if (bindingErrors.length > 0) {
-        validation.errors.push(...bindingErrors);
-        validation.isValid = false;
-      }
-      if (validation.isValid) {
-        handleImport();
-      }
-    }
   };
 
   // Закрытие
@@ -172,7 +161,6 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
     }
 
     if (currentStep === 1) {
-      const hasErrors = validationResult && !validationResult.isValid;
       const hasMissingNomenclature = validationResult && (
         validationResult.missingNomenclature.works.length > 0 ||
         validationResult.missingNomenclature.materials.length > 0
@@ -209,18 +197,16 @@ export const MassBoqImportModal: React.FC<MassBoqImportModalProps> = ({
           key="import"
           type="primary"
           onClick={handleValidate}
-          disabled={hasErrors || !hasDataToImport || addingToNomenclature || hasUnmappedUnits}
+          disabled={!hasDataToImport || addingToNomenclature || hasUnmappedUnits}
           loading={uploading}
         >
           {hasUnmappedUnits
             ? 'Сопоставьте единицы измерения'
-            : hasErrors
-              ? 'Исправьте ошибки'
-              : parsedData.length > 0 && positionOnlyCount > 0
-                ? `Импортировать ${parsedData.length} элементов + ${positionOnlyCount} поз. ГП`
+            : parsedData.length > 0 && positionOnlyCount > 0
+                ? `Загрузить ${parsedData.length} элементов + ${positionOnlyCount} поз. ГП`
                 : parsedData.length > 0
-                  ? `Импортировать ${parsedData.length} элементов`
-                  : `Обновить ${positionOnlyCount} позиций (данные ГП)`
+                  ? `Загрузить ${parsedData.length} элементов`
+                  : `Загрузить ${positionOnlyCount} позиций (данные ГП)`
           }
         </Button>,
       ];
