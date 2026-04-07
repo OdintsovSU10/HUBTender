@@ -19,7 +19,7 @@ export interface ParsedRow {
   hierarchy_level: number;
   work_name: string;
   unit_code: string;
-  volume: number;
+  volume: number | null;
   client_note: string;
 }
 

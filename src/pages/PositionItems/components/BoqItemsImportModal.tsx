@@ -18,6 +18,8 @@ export const BoqItemsImportModal: React.FC<BoqItemsImportModalProps> = ({
   onClose,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [nomenclatureLoaded, setNomenclatureLoaded] = useState(false);
+  const [addingToNomenclature, setAddingToNomenclature] = useState(false);
 
   const {
     parsedData,
@@ -29,13 +31,21 @@ export const BoqItemsImportModal: React.FC<BoqItemsImportModalProps> = ({
     validateParsedData,
     processWorkBindings,
     insertBoqItems,
+    addMissingToNomenclature,
     reset,
   } = useBoqItemsImport();
 
   // Загрузка справочников при открытии модального окна
   useEffect(() => {
     if (open) {
-      loadNomenclature();
+      loadNomenclature().then(setNomenclatureLoaded);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setNomenclatureLoaded(false);
+      setAddingToNomenclature(false);
     }
   }, [open]);
 
@@ -52,11 +62,11 @@ export const BoqItemsImportModal: React.FC<BoqItemsImportModalProps> = ({
   // Валидация и переход к следующему шагу
   const handleValidate = () => {
     // Обрабатываем привязки материалов к работам
+    const validation = validateParsedData(parsedData);
     const bindingErrors = processWorkBindings(parsedData);
 
     if (bindingErrors.length > 0) {
       // Показываем ошибки привязок
-      const validation = validateParsedData(parsedData);
       validation.errors.push(...bindingErrors);
       validation.isValid = false;
       return;
@@ -67,6 +77,15 @@ export const BoqItemsImportModal: React.FC<BoqItemsImportModalProps> = ({
   };
 
   // Импорт данных
+  const handleAddMissingToNomenclature = async () => {
+    setAddingToNomenclature(true);
+    const success = await addMissingToNomenclature();
+    if (success) {
+      validateParsedData(parsedData);
+    }
+    setAddingToNomenclature(false);
+  };
+
   const handleImport = async () => {
     setCurrentStep(2);
 
@@ -98,20 +117,37 @@ export const BoqItemsImportModal: React.FC<BoqItemsImportModalProps> = ({
 
     if (currentStep === 1) {
       const hasErrors = validationResult && !validationResult.isValid;
+      const hasMissingNomenclature = validationResult && (
+        validationResult.missingNomenclature.works.length > 0 ||
+        validationResult.missingNomenclature.materials.length > 0
+      );
+      const missingCount = hasMissingNomenclature
+        ? validationResult!.missingNomenclature.works.length + validationResult!.missingNomenclature.materials.length
+        : 0;
       console.log('[BoqImportModal] Кнопки шага 1:', {
         hasErrors,
         validationResult,
         parsedDataLength: parsedData.length,
       });
       return [
-        <Button key="back" onClick={() => setCurrentStep(0)} disabled={uploading}>
+        <Button key="back" onClick={() => setCurrentStep(0)} disabled={uploading || addingToNomenclature}>
           Назад
         </Button>,
+        ...(hasMissingNomenclature ? [
+          <Button
+            key="addNomenclature"
+            onClick={handleAddMissingToNomenclature}
+            loading={addingToNomenclature}
+            disabled={uploading}
+          >
+            Р”РѕР±Р°РІРёС‚СЊ РІ РЅРѕРјРµРЅРєР»Р°С‚СѓСЂСѓ ({missingCount})
+          </Button>,
+        ] : []),
         <Button
           key="import"
           type="primary"
           onClick={handleValidate}
-          disabled={hasErrors || parsedData.length === 0}
+          disabled={hasErrors || parsedData.length === 0 || addingToNomenclature}
           loading={uploading}
         >
           {hasErrors ? 'Устранить ошибки' : `Импортировать ${parsedData.length} элементов`}
@@ -150,7 +186,11 @@ export const BoqItemsImportModal: React.FC<BoqItemsImportModalProps> = ({
 
         {/* Шаг 0: Загрузка файла */}
         {currentStep === 0 && (
-          <FileUploadStep onFileUpload={handleFileUpload} uploading={uploading} />
+          <FileUploadStep
+            onFileUpload={handleFileUpload}
+            uploading={uploading}
+            nomenclatureLoaded={nomenclatureLoaded}
+          />
         )}
 
         {/* Шаг 1: Результаты валидации */}

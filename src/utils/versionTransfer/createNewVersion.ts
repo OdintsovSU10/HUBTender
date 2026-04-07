@@ -108,7 +108,7 @@ export async function createNewVersion(
       item_no: pos.item_no,
       work_name: pos.work_name,
       unit_code: unitCode,
-      volume: pos.volume || null,
+      volume: pos.volume ?? null,
       client_note: pos.client_note || null,
       hierarchy_level: pos.hierarchy_level || 0,
       is_additional: false,

@@ -8,7 +8,31 @@ import {
   type ParsedRow,
   type MatchScoreBreakdown,
 } from './calculateMatchScore';
+import { calculateVolumeProximity, normalizeString } from './similarity';
 import type { ClientPosition } from '../../lib/supabase';
+
+const POSITION_WINDOW = 80;
+const MAX_FULL_SCORE_CANDIDATES = 30;
+
+interface PositionMeta {
+  position: ClientPosition;
+  normalizedItemNo: string;
+  normalizedUnitCode: string;
+  normalizedWorkName: string;
+  primaryToken: string;
+  volumeKey: string;
+  index: number;
+}
+
+interface ParsedRowMeta {
+  position: ParsedRow;
+  normalizedItemNo: string;
+  normalizedUnitCode: string;
+  normalizedWorkName: string;
+  primaryToken: string;
+  volumeKey: string;
+  index: number;
+}
 
 /**
  * Результат сопоставления одной позиции
@@ -20,19 +44,216 @@ export interface MatchResult {
   matchType: 'auto' | 'low_confidence';
 }
 
+function normalizeLookup(value: string | null | undefined): string {
+  return normalizeString(value || '');
+}
+
+function formatVolumeKey(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '';
+  }
+
+  return Number(value).toFixed(6);
+}
+
+function extractPrimaryToken(normalizedWorkName: string): string {
+  const token = normalizedWorkName
+    .split(' ')
+    .find(part => part.length >= 3);
+
+  return token || '';
+}
+
+function buildPositionMeta(position: ClientPosition, index: number): PositionMeta {
+  const normalizedWorkName = normalizeLookup(position.work_name);
+
+  return {
+    position,
+    normalizedItemNo: normalizeLookup(position.item_no),
+    normalizedUnitCode: normalizeLookup(position.unit_code),
+    normalizedWorkName,
+    primaryToken: extractPrimaryToken(normalizedWorkName),
+    volumeKey: formatVolumeKey(position.volume),
+    index,
+  };
+}
+
+function buildParsedRowMeta(position: ParsedRow, index: number): ParsedRowMeta {
+  const normalizedWorkName = normalizeLookup(position.work_name);
+
+  return {
+    position,
+    normalizedItemNo: normalizeLookup(position.item_no),
+    normalizedUnitCode: normalizeLookup(position.unit_code),
+    normalizedWorkName,
+    primaryToken: extractPrimaryToken(normalizedWorkName),
+    volumeKey: formatVolumeKey(position.volume),
+    index,
+  };
+}
+
+function buildStrongKey(meta: Pick<PositionMeta, 'normalizedItemNo' | 'normalizedUnitCode' | 'normalizedWorkName'>): string {
+  return `${meta.normalizedItemNo}|${meta.normalizedUnitCode}|${meta.normalizedWorkName}`;
+}
+
+function buildExactKey(meta: Pick<PositionMeta, 'normalizedItemNo' | 'normalizedUnitCode' | 'normalizedWorkName' | 'volumeKey'>): string {
+  return `${buildStrongKey(meta)}|${meta.volumeKey}`;
+}
+
+function pushToMap<T>(map: Map<string, T[]>, key: string, value: T) {
+  if (!key || key === '||' || key === '|||') {
+    return;
+  }
+
+  const bucket = map.get(key) || [];
+  bucket.push(value);
+  map.set(key, bucket);
+}
+
+function addCandidates(
+  target: PositionMeta[],
+  source: PositionMeta[] | undefined,
+  usedOldPositions: Set<string>,
+  seenIds: Set<string>
+) {
+  if (!source) {
+    return;
+  }
+
+  for (const candidate of source) {
+    if (usedOldPositions.has(candidate.position.id) || seenIds.has(candidate.position.id)) {
+      continue;
+    }
+
+    seenIds.add(candidate.position.id);
+    target.push(candidate);
+  }
+}
+
+function buildQuickScore(candidate: PositionMeta, current: ParsedRowMeta): number {
+  let score = 0;
+
+  if (candidate.normalizedItemNo && candidate.normalizedItemNo === current.normalizedItemNo) {
+    score += 140;
+  }
+
+  if (candidate.normalizedWorkName && candidate.normalizedWorkName === current.normalizedWorkName) {
+    score += 60;
+  }
+
+  if (candidate.normalizedUnitCode && candidate.normalizedUnitCode === current.normalizedUnitCode) {
+    score += 25;
+  }
+
+  if (candidate.primaryToken && candidate.primaryToken === current.primaryToken) {
+    score += 15;
+  }
+
+  if (candidate.volumeKey && candidate.volumeKey === current.volumeKey) {
+    score += 15;
+  }
+
+  score += calculateVolumeProximity(candidate.position.volume ?? null, current.position.volume ?? null) * 10;
+  score += Math.max(0, 15 - Math.abs(candidate.index - current.index) / 5);
+
+  return score;
+}
+
+function evaluateBestMatch(
+  candidates: PositionMeta[],
+  current: ParsedRowMeta
+): { oldPos: ClientPosition; score: MatchScoreBreakdown } | null {
+  let bestMatch: {
+    oldPos: ClientPosition;
+    score: MatchScoreBreakdown;
+  } | null = null;
+
+  for (const candidate of candidates) {
+    const score = calculateMatchScore(candidate.position, current.position);
+
+    if (!bestMatch || score.total > bestMatch.score.total) {
+      bestMatch = {
+        oldPos: candidate.position,
+        score,
+      };
+    }
+  }
+
+  return bestMatch;
+}
+
+function getUnusedCandidates(
+  source: PositionMeta[] | undefined,
+  usedOldPositions: Set<string>
+): PositionMeta[] {
+  if (!source) {
+    return [];
+  }
+
+  return source.filter(candidate => !usedOldPositions.has(candidate.position.id));
+}
+
+function collectCandidatePool(
+  oldMetas: PositionMeta[],
+  current: ParsedRowMeta,
+  usedOldPositions: Set<string>,
+  byItemNo: Map<string, PositionMeta[]>,
+  byUnitCode: Map<string, PositionMeta[]>,
+  byToken: Map<string, PositionMeta[]>
+): PositionMeta[] {
+  const candidates: PositionMeta[] = [];
+  const seenIds = new Set<string>();
+
+  if (current.normalizedItemNo) {
+    addCandidates(candidates, byItemNo.get(current.normalizedItemNo), usedOldPositions, seenIds);
+  }
+
+  const windowStart = Math.max(0, current.index - POSITION_WINDOW);
+  const windowEnd = Math.min(oldMetas.length - 1, current.index + POSITION_WINDOW);
+
+  for (let idx = windowStart; idx <= windowEnd; idx++) {
+    const candidate = oldMetas[idx];
+
+    if (
+      usedOldPositions.has(candidate.position.id) ||
+      seenIds.has(candidate.position.id)
+    ) {
+      continue;
+    }
+
+    if (
+      (current.normalizedUnitCode && candidate.normalizedUnitCode === current.normalizedUnitCode) ||
+      (current.primaryToken && candidate.primaryToken === current.primaryToken) ||
+      Math.abs(candidate.index - current.index) <= 10
+    ) {
+      seenIds.add(candidate.position.id);
+      candidates.push(candidate);
+    }
+  }
+
+  if (current.normalizedUnitCode) {
+    addCandidates(candidates, byUnitCode.get(current.normalizedUnitCode), usedOldPositions, seenIds);
+  }
+
+  if (current.primaryToken) {
+    addCandidates(candidates, byToken.get(current.primaryToken), usedOldPositions, seenIds);
+  }
+
+  if (candidates.length === 0) {
+    addCandidates(candidates, oldMetas, usedOldPositions, seenIds);
+  }
+
+  return candidates
+    .sort((left, right) => buildQuickScore(right, current) - buildQuickScore(left, current));
+}
+
 /**
  * Найти лучшие совпадения для всех позиций
  *
  * Алгоритм:
- * 1. Для каждой позиции новой версии ищем лучшее совпадение в старой версии
- * 2. Если score >= threshold (80%) - помечаем как автоматическое совпадение
- * 3. Если score < threshold но > 50% - помечаем как требующее ручного подтверждения
- * 4. Используем жадный алгоритм: одна позиция старой версии может соответствовать только одной позиции новой
- *
- * @param oldPositions - позиции из старой версии тендера
- * @param newPositions - позиции из новой версии (Excel)
- * @param threshold - порог для автоматического сопоставления (по умолчанию 80)
- * @returns массив результатов сопоставления
+ * 1. Сначала пытаемся найти точное совпадение по сильному ключу
+ * 2. Для остальных строк строим короткий список кандидатов
+ * 3. Полный перебор выполняем только как fallback для спорных строк
  */
 export function findBestMatches(
   oldPositions: ClientPosition[],
@@ -42,32 +263,94 @@ export function findBestMatches(
   const results: MatchResult[] = [];
   const usedOldPositions = new Set<string>();
 
-  // Для каждой позиции новой версии
-  for (let newIdx = 0; newIdx < newPositions.length; newIdx++) {
-    const newPos = newPositions[newIdx];
-    let bestMatch: {
-      oldPos: ClientPosition;
-      score: MatchScoreBreakdown;
-    } | null = null;
+  const oldMetas = oldPositions
+    .filter(position => !position.is_additional)
+    .map((position, index) => buildPositionMeta(position, index));
 
-    // Ищем лучшее совпадение среди неиспользованных позиций старой версии
-    for (const oldPos of oldPositions) {
-      // Пропускаем уже использованные позиции
-      if (usedOldPositions.has(oldPos.id)) continue;
+  const newMetas = newPositions.map((position, index) => buildParsedRowMeta(position, index));
 
-      // Пропускаем дополнительные работы (их обрабатываем отдельно)
-      if (oldPos.is_additional) continue;
+  const byItemNo = new Map<string, PositionMeta[]>();
+  const byUnitCode = new Map<string, PositionMeta[]>();
+  const byToken = new Map<string, PositionMeta[]>();
+  const byExactKey = new Map<string, PositionMeta[]>();
+  const byStrongKey = new Map<string, PositionMeta[]>();
 
-      // Вычисляем оценку совпадения
-      const score = calculateMatchScore(oldPos, newPos);
+  for (const meta of oldMetas) {
+    if (meta.normalizedItemNo) {
+      pushToMap(byItemNo, meta.normalizedItemNo, meta);
+    }
 
-      // Обновляем лучшее совпадение
-      if (!bestMatch || score.total > bestMatch.score.total) {
-        bestMatch = { oldPos, score };
+    if (meta.normalizedUnitCode) {
+      pushToMap(byUnitCode, meta.normalizedUnitCode, meta);
+    }
+
+    if (meta.primaryToken) {
+      pushToMap(byToken, meta.primaryToken, meta);
+    }
+
+    pushToMap(byExactKey, buildExactKey(meta), meta);
+    pushToMap(byStrongKey, buildStrongKey(meta), meta);
+  }
+
+  for (const current of newMetas) {
+    const exactCandidates = getUnusedCandidates(byExactKey.get(buildExactKey(current)), usedOldPositions);
+    let bestMatch: { oldPos: ClientPosition; score: MatchScoreBreakdown } | null = null;
+
+    if (exactCandidates.length > 0) {
+      bestMatch = evaluateBestMatch(exactCandidates, current);
+    }
+
+    if (!bestMatch) {
+      const strongCandidates = getUnusedCandidates(byStrongKey.get(buildStrongKey(current)), usedOldPositions);
+
+      if (strongCandidates.length > 0) {
+        bestMatch = evaluateBestMatch(strongCandidates, current);
       }
     }
 
-    // Если нашли совпадение с score > 50%
+    if (!bestMatch || bestMatch.score.total < threshold) {
+      const candidatePool = collectCandidatePool(
+        oldMetas,
+        current,
+        usedOldPositions,
+        byItemNo,
+        byUnitCode,
+        byToken
+      );
+
+      const shortlistedCandidates = candidatePool.slice(0, MAX_FULL_SCORE_CANDIDATES);
+      const shortlistedBestMatch = evaluateBestMatch(shortlistedCandidates, current);
+
+      if (
+        shortlistedBestMatch &&
+        (!bestMatch || shortlistedBestMatch.score.total > bestMatch.score.total)
+      ) {
+        bestMatch = shortlistedBestMatch;
+      }
+
+      const bestScore = bestMatch?.score.total ?? 0;
+      const needsFullFallback =
+        bestScore < threshold &&
+        shortlistedCandidates.length < candidatePool.length;
+
+      if (needsFullFallback) {
+        const evaluatedIds = new Set(shortlistedCandidates.map(candidate => candidate.position.id));
+        const remainingCandidates = oldMetas.filter(candidate =>
+          !usedOldPositions.has(candidate.position.id) &&
+          !evaluatedIds.has(candidate.position.id)
+        );
+
+        const fallbackBestMatch = evaluateBestMatch(remainingCandidates, current);
+
+        if (
+          fallbackBestMatch &&
+          (!bestMatch || fallbackBestMatch.score.total > bestMatch.score.total)
+        ) {
+          bestMatch = fallbackBestMatch;
+        }
+      }
+    }
+
     if (bestMatch && bestMatch.score.total > 50) {
       const matchType = isAutoMatchScore(bestMatch.score, threshold)
         ? 'auto'
@@ -75,12 +358,11 @@ export function findBestMatches(
 
       results.push({
         oldPositionId: bestMatch.oldPos.id,
-        newPositionIndex: newIdx,
+        newPositionIndex: current.index,
         score: bestMatch.score,
         matchType,
       });
 
-      // Помечаем позицию старой версии как использованную
       usedOldPositions.add(bestMatch.oldPos.id);
     }
   }
@@ -90,10 +372,6 @@ export function findBestMatches(
 
 /**
  * Получить не сопоставленные позиции старой версии (удаленные заказчиком)
- *
- * @param oldPositions - все позиции старой версии
- * @param matches - результаты сопоставления
- * @returns позиции, которые не были сопоставлены
  */
 export function getUnmatchedOldPositions(
   oldPositions: ClientPosition[],
@@ -103,16 +381,12 @@ export function getUnmatchedOldPositions(
 
   return oldPositions.filter(pos =>
     !matchedIds.has(pos.id) &&
-    !pos.is_additional // Дополнительные работы обрабатываем отдельно
+    !pos.is_additional
   );
 }
 
 /**
  * Получить индексы не сопоставленных позиций новой версии (новые позиции)
- *
- * @param newPositions - все позиции новой версии
- * @param matches - результаты сопоставления
- * @returns индексы позиций, которые не были сопоставлены
  */
 export function getUnmatchedNewPositionIndices(
   newPositions: ParsedRow[],
@@ -140,11 +414,6 @@ export interface MatchingStatistics {
 
 /**
  * Вычислить статистику сопоставления
- *
- * @param oldPositions - позиции старой версии
- * @param newPositions - позиции новой версии
- * @param matches - результаты сопоставления
- * @returns статистика
  */
 export function calculateMatchingStatistics(
   oldPositions: ClientPosition[],
@@ -153,19 +422,16 @@ export function calculateMatchingStatistics(
 ): MatchingStatistics {
   const autoMatched = matches.filter(m => m.matchType === 'auto').length;
   const lowConfidence = matches.filter(m => m.matchType === 'low_confidence').length;
-
-  const unmatchedOld = getUnmatchedOldPositions(oldPositions, matches);
-  const unmatchedNew = getUnmatchedNewPositionIndices(newPositions, matches);
-
-  const additionalWorks = oldPositions.filter(p => p.is_additional).length;
+  const matchedOldIds = new Set(matches.map(m => m.oldPositionId));
+  const matchedNewIndices = new Set(matches.map(m => m.newPositionIndex));
 
   return {
     totalOld: oldPositions.filter(p => !p.is_additional).length,
     totalNew: newPositions.length,
     autoMatched,
     lowConfidence,
-    deleted: unmatchedOld.length,
-    new: unmatchedNew.length,
-    additionalWorks,
+    deleted: oldPositions.filter(p => !p.is_additional && !matchedOldIds.has(p.id)).length,
+    new: newPositions.filter((_, idx) => !matchedNewIndices.has(idx)).length,
+    additionalWorks: oldPositions.filter(p => p.is_additional).length,
   };
 }

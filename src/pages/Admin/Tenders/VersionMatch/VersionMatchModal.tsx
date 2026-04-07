@@ -166,7 +166,7 @@ export function VersionMatchModal({ open, onClose, tender }: VersionMatchModalPr
       footer={modalFooter()}
       width="90%"
       style={{ top: 20 }}
-      bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+      styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
     >
       {/* Успешное создание версии */}
       {state.newTenderId && (

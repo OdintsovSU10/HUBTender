@@ -8,9 +8,10 @@ const { Dragger } = Upload;
 interface FileUploadStepProps {
   onFileUpload: (file: File) => Promise<boolean>;
   uploading: boolean;
+  nomenclatureLoaded: boolean;
 }
 
-export const FileUploadStep: React.FC<FileUploadStepProps> = ({ onFileUpload, uploading }) => {
+export const FileUploadStep: React.FC<FileUploadStepProps> = ({ onFileUpload, uploading, nomenclatureLoaded }) => {
   return (
     <div style={{ width: '100%' }}>
       {/* Инструкция по формату файла */}
@@ -109,7 +110,7 @@ export const FileUploadStep: React.FC<FileUploadStepProps> = ({ onFileUpload, up
         }}
         accept=".xlsx,.xls"
         maxCount={1}
-        disabled={uploading}
+        disabled={uploading || !nomenclatureLoaded}
         showUploadList={false}
       >
         <p className="ant-upload-drag-icon">

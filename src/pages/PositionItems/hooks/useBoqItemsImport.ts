@@ -97,6 +97,8 @@ interface DetailCostCategoryRecord {
   cost_category_name: string;
 }
 
+const PAGE_SIZE = 1000;
+
 // ===========================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ===========================
@@ -113,6 +115,41 @@ const normalizeString = (str: string): string => {
   return str.trim()
     .replace(/\s+/g, ' ');  // Множественные пробелы -> один пробел
   // НЕ убираем пробелы вокруг слэша, т.к. в БД категории хранятся как "ВИС / Электрические системы"
+};
+
+const normalizeForLookup = (str: string): string => {
+  return normalizeString(str).toLowerCase();
+};
+
+const buildNomenclatureLookupKey = (name: string, unit: string): string => {
+  return `${normalizeForLookup(name)}|${normalizeForLookup(unit)}`;
+};
+
+const fetchAllPages = async <T>(
+  queryFactory: (from: number, to: number) => any
+): Promise<T[]> => {
+  const items: T[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await queryFactory(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    const batch = data || [];
+    items.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      break;
+    }
+
+    from += PAGE_SIZE;
+  }
+
+  return items;
 };
 
 const parseNumber = (value: any): number | undefined => {
@@ -252,6 +289,80 @@ export const useBoqItemsImport = () => {
 
   const loadNomenclature = async () => {
     try {
+      {
+      const [allWorks, allMaterials, allCosts] = await Promise.all([
+        fetchAllPages<WorkNameRecord>((from, to) => (
+          supabase
+            .from('work_names')
+            .select('id, name, unit')
+            .order('name')
+            .range(from, to)
+        )),
+        fetchAllPages<MaterialNameRecord>((from, to) => (
+          supabase
+            .from('material_names')
+            .select('id, name, unit')
+            .order('name')
+            .range(from, to)
+        )),
+        fetchAllPages<any>((from, to) => (
+          supabase
+            .from('detail_cost_categories')
+            .select(`
+              id,
+              name,
+              location,
+              cost_categories!inner(name)
+            `)
+            .order('name')
+            .range(from, to)
+        )),
+      ]);
+
+      const nextWorksMap = new Map<string, string>();
+      allWorks.forEach((work) => {
+        nextWorksMap.set(buildNomenclatureLookupKey(work.name, work.unit), work.id);
+      });
+
+      const nextMaterialsMap = new Map<string, string>();
+      allMaterials.forEach((material) => {
+        nextMaterialsMap.set(buildNomenclatureLookupKey(material.name, material.unit), material.id);
+      });
+
+      const nextCostsMap = new Map<string, string>();
+      let costLogCount = 0;
+      allCosts.forEach((cost: any) => {
+        const costCategoryName = cost.cost_categories?.name || '';
+        const key = `${normalizeString(costCategoryName)}|${normalizeString(cost.name)}|${normalizeString(cost.location)}`;
+        nextCostsMap.set(key, cost.id);
+
+        const fullPath = normalizeString(`${costCategoryName} / ${cost.name} / ${cost.location}`);
+        nextCostsMap.set(fullPath, cost.id);
+
+        if (costLogCount < 5 || cost.name.includes('/') || costCategoryName.includes('/')) {
+          console.log('[CostCategory] Р—Р°РіСЂСѓР¶РµРЅР° Р·Р°С‚СЂР°С‚Р°:', {
+            category: costCategoryName,
+            detail: cost.name,
+            location: cost.location,
+            key,
+            fullPath,
+          });
+          costLogCount++;
+        }
+      });
+
+      setWorkNamesMap(nextWorksMap);
+      setMaterialNamesMap(nextMaterialsMap);
+      setCostCategoriesMap(nextCostsMap);
+
+      console.log('[BoqImport] Р—Р°РіСЂСѓР¶РµРЅРѕ СЃРїСЂР°РІРѕС‡РЅРёРєРѕРІ:', {
+        works: nextWorksMap.size,
+        materials: nextMaterialsMap.size,
+        costs: nextCostsMap.size,
+      });
+
+      return true;
+      }
       // Загрузка work_names
       const { data: works, error: worksError } = await supabase
         .from('work_names')
@@ -559,7 +670,7 @@ export const useBoqItemsImport = () => {
 
       // 6. КРИТИЧНО: Проверка наличия в номенклатуре
       if (isWork(item.boq_item_type)) {
-        const key = `${normalizeString(item.nameText)}|${item.unit_code}`;
+        const key = buildNomenclatureLookupKey(item.nameText, item.unit_code);
         const workId = workNamesMap.get(key);
 
         if (!workId) {
@@ -583,7 +694,7 @@ export const useBoqItemsImport = () => {
       }
 
       if (isMaterial(item.boq_item_type)) {
-        const key = `${normalizeString(item.nameText)}|${item.unit_code}`;
+        const key = buildNomenclatureLookupKey(item.nameText, item.unit_code);
         const materialId = materialNamesMap.get(key);
 
         if (!materialId) {
@@ -667,6 +778,7 @@ export const useBoqItemsImport = () => {
       missingMaterials: result.missingNomenclature.materials.length,
     });
 
+    setValidationResult(result);
     return result;
   };
 
@@ -938,6 +1050,80 @@ export const useBoqItemsImport = () => {
   // ПУБЛИЧНЫЙ API
   // ===========================
 
+  const addMissingToNomenclature = async (): Promise<boolean> => {
+    if (!validationResult) return false;
+
+    const { works, materials } = validationResult.missingNomenclature;
+    if (works.length === 0 && materials.length === 0) {
+      return true;
+    }
+
+    try {
+      setUploading(true);
+
+      const existingWorkKeys = new Set(workNamesMap.keys());
+      const existingMaterialKeys = new Set(materialNamesMap.keys());
+
+      const uniqueWorksToInsert = Array.from(
+        new Map(
+          works.map((work) => [
+            buildNomenclatureLookupKey(work.name, work.unit),
+            { name: work.name, unit: work.unit },
+          ])
+        ).entries()
+      )
+        .filter(([key]) => !existingWorkKeys.has(key))
+        .map(([, value]) => value);
+
+      const uniqueMaterialsToInsert = Array.from(
+        new Map(
+          materials.map((material) => [
+            buildNomenclatureLookupKey(material.name, material.unit),
+            { name: material.name, unit: material.unit },
+          ])
+        ).entries()
+      )
+        .filter(([key]) => !existingMaterialKeys.has(key))
+        .map(([, value]) => value);
+
+      if (uniqueWorksToInsert.length > 0) {
+        const { error } = await supabase
+          .from('work_names')
+          .insert(uniqueWorksToInsert);
+
+        if (error) {
+          throw new Error(`РћС€РёР±РєР° РґРѕР±Р°РІР»РµРЅРёСЏ СЂР°Р±РѕС‚: ${error.message}`);
+        }
+      }
+
+      if (uniqueMaterialsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('material_names')
+          .insert(uniqueMaterialsToInsert);
+
+        if (error) {
+          throw new Error(`РћС€РёР±РєР° РґРѕР±Р°РІР»РµРЅРёСЏ РјР°С‚РµСЂРёР°Р»РѕРІ: ${error.message}`);
+        }
+      }
+
+      await loadNomenclature();
+
+      const total = uniqueWorksToInsert.length + uniqueMaterialsToInsert.length;
+      if (total > 0) {
+        message.success(`Р”РѕР±Р°РІР»РµРЅРѕ РІ РЅРѕРјРµРЅРєР»Р°С‚СѓСЂСѓ: ${total} Р·Р°РїРёСЃРµР№. РўРµРїРµСЂСЊ РЅР°Р¶РјРёС‚Рµ В«Р—Р°РіСЂСѓР·РёС‚СЊВ».`);
+      } else {
+        message.info('РџРѕРґС…РѕРґСЏС‰РёРµ Р·Р°РїРёСЃРё СѓР¶Рµ РµСЃС‚СЊ РІ РЅРѕРјРµРЅРєР»Р°С‚СѓСЂРµ. РўРµРїРµСЂСЊ РЅР°Р¶РјРёС‚Рµ В«Р—Р°РіСЂСѓР·РёС‚СЊВ».');
+      }
+
+      return true;
+    } catch (error: any) {
+      message.error(error.message);
+      return false;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const reset = () => {
     setParsedData([]);
     setValidationResult(null);
@@ -957,6 +1143,7 @@ export const useBoqItemsImport = () => {
     validateParsedData,
     processWorkBindings,
     insertBoqItems,
+    addMissingToNomenclature,
     reset,
   };
 };

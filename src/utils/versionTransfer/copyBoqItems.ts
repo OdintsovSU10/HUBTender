@@ -4,6 +4,8 @@
 
 import { supabase } from '../../lib/supabase';
 
+const PAGE_SIZE = 1000;
+
 /**
  * Результат копирования boq_items
  */
@@ -36,19 +38,35 @@ export async function copyBoqItems(
   };
 
   try {
-    // 1. Загрузить все boq_items старой позиции
-    const { data: oldItems, error: fetchError } = await supabase
-      .from('boq_items')
-      .select('*')
-      .eq('client_position_id', oldPositionId)
-      .order('sort_number', { ascending: true });
+    // 1. Загрузить все boq_items старой позиции батчами
+    const oldItems: any[] = [];
+    let from = 0;
 
-    if (fetchError) {
-      result.errors.push(`Ошибка загрузки boq_items: ${fetchError.message}`);
-      return result;
+    while (true) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from('boq_items')
+        .select('*')
+        .eq('client_position_id', oldPositionId)
+        .order('sort_number', { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        result.errors.push(`Ошибка загрузки boq_items: ${error.message}`);
+        return result;
+      }
+
+      const batch = data || [];
+      oldItems.push(...batch);
+
+      if (batch.length < PAGE_SIZE) {
+        break;
+      }
+
+      from += PAGE_SIZE;
     }
 
-    if (!oldItems || oldItems.length === 0) {
+    if (oldItems.length === 0) {
       return result; // Нет элементов для копирования
     }
 
@@ -81,26 +99,40 @@ export async function copyBoqItems(
       unit_rate: item.unit_rate,
     }));
 
-    const { data: newItems, error: insertError } = await supabase
-      .from('boq_items')
-      .insert(itemsToCreate)
-      .select('id');
+    // 3. Создать новые boq_items батчами и собрать маппинг старый id -> новый id
+    let copiedCount = 0;
 
-    if (insertError) {
-      result.errors.push(`Ошибка вставки boq_items: ${insertError.message}`);
+    for (let start = 0; start < itemsToCreate.length; start += PAGE_SIZE) {
+      const end = start + PAGE_SIZE;
+      const itemsChunk = itemsToCreate.slice(start, end);
+      const oldItemsChunk = oldItems.slice(start, end);
+
+      const { data: newItems, error: insertError } = await supabase
+        .from('boq_items')
+        .insert(itemsChunk)
+        .select('id');
+
+      if (insertError) {
+        result.errors.push(`Ошибка вставки boq_items: ${insertError.message}`);
+        return result;
+      }
+
+      oldItemsChunk.forEach((oldItem, index) => {
+        if (newItems && newItems[index]) {
+          itemIdMap.set(oldItem.id, newItems[index].id);
+        }
+      });
+
+      copiedCount += newItems?.length || 0;
+    }
+
+    result.copied = copiedCount;
+
+    if (result.copied === 0) {
       return result;
     }
 
-    // 3. Создать маппинг старый id → новый id
-    oldItems.forEach((oldItem, index) => {
-      if (newItems && newItems[index]) {
-        itemIdMap.set(oldItem.id, newItems[index].id);
-      }
-    });
-
-    result.copied = newItems?.length || 0;
-
-    // 4. Второй проход: восстановить parent_work_item_id
+    // 4. Восстановить parent_work_item_id
     const updatePromises: PromiseLike<any>[] = [];
 
     for (const oldItem of oldItems) {
@@ -131,36 +163,26 @@ export async function copyBoqItems(
     });
 
     // 5. Пересчитать total_material и total_works для новой позиции
-    const { data: totals, error: totalsError } = await supabase
-      .from('boq_items')
-      .select('boq_item_type, total_amount')
-      .eq('client_position_id', newPositionId);
+    const totalMaterial = oldItems
+      .filter((item) =>
+        ['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)
+      )
+      .reduce((sum, item) => sum + (item.total_amount || 0), 0);
 
-    if (!totalsError && totals) {
-      const totalMaterial = totals
-        .filter((item) =>
-          ['мат', 'суб-мат', 'мат-комп.'].includes(item.boq_item_type)
-        )
-        .reduce((sum, item) => sum + (item.total_amount || 0), 0);
+    const totalWorks = oldItems
+      .filter((item) => ['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type))
+      .reduce((sum, item) => sum + (item.total_amount || 0), 0);
 
-      const totalWorks = totals
-        .filter((item) => ['раб', 'суб-раб', 'раб-комп.'].includes(item.boq_item_type))
-        .reduce((sum, item) => sum + (item.total_amount || 0), 0);
+    const { error: updateTotalsError } = await supabase
+      .from('client_positions')
+      .update({
+        total_material: totalMaterial,
+        total_works: totalWorks,
+      })
+      .eq('id', newPositionId);
 
-      // Обновить итоговые суммы в позиции заказчика
-      const { error: updateTotalsError } = await supabase
-        .from('client_positions')
-        .update({
-          total_material: totalMaterial,
-          total_works: totalWorks,
-        })
-        .eq('id', newPositionId);
-
-      if (updateTotalsError) {
-        result.errors.push(`Ошибка обновления итогов: ${updateTotalsError.message}`);
-      }
-    } else if (totalsError) {
-      result.errors.push(`Ошибка расчета итогов: ${totalsError.message}`);
+    if (updateTotalsError) {
+      result.errors.push(`Ошибка обновления итогов: ${updateTotalsError.message}`);
     }
 
   } catch (error: any) {
