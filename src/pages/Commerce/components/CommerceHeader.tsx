@@ -4,7 +4,6 @@
 
 import { Button, Select, Space, Typography, Tooltip, Tag } from 'antd';
 import {
-  ReloadOutlined,
   CalculatorOutlined,
   FileExcelOutlined,
   ArrowLeftOutlined,
@@ -32,7 +31,6 @@ interface CommerceHeaderProps {
   onApplyTactic: () => void;
   onRecalculate: () => void;
   onExport: () => void;
-  onReload: () => void;
   shouldFilterArchived?: boolean;
 }
 
@@ -53,7 +51,6 @@ export default function CommerceHeader({
   onApplyTactic,
   onRecalculate,
   onExport,
-  onReload,
   shouldFilterArchived = false
 }: CommerceHeaderProps) {
   // Получение уникальных наименований тендеров
@@ -198,13 +195,6 @@ export default function CommerceHeader({
               >
                 Экспорт
               </Button>
-            </Tooltip>
-            <Tooltip title="Обновить данные">
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={onReload}
-                loading={loading}
-              />
             </Tooltip>
           </Space>
         </div>

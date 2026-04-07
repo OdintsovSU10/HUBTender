@@ -3,6 +3,7 @@
  */
 
 import { Card, Spin, Empty } from 'antd';
+import { useEffect, useRef } from 'react';
 import { useCommerceData, useCommerceActions } from './hooks';
 import { TenderSelector, CommerceTable, CommerceHeader } from './components';
 import { exportCommerceToExcel } from './utils/exportToExcel';
@@ -12,6 +13,7 @@ export default function Commerce() {
   const { user } = useAuth();
   // Архивные тендеры отображаются в фильтре для всех пользователей
   const shouldFilterArchived = false;
+  const lastAutoRefreshAtRef = useRef(0);
 
   const {
     loading,
@@ -51,6 +53,40 @@ export default function Commerce() {
     loadTenders,
     loadPositions
   );
+
+  useEffect(() => {
+    const refreshIfNeeded = () => {
+      if (!selectedTenderId || loading || calculating) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastAutoRefreshAtRef.current < 1000) {
+        return;
+      }
+
+      lastAutoRefreshAtRef.current = now;
+      void loadPositions(selectedTenderId);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshIfNeeded();
+      }
+    };
+
+    const handleFocus = () => {
+      refreshIfNeeded();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [selectedTenderId, loading, calculating, loadPositions]);
 
   // Обработка выбора наименования тендера
   const handleTenderTitleChange = (title: string) => {
@@ -144,7 +180,6 @@ export default function Commerce() {
           onApplyTactic={handleApplyTactic}
           onRecalculate={handleRecalculate}
           onExport={handleExportToExcel}
-          onReload={() => selectedTenderId && loadPositions(selectedTenderId)}
           shouldFilterArchived={shouldFilterArchived}
         />
       }
