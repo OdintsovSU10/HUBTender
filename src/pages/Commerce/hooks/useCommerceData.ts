@@ -224,16 +224,18 @@ async function loadBoqItemsFallback(tenderId: string): Promise<CommerceBoqItem[]
 }
 
 async function loadPositionsViaRpc(tenderId: string): Promise<AggregatedPositionLoadResult> {
-  const { data, error } = await supabase.rpc('get_positions_with_costs', {
-    p_tender_id: tenderId,
-  });
-
-  if (error) {
-    throw error;
-  }
+  const data = await fetchAllPages<RpcPositionWithCostsRow>(
+    async (from, to) =>
+      supabase
+        .rpc('get_positions_with_costs', {
+          p_tender_id: tenderId,
+        })
+        .range(from, to),
+    1000
+  );
 
   const positions = applyLeafFlags(
-    ((data || []) as RpcPositionWithCostsRow[]).map((row) => ({
+    data.map((row) => ({
       ...row,
       base_total: row.base_total || 0,
       commercial_total: row.commercial_total || 0,
