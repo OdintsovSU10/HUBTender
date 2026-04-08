@@ -24,20 +24,13 @@ export const parseExcelData = (rows: unknown[]): ParseExcelResult => {
   // Текущий номер позиции (наследуется от родительской строки)
   let currentPositionNumber = '';
 
-  const hasBoqPayload = (cells: any[]): boolean => {
+  const hasStandaloneMaterialPayload = (cells: any[]): boolean => {
     return Boolean(
       cells[2] || // затрата
       cells[6] || // наименование
       cells[7] || // ед. изм.
-      cells[9] || // коэфф. перевода
-      cells[10] || // коэфф. расхода
       cells[11] || // количество
-      cells[12] || // валюта
-      cells[13] || // тип доставки
-      cells[14] || // стоимость доставки
-      cells[15] || // цена за единицу
-      cells[17] || // ссылка на КП
-      cells[19] // примечание
+      cells[15] // цена за единицу
     );
   };
 
@@ -54,10 +47,14 @@ export const parseExcelData = (rows: unknown[]): ParseExcelResult => {
     const rowPositionNumber = normalizePositionNumber(cells[1]);
 
     // Тип элемента BOQ из колонки 4.
-    // Если тип не заполнен, но строка содержит BOQ-данные и не привязывается к работе,
-    // считаем её независимым материалом.
+    // Независимый материал выводим только для дочерней BOQ-строки без номера позиции.
+    // Иначе строка-заголовок позиции с названием и количеством ошибочно попадёт в BOQ.
     const rawBoqType = cells[4] ? String(cells[4]).trim() : '';
-    const inferredAsStandaloneMaterial = !rawBoqType && !parseBoolean(cells[3]) && hasBoqPayload(cells);
+    const inferredAsStandaloneMaterial =
+      !rowPositionNumber &&
+      !rawBoqType &&
+      !parseBoolean(cells[3]) &&
+      hasStandaloneMaterialPayload(cells);
     const boqType = inferredAsStandaloneMaterial ? 'мат' : rawBoqType;
     const isValidBoqType = validBoqTypes.includes(boqType);
 
