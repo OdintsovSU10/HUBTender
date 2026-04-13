@@ -70,6 +70,10 @@ export const validateBoqData = (
         });
       } else {
         item.matchedPositionId = position.id;
+        const posData = positionUpdates.get(item.positionNumber);
+        if (posData) {
+          posData.positionId = position.id;
+        }
       }
     }
 
@@ -217,10 +221,14 @@ export const validateBoqData = (
 
   // 6. Валидация position-only записей (только данные ГП без BOQ-элементов)
   positionUpdates.forEach((posData, posNum) => {
+    const position = clientPositionsMap.get(posNum);
+    if (position) {
+      posData.positionId = position.id;
+    }
+
     if (posData.itemsCount > 0) return;
     if (posData.manualVolume === undefined && posData.manualNote === undefined) return;
 
-    const position = clientPositionsMap.get(posNum);
     if (!position) {
       if (!unmatchedPositionsMap.has(posNum)) {
         unmatchedPositionsMap.set(posNum, []);
@@ -234,8 +242,6 @@ export const validateBoqData = (
         message: `Позиция "${posNum}" (только данные ГП) не найдена в тендере`,
         severity: 'error',
       });
-    } else {
-      posData.positionId = position.id;
     }
   });
 
