@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Card, Table, Typography, Tag, Space, Button, Tooltip } from 'antd';
+import { Card, Table, Typography, Tag, Space, Button, Tooltip, Input } from 'antd';
 import {
   CheckOutlined,
   DownloadOutlined,
@@ -12,6 +12,7 @@ import {
   EyeOutlined,
   EyeInvisibleOutlined,
   VerticalAlignBottomOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { ClientPosition, Tender } from '../../../lib/supabase';
@@ -70,6 +71,8 @@ interface PositionTableProps {
   canDeletePositions?: boolean;
   onExportToExcel: () => void;
   onMassImport?: () => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
   tempSelectedPositionIds?: Set<string>;
   onToggleFilterCheckbox?: (positionId: string) => void;
   onApplyFilter?: () => void;
@@ -127,6 +130,8 @@ export const PositionTable: React.FC<PositionTableProps> = ({
   canDeletePositions = false,
   onExportToExcel,
   onMassImport,
+  searchQuery = '',
+  onSearchQueryChange,
   isFilterActive = false,
   filterSelectedCount = 0,
   totalPositionsCount = 0,
@@ -430,6 +435,14 @@ export const PositionTable: React.FC<PositionTableProps> = ({
       }
       extra={
         <Space>
+          <Input
+            allowClear
+            value={searchQuery}
+            onChange={(event) => onSearchQueryChange?.(event.target.value)}
+            placeholder="Поиск по номеру и наименованию"
+            prefix={<SearchOutlined />}
+            style={{ width: 320 }}
+          />
           {/* Кнопки фильтра */}
           {!isFilterActive && tempSelectedPositionIds.size > 0 && (
             <Button type="primary" icon={<FilterOutlined />} onClick={onApplyFilter} disabled={readOnly}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,7 +13,7 @@ import { DeadlineBar } from './components/DeadlineBar';
 import { PositionTable } from './components/PositionTable';
 import AddAdditionalPositionModal from './AddAdditionalPositionModal';
 import { MassBoqImportModal } from './components/MassBoqImportModal';
-import type { Tender } from '../../lib/supabase';
+import type { ClientPosition, Tender } from '../../lib/supabase';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -23,6 +23,41 @@ interface TenderOption {
   value: string;
   label: string;
   clientName: string;
+}
+
+function normalizePositionSearchValue(value: string | number | null | undefined): string {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('ru-RU')
+    .replace(/[.,/\\()[\]_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function filterPositionsBySearch(
+  positions: ClientPosition[],
+  query: string
+): ClientPosition[] {
+  const normalizedQuery = normalizePositionSearchValue(query);
+  const compactQuery = normalizedQuery.replace(/\s+/g, '');
+  const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+
+  if (!normalizedQuery) {
+    return positions;
+  }
+
+  return positions.filter((position) => {
+    const workName = normalizePositionSearchValue(position.work_name);
+    const itemNo = normalizePositionSearchValue(position.item_no);
+    const haystack = `${itemNo} ${workName}`.trim();
+    const compactHaystack = haystack.replace(/\s+/g, '');
+    const compactItemNo = itemNo.replace(/\s+/g, '');
+    return (
+      haystack.includes(normalizedQuery) ||
+      queryTokens.every((token) => haystack.includes(token)) ||
+      queryTokens.every((token) => compactHaystack.includes(token.replace(/\s+/g, ''))) ||
+      (compactQuery.length > 0 && compactItemNo.includes(compactQuery))
+    );
+  });
 }
 
 const ClientPositions: React.FC = () => {
@@ -40,6 +75,8 @@ const ClientPositions: React.FC = () => {
   const [massImportModalOpen, setMassImportModalOpen] = useState(false);
   const [showAllPositions, setShowAllPositions] = useState(false);
   const [tableScrollY, setTableScrollY] = useState(600);
+  const [positionSearchQuery, setPositionSearchQuery] = useState('');
+  const deferredPositionSearchQuery = useDeferredValue(positionSearchQuery);
 
   // Hooks
   const {
@@ -169,6 +206,11 @@ const ClientPositions: React.FC = () => {
     return clientPositions.filter(pos => selectedPositionIds.has(pos.id));
   }, [clientPositions, isFilterActive, selectedPositionIds, showAllPositions]);
 
+  const searchedPositions = useMemo(
+    () => filterPositionsBySearch(displayedPositions, deferredPositionSearchQuery),
+    [deferredPositionSearchQuery, displayedPositions]
+  );
+
   // Высота tbody: viewport - nav(64) - cardHeader(56) - cardBodyPadding(48) - thead(40) - небольшой запас(8)
   // Card sticky — тулбар уходит при скролле, Card остаётся
   useEffect(() => {
@@ -179,6 +221,10 @@ const ClientPositions: React.FC = () => {
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  useEffect(() => {
+    setPositionSearchQuery('');
+  }, [selectedTenderId]);
 
   // Обработка выбора наименования тендера
   const handleTenderTitleChange = (title: string) => {
@@ -386,7 +432,7 @@ const ClientPositions: React.FC = () => {
       {/* Таблица позиций заказчика */}
       {selectedTender && (
         <PositionTable
-          clientPositions={displayedPositions}
+          clientPositions={searchedPositions}
           selectedTender={selectedTender}
           loading={loading || filterLoading}
           copiedPositionId={copiedPositionId}
@@ -443,6 +489,8 @@ const ClientPositions: React.FC = () => {
             isFilterActive && !showAllPositions ? selectedPositionIds : null
           )}
           onMassImport={() => setMassImportModalOpen(true)}
+          searchQuery={positionSearchQuery}
+          onSearchQueryChange={setPositionSearchQuery}
           tempSelectedPositionIds={tempSelectedPositionIds}
           onToggleFilterCheckbox={handleToggleFilterCheckbox}
           onApplyFilter={handleApplyFilter}
