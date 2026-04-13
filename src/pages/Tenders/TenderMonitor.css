@@ -1,0 +1,42 @@
+.tender-monitor-page {
+  min-height: 100%;
+  padding: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(201, 168, 76, 0.14), transparent 30%),
+    radial-gradient(circle at top right, rgba(74, 144, 226, 0.10), transparent 28%),
+    #12141d;
+}
+
+.tender-monitor-call-button {
+  animation: tender-monitor-call-pulse 1.2s ease-in-out infinite;
+}
+
+.tender-monitor-alert-card {
+  animation: tender-monitor-alert-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tender-monitor-call-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(226, 75, 74, 0);
+    opacity: 1;
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(226, 75, 74, 0.08);
+    opacity: 0.65;
+  }
+}
+
+@keyframes tender-monitor-alert-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(226, 75, 74, 0);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(226, 75, 74, 0.08);
+    border-color: rgba(226, 75, 74, 0.28);
+  }
+}

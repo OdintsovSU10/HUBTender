@@ -144,7 +144,7 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
 
         // Конвертация старого текстового поля chronology в JSONB массив
         const chronology_items = tender.chronology && tender.chronology.trim()
-          ? [{ date: null, text: tender.chronology }]
+          ? [{ date: null, text: tender.chronology, type: 'default' }]
           : [];
 
         // Конвертация старого текстового поля has_tender_package в JSONB массив

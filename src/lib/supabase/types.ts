@@ -64,6 +64,12 @@ export interface TenderPackageItem {
   text: string;
 }
 
+export type DashboardStatus = 'calc' | 'sent' | 'waiting_pd' | 'archive';
+
+export interface ChronologyItem {
+  type?: 'default' | 'call_follow_up' | null;
+}
+
 export interface TenderRegistryInsert {
   title: string;
   client_name: string;
@@ -104,6 +110,18 @@ export interface TenderRegistryWithRelations extends TenderRegistry {
   status?: TenderStatus | null;
   construction_scope?: ConstructionScope | null;
   total_cost?: number | null; // Общая стоимость из связанного тендера (рассчитывается динамически)
+}
+
+export interface TenderRegistryInsert {
+  object_coordinates?: string | null;
+  commission_date?: string | null;
+  dashboard_status?: DashboardStatus | null;
+}
+
+export interface TenderRegistry {
+  object_coordinates?: string | null;
+  commission_date?: string | null;
+  dashboard_status?: DashboardStatus | null;
 }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -977,6 +995,7 @@ export interface UserPositionFilter {
 // Все страницы портала (для Transfer component и проверки доступа)
 export const ALL_PAGES = [
   '/dashboard',
+  '/tender-dashboard',
   '/tenders',
   '/tender-timeline',
   '/tasks',
@@ -1012,6 +1031,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
   'Разработчик': [], // Полный доступ (для отладки и разработки)
   'Старший группы': [
     '/dashboard',
+    '/tender-dashboard',
     '/tender-timeline',
     '/tasks',
     '/positions',
@@ -1028,6 +1048,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
   ],
   'Инженер': [
     '/dashboard',
+    '/tender-dashboard',
     '/tender-timeline',
     '/tasks',
     '/positions',
@@ -1041,6 +1062,7 @@ export const DEFAULT_ROLE_PAGES: Record<UserRole, string[]> = {
 
 // Названия страниц (соответствуют левому боковому меню)
 export const PAGE_LABELS: Record<string, string> = {
+  '/tender-dashboard': 'Тендерный монитор',
   '/dashboard': 'Дашборд',
   '/tenders': 'Перечень тендеров',
   '/tender-timeline': 'Хронология расчёта тендеров',
@@ -1078,7 +1100,7 @@ export const PAGES_STRUCTURE = [
   },
   {
     title: 'Данные по тендерам',
-    pages: ['/tenders', '/tender-timeline'],
+    pages: ['/tender-dashboard', '/tenders', '/tender-timeline'],
   },
   {
     title: 'Коммерция',
@@ -1154,6 +1176,12 @@ export const hasPageAccess = (user: AuthUser, pagePath: string): boolean => {
 
   // Специальная логика: если есть доступ к /projects, автоматически разрешен доступ к /projects/:projectId
   // Эти страницы являются одним целым - просмотр списка объектов и деталей конкретного объекта
+  if (pagePath === '/tender-dashboard') {
+    if (user.allowed_pages.includes('/dashboard') || user.allowed_pages.includes('/tenders')) {
+      return true;
+    }
+  }
+
   if (pagePath.match(/^\/projects\/[^/]+$/)) {
     // Проверяем, есть ли доступ к родительской странице /projects
     if (user.allowed_pages.includes('/projects')) {

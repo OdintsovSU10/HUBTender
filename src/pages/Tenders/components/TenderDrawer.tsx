@@ -78,6 +78,7 @@ export const TenderDrawer: React.FC<TenderDrawerProps> = ({
       const chronologyItems = (values.chronology_items || []).map((item: any) => ({
         date: item.date?.toISOString() || null,
         text: item.text,
+        type: item.type || 'default',
       }));
 
       // Конвертировать dayjs объекты в ISO строки для tender_package_items

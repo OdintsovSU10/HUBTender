@@ -2,6 +2,44 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import type { TenderRegistryWithRelations, TenderStatus, ConstructionScope } from '../../../lib/supabase';
 
+const normalizeTenderTitle = (title?: string | null) =>
+  (title || '')
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleLowerCase('ru-RU');
+
+const getTenderRegistryDedupKey = (tender: TenderRegistryWithRelations) => {
+  if (tender.tender_number) {
+    return `number:${tender.tender_number}`;
+  }
+
+  return `title:${normalizeTenderTitle(tender.title)}|client:${(tender.client_name || '').trim().toLocaleLowerCase('ru-RU')}`;
+};
+
+const dedupeTenderRegistry = (items: TenderRegistryWithRelations[]) => {
+  const map = new Map<string, TenderRegistryWithRelations>();
+
+  items.forEach((item) => {
+    const key = getTenderRegistryDedupKey(item);
+    const current = map.get(key);
+
+    if (!current) {
+      map.set(key, item);
+      return;
+    }
+
+    const nextTimestamp = new Date(item.updated_at || item.created_at).getTime();
+    const currentTimestamp = new Date(current.updated_at || current.created_at).getTime();
+
+    if (nextTimestamp > currentTimestamp) {
+      map.set(key, item);
+    }
+  });
+
+  return Array.from(map.values()).sort((left, right) => (left.sort_order || 0) - (right.sort_order || 0));
+};
+
 export const useTenderData = () => {
   const [tenders, setTenders] = useState<TenderRegistryWithRelations[]>([]);
   const [statuses, setStatuses] = useState<TenderStatus[]>([]);
@@ -17,7 +55,7 @@ export const useTenderData = () => {
       .order('sort_order', { ascending: true });
 
     if (!error && data) {
-      const tendersData = data as TenderRegistryWithRelations[];
+      const tendersData = dedupeTenderRegistry(data as TenderRegistryWithRelations[]);
 
       // Сначала устанавливаем данные без стоимости
       setTenders(tendersData);

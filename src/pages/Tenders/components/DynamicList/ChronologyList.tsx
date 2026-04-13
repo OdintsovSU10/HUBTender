@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, DatePicker, Input, Button, Space, List, Typography } from 'antd';
+import { Form, DatePicker, Input, Button, Space, List, Select, Tag, Typography } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { FormInstance } from 'antd';
@@ -20,8 +20,9 @@ export const ChronologyList: React.FC<ChronologyListProps> = ({
   form,
   fieldName = 'chronology_items',
 }) => {
+  void form;
+
   if (!editable) {
-    // РЕЖИМ ПРОСМОТРА
     if (items.length === 0) {
       return <Text type="secondary">Нет записей</Text>;
     }
@@ -34,9 +35,12 @@ export const ChronologyList: React.FC<ChronologyListProps> = ({
         renderItem={(item, index) => (
           <List.Item style={{ padding: '4px 0', border: 'none' }}>
             <Space direction="vertical" size={0} style={{ width: '100%' }}>
-              <Text strong>
-                {index + 1}) {item.date ? dayjs(item.date).format('DD.MM.YYYY') : 'Без даты'}
-              </Text>
+              <Space size={8} wrap>
+                <Text strong>
+                  {index + 1}) {item.date ? dayjs(item.date).format('DD.MM.YYYY') : 'Без даты'}
+                </Text>
+                {item.type === 'call_follow_up' ? <Tag color="error">Звонок</Tag> : null}
+              </Space>
               <Text>{item.text}</Text>
             </Space>
           </List.Item>
@@ -45,7 +49,6 @@ export const ChronologyList: React.FC<ChronologyListProps> = ({
     );
   }
 
-  // РЕЖИМ РЕДАКТИРОВАНИЯ
   return (
     <Form.List name={fieldName}>
       {(fields, { add, remove }) => (
@@ -60,6 +63,20 @@ export const ChronologyList: React.FC<ChronologyListProps> = ({
                 alignItems: 'flex-start',
               }}
             >
+              <Form.Item
+                {...restField}
+                name={[name, 'type']}
+                initialValue="default"
+                style={{ marginBottom: 0, width: 150, flexShrink: 0 }}
+              >
+                <Select
+                  options={[
+                    { value: 'default', label: 'Событие' },
+                    { value: 'call_follow_up', label: 'Звонок' },
+                  ]}
+                />
+              </Form.Item>
+
               <Form.Item
                 {...restField}
                 name={[name, 'date']}
@@ -93,7 +110,7 @@ export const ChronologyList: React.FC<ChronologyListProps> = ({
 
           <Button
             type="dashed"
-            onClick={() => add({ date: null, text: '' })}
+            onClick={() => add({ date: null, text: '', type: 'default' })}
             icon={<PlusOutlined />}
             block
             style={{ marginTop: 8 }}

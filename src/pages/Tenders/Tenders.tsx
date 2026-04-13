@@ -1,256 +1,281 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Card, Tabs, Button, Space, message } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { App, Button, Space } from 'antd';
+import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { supabase } from '../../lib/supabase';
-import { UploadOutlined, PlusOutlined } from '@ant-design/icons';
-import type { TenderRegistryWithRelations, TenderRegistry } from '../../lib/supabase';
+import type { TenderRegistryWithRelations } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenderData } from './hooks/useTenderData';
-import { useTenderCRUD } from './hooks/useTenderCRUD';
-import { TenderAddForm, TenderDrawerModern } from './components';
-import { TenderGrid } from './components/TenderGrid';
+import { TenderAddForm } from './components';
 import ImportTendersModal from './ImportTendersModal';
+import TenderMonitorModal from './components/TenderMonitorModal';
+import TenderMonitorTable from './components/TenderMonitorTable';
+import {
+  buildCallFollowUpItem,
+  formatArea,
+  formatMoney,
+  getDashboardStatus,
+  getTenderSearchText,
+  shouldShowCallAction,
+  sortTenders,
+  type TenderMonitorSortDirection,
+  type TenderMonitorSortField,
+  type TenderMonitorTab,
+} from './utils/tenderMonitor';
 import './Tenders.css';
 import './TendersModern.css';
+import './TenderMonitor.css';
+
+interface MetricCardProps {
+  title: string;
+  value: React.ReactNode;
+  caption: string;
+  accent: string;
+  blinking?: boolean;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({
+  title,
+  value,
+  caption,
+  accent,
+  blinking = false,
+}) => (
+  <div
+    className={blinking ? 'tender-monitor-alert-card' : undefined}
+    style={{
+      background: '#202433',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 14,
+      padding: '14px 18px',
+      position: 'relative',
+      overflow: 'hidden',
+      minHeight: 104,
+    }}
+  >
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        background: accent,
+      }}
+    />
+    <div style={{ color: '#8b93a7', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{title}</div>
+    <div style={{ color: '#f5efe4', fontSize: 28, fontWeight: 700, marginTop: 8 }}>{value}</div>
+    <div style={{ color: '#8b93a7', fontSize: 13, marginTop: 8 }}>{caption}</div>
+  </div>
+);
 
 const Tenders: React.FC = () => {
+  const { message } = App.useApp();
   const { user } = useAuth();
-  const isGeneralDirector = user?.role_code === 'general_director';
-  const isDirector = user?.role_code === 'director' || isGeneralDirector;
+  const isDirector = user?.role_code === 'director' || user?.role_code === 'general_director';
 
-  const [activeTab, setActiveTab] = useState<'current' | 'waiting' | 'archive'>('current');
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<TenderMonitorTab>('all');
+  const [searchValue, setSearchValue] = useState('');
+  const [sortField, setSortField] = useState<TenderMonitorSortField>('submission_date');
+  const [sortDirection, setSortDirection] = useState<TenderMonitorSortDirection>('asc');
   const [selectedTender, setSelectedTender] = useState<TenderRegistryWithRelations | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailInitialTab, setDetailInitialTab] = useState<'info' | 'timeline' | 'package'>('info');
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
 
   const { tenders, statuses, constructionScopes, tenderNumbers, loading, refetch } = useTenderData();
-  const { handleMoveUp, handleMoveDown, handleArchive } = useTenderCRUD(tenders, refetch);
 
-  // Синхронизация selectedTender с обновлёнными данными после refetch
   useEffect(() => {
-    if (selectedTender && tenders.length > 0) {
-      const updatedTender = tenders.find(t => t.id === selectedTender.id);
-      if (updatedTender) {
-        setSelectedTender(updatedTender);
-      }
+    if (!selectedTender) {
+      return;
     }
+
+    const updatedTender = tenders.find((tender) => tender.id === selectedTender.id) || null;
+    setSelectedTender(updatedTender);
+  }, [selectedTender, tenders]);
+
+  const visibleTenders = useMemo(() => {
+    const filteredBySearch = searchValue.trim()
+      ? tenders.filter((tender) =>
+          getTenderSearchText(tender).includes(searchValue.trim().toLocaleLowerCase('ru-RU'))
+        )
+      : tenders;
+
+    const filteredByTab =
+      activeTab === 'all'
+        ? filteredBySearch
+        : filteredBySearch.filter((tender) => getDashboardStatus(tender) === activeTab);
+
+    return sortTenders(filteredByTab, sortField, sortDirection);
+  }, [activeTab, searchValue, sortDirection, sortField, tenders]);
+
+  const counts = useMemo(() => {
+    const base = {
+      all: 0,
+      calc: 0,
+      sent: 0,
+      waiting_pd: 0,
+      archive: 0,
+    } satisfies Record<TenderMonitorTab, number>;
+
+    tenders.forEach((tender) => {
+      const status = getDashboardStatus(tender);
+      base.all += 1;
+      base[status] += 1;
+    });
+
+    return base;
   }, [tenders]);
 
-  // Обработчик drag and drop сортировки
-  const handleReorder = async (draggedId: string, targetId: string) => {
-    const draggedIndex = tenders.findIndex((t) => t.id === draggedId);
-    const targetIndex = tenders.findIndex((t) => t.id === targetId);
+  const needCallCount = useMemo(
+    () => tenders.filter((tender) => shouldShowCallAction(tender)).length,
+    [tenders]
+  );
 
-    if (draggedIndex === -1 || targetIndex === -1) return;
+  const totalCost = useMemo(
+    () => tenders.reduce((sum, tender) => sum + (tender.total_cost || tender.manual_total_cost || 0), 0),
+    [tenders]
+  );
 
-    const draggedTender = tenders[draggedIndex];
-    const targetTender = tenders[targetIndex];
+  const totalArea = useMemo(
+    () => tenders.reduce((sum, tender) => sum + (tender.area || 0), 0),
+    [tenders]
+  );
 
-    // Swap sort_order
-    const { error: error1 } = await supabase
-      .from('tender_registry')
-      .update({ sort_order: targetTender.sort_order })
-      .eq('id', draggedTender.id);
-
-    const { error: error2 } = await supabase
-      .from('tender_registry')
-      .update({ sort_order: draggedTender.sort_order })
-      .eq('id', targetTender.id);
-
-    if (!error1 && !error2) {
-      refetch();
-    } else {
-      message.error('Ошибка при изменении порядка');
-    }
-  };
-
-  // Фильтрация тендеров по активной вкладке
-  const filteredTenders = useMemo(() => {
-    return tenders.filter((t) => {
-      if (activeTab === 'current') {
-        // Текущие: не архивные и не в ожидании
-        return !t.is_archived && (t.status as any)?.name !== 'Ожидаем тендерный пакет';
-      }
-      if (activeTab === 'waiting') {
-        // В ожидании: не архивные и статус "Ожидаем тендерный пакет"
-        return !t.is_archived && (t.status as any)?.name === 'Ожидаем тендерный пакет';
-      }
-      // Архив
-      return t.is_archived;
-    });
-  }, [tenders, activeTab]);
-
-  const handleRowClick = (record: TenderRegistryWithRelations) => {
-    // Сохранить текущую позицию прокрутки
-    if (tableContainerRef.current) {
-      setScrollPosition(tableContainerRef.current.scrollTop);
-    }
-
-    // Если кликнули на уже выбранную строку - закрыть drawer
-    if (selectedTender?.id === record.id && drawerVisible) {
-      setDrawerVisible(false);
-      setSelectedTender(null);
+  const handleSortChange = (field: TenderMonitorSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
       return;
     }
 
-    // Обновляем выбранный тендер и открываем/обновляем Drawer
-    setSelectedTender(record);
-    setDrawerVisible(true);
+    setSortField(field);
+    setSortDirection('asc');
   };
 
-  const handleDrawerClose = () => {
-    setDrawerVisible(false);
-    setSelectedTender(null);
-
-    // Восстановить прокрутку после анимации закрытия
-    setTimeout(() => {
-      if (tableContainerRef.current) {
-        tableContainerRef.current.scrollTop = scrollPosition;
-      }
-    }, 300);
+  const handleOpenTender = (
+    tender: TenderRegistryWithRelations,
+    tab: 'info' | 'timeline' | 'package' = 'info'
+  ) => {
+    setSelectedTender(tender);
+    setDetailInitialTab(tab);
+    setDetailOpen(true);
   };
 
-  const handlePageChange = (page: number, size: number) => {
-    if (size !== pageSize) {
-      setPageSize(size);
-      setCurrentPage(1);
+  const handleQuickCall = async (tender: TenderRegistryWithRelations) => {
+    const chronologyItems = tender.chronology_items || [];
+    const updatedItems = [...chronologyItems, buildCallFollowUpItem(dayjs().toISOString())];
+
+    const { error } = await supabase
+      .from('tender_registry')
+      .update({ chronology_items: updatedItems })
+      .eq('id', tender.id);
+
+    if (error) {
+      message.error(error.message);
       return;
     }
 
-    setCurrentPage(page);
+    message.success(`В хронологию "${tender.title}" добавлено событие звонка`);
+    await refetch();
   };
 
   return (
-    <div className="tenders-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <Card
-          title="Перечень тендеров"
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', margin: 0 }}
-          styles={{ body: { flex: 1, overflow: 'auto', padding: '16px' } }}
-          extra={
-            !isDirector && activeTab === 'current' && (
-              <Space>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setShowAddForm(!showAddForm)}
-                >
-                  {showAddForm ? 'Скрыть форму' : 'Добавить тендер'}
-                </Button>
-                <Button
-                  icon={<UploadOutlined />}
-                  onClick={() => setImportModalOpen(true)}
-                >
-                  Импорт из Excel
-                </Button>
-              </Space>
-            )
-          }
-        >
-          <Tabs
-            activeKey={activeTab}
-            onChange={(key) => { setActiveTab(key as 'current' | 'waiting' | 'archive'); setCurrentPage(1); }}
-            items={[
-              {
-                key: 'current',
-                label: `Текущие (${tenders.filter((t) => !t.is_archived && (t.status as any)?.name !== 'Ожидаем тендерный пакет').length})`,
-                children: (
-                  <>
-                    {/* Inline-форма добавления (только во вкладке "Текущие") */}
-                    {!isDirector && showAddForm && (
-                      <TenderAddForm
-                        statuses={statuses}
-                        constructionScopes={constructionScopes}
-                        tenderNumbers={tenderNumbers}
-                        onSuccess={() => {
-                          refetch();
-                          setShowAddForm(false);
-                        }}
-                        onCancel={() => setShowAddForm(false)}
-                      />
-                    )}
+    <div className="tender-monitor-page">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minHeight: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: '#f5efe4', fontSize: 30, fontWeight: 700, marginBottom: 6 }}>Перечень тендеров</div>
+            <div style={{ color: '#8b93a7', fontSize: 14 }}>
+              Реестр с контролем подачи КП, звонков и общей хронологии тендера.
+            </div>
+          </div>
 
-                    {/* Таблица текущих тендеров */}
-                    <div ref={tableContainerRef} className="tenders-table-wrapper">
-                      <TenderGrid
-                        dataSource={filteredTenders}
-                        loading={loading}
-                        currentPage={currentPage}
-                        pageSize={pageSize}
-                        totalCount={filteredTenders.length}
-                        onPageChange={handlePageChange}
-                        onRowClick={handleRowClick}
-                        onReorder={handleReorder}
-                      />
-                    </div>
-                  </>
-                ),
-              },
-              {
-                key: 'waiting',
-                label: `В ожидании (${tenders.filter((t) => !t.is_archived && (t.status as any)?.name === 'Ожидаем тендерный пакет').length})`,
-                children: (
-                  <div ref={tableContainerRef} className="tenders-table-wrapper">
-                    <TenderGrid
-                      dataSource={filteredTenders}
-                      loading={loading}
-                      currentPage={currentPage}
-                      pageSize={pageSize}
-                      totalCount={filteredTenders.length}
-                      onPageChange={handlePageChange}
-                      onRowClick={handleRowClick}
-                      onReorder={handleReorder}
-                    />
-                  </div>
-                ),
-              },
-              {
-                key: 'archive',
-                label: `Архив (${tenders.filter((t) => t.is_archived).length})`,
-                children: (
-                  <div ref={tableContainerRef} className="tenders-table-wrapper">
-                    <TenderGrid
-                      dataSource={filteredTenders}
-                      loading={loading}
-                      currentPage={currentPage}
-                      pageSize={pageSize}
-                      totalCount={filteredTenders.length}
-                      onPageChange={handlePageChange}
-                      onRowClick={handleRowClick}
-                      onReorder={handleReorder}
-                    />
-                  </div>
-                ),
-              },
-            ]}
+          {!isDirector ? (
+            <Space wrap>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowAddForm((prev) => !prev)}>
+                {showAddForm ? 'Скрыть форму' : 'Добавить тендер'}
+              </Button>
+              <Button icon={<UploadOutlined />} onClick={() => setImportModalOpen(true)}>
+                Импорт из Excel
+              </Button>
+            </Space>
+          ) : null}
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 14,
+          }}
+        >
+          <MetricCard title="Всего тендеров" value={counts.all} caption="активных позиций" accent="#c9a84c" />
+          <MetricCard title="В расчете" value={counts.calc} caption="готовятся КП" accent="#4a90e2" />
+          <MetricCard title="Направлено" value={counts.sent} caption="ожидает ответа" accent="#ef9f27" />
+          <MetricCard
+            title="Требуют звонка"
+            value={needCallCount}
+            caption="более 7 дней без контроля"
+            accent="#e24b4a"
+            blinking={needCallCount > 0}
           />
-        </Card>
+          <MetricCard
+            title="Сумма КП"
+            value={formatMoney(totalCost)}
+            caption={`${formatArea(totalArea)} в работе`}
+            accent="#3db87a"
+          />
+        </div>
+
+        {showAddForm && !isDirector ? (
+          <TenderAddForm
+            statuses={statuses}
+            constructionScopes={constructionScopes}
+            tenderNumbers={tenderNumbers}
+            onSuccess={async () => {
+              setShowAddForm(false);
+              await refetch();
+            }}
+            onCancel={() => setShowAddForm(false)}
+          />
+        ) : null}
+
+        <TenderMonitorTable
+          tenders={visibleTenders}
+          loading={loading}
+          activeTab={activeTab}
+          searchValue={searchValue}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          counts={counts}
+          onTabChange={setActiveTab}
+          onSearchChange={setSearchValue}
+          onSortChange={handleSortChange}
+          onOpenTender={(tender) => handleOpenTender(tender, 'info')}
+          onOpenTimeline={(tender) => handleOpenTender(tender, 'timeline')}
+          onQuickCall={handleQuickCall}
+          onAddTender={!isDirector ? () => setShowAddForm((prev) => !prev) : undefined}
+        />
       </div>
 
-      {/* Drawer без разрыва */}
-      {drawerVisible && (
-        <TenderDrawerModern
-          open={drawerVisible}
-          tender={selectedTender}
-          statuses={statuses}
-          constructionScopes={constructionScopes}
-          onClose={handleDrawerClose}
-          onUpdate={refetch}
-          readOnly={isGeneralDirector}
-        />
-      )}
+      <TenderMonitorModal
+        open={detailOpen}
+        tender={selectedTender}
+        initialTab={detailInitialTab}
+        statuses={statuses}
+        constructionScopes={constructionScopes}
+        onClose={() => setDetailOpen(false)}
+        onQuickCall={handleQuickCall}
+        onUpdate={refetch}
+      />
 
-      {/* Import Modal */}
       <ImportTendersModal
         open={importModalOpen}
         onCancel={() => setImportModalOpen(false)}
-        onSuccess={() => {
+        onSuccess={async () => {
           setImportModalOpen(false);
-          refetch();
+          await refetch();
         }}
         constructionScopes={constructionScopes}
         statuses={statuses}
