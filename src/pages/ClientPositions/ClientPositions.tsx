@@ -33,13 +33,22 @@ function normalizePositionSearchValue(value: string | number | null | undefined)
     .replace(/\s+/g, ' ');
 }
 
+function normalizePositionNumberSearchValue(value: string | number | null | undefined): string {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('ru-RU')
+    .replace(/\s+/g, '');
+}
+
 function filterPositionsBySearch(
   positions: ClientPosition[],
   query: string
 ): ClientPosition[] {
+  const hasTrailingSpace = /\s$/.test(query);
   const normalizedQuery = normalizePositionSearchValue(query);
-  const compactQuery = normalizedQuery.replace(/\s+/g, '');
+  const normalizedItemQuery = normalizePositionNumberSearchValue(query);
   const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+  const exactItemNoMode = hasTrailingSpace && normalizedItemQuery.length > 0 && /\d/.test(normalizedItemQuery);
 
   if (!normalizedQuery) {
     return positions;
@@ -47,15 +56,17 @@ function filterPositionsBySearch(
 
   return positions.filter((position) => {
     const workName = normalizePositionSearchValue(position.work_name);
-    const itemNo = normalizePositionSearchValue(position.item_no);
-    const haystack = `${itemNo} ${workName}`.trim();
-    const compactHaystack = haystack.replace(/\s+/g, '');
-    const compactItemNo = itemNo.replace(/\s+/g, '');
+    const itemNo = normalizePositionNumberSearchValue(position.item_no);
+    const workNameMatches =
+      workName.includes(normalizedQuery) ||
+      queryTokens.every((token) => workName.includes(token));
+    const itemNoMatches = exactItemNoMode
+      ? itemNo === normalizedItemQuery
+      : normalizedItemQuery.length > 0 && itemNo.includes(normalizedItemQuery);
+
     return (
-      haystack.includes(normalizedQuery) ||
-      queryTokens.every((token) => haystack.includes(token)) ||
-      queryTokens.every((token) => compactHaystack.includes(token.replace(/\s+/g, ''))) ||
-      (compactQuery.length > 0 && compactItemNo.includes(compactQuery))
+      workNameMatches ||
+      itemNoMatches
     );
   });
 }
