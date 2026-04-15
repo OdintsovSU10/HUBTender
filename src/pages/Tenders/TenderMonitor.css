@@ -13,6 +13,7 @@
 
 .tender-monitor-alert-card {
   animation: tender-monitor-alert-pulse 1.2s ease-in-out infinite;
+  will-change: opacity, transform, box-shadow, filter;
 }
 
 @keyframes tender-monitor-call-pulse {
@@ -33,10 +34,16 @@
   100% {
     box-shadow: 0 0 0 0 rgba(226, 75, 74, 0);
     border-color: var(--tm-card-border);
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
   }
 
   50% {
     box-shadow: 0 0 0 8px var(--tm-alert-pulse-shadow);
     border-color: var(--tm-alert-pulse-border);
+    opacity: 0.94;
+    transform: scale(0.975);
+    filter: brightness(1.03);
   }
 }

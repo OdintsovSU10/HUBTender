@@ -237,7 +237,7 @@ const Tenders: React.FC = () => {
             value={needCallCount}
             caption="более 7 дней без контроля"
             accent={palette.danger}
-            blinking={needCallCount > 0}
+            blinking={needCallCount >= 0}
             palette={palette}
           />
           <MetricCard
@@ -276,7 +276,6 @@ const Tenders: React.FC = () => {
           onOpenTender={(tender) => handleOpenTender(tender, 'info')}
           onOpenTimeline={(tender) => handleOpenTender(tender, 'timeline')}
           onQuickCall={handleQuickCall}
-          onAddTender={!isDirector ? () => setShowAddForm((prev) => !prev) : undefined}
         />
       </div>
 

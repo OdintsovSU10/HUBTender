@@ -4,6 +4,7 @@ import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { FormInstance } from 'antd';
 import type { TenderPackageItem } from '../../../../lib/supabase';
+import { getPackageLinkHref } from '../../utils/tenderMonitor';
 
 const { Text } = Typography;
 
@@ -20,8 +21,9 @@ export const TenderPackageList: React.FC<TenderPackageListProps> = ({
   form,
   fieldName = 'tender_package_items',
 }) => {
+  void form;
+
   if (!editable) {
-    // РЕЖИМ ПРОСМОТРА
     if (items.length === 0) {
       return <Text type="secondary">Нет записей</Text>;
     }
@@ -31,21 +33,30 @@ export const TenderPackageList: React.FC<TenderPackageListProps> = ({
         size="small"
         dataSource={items}
         style={{ padding: 0 }}
-        renderItem={(item, index) => (
-          <List.Item style={{ padding: '4px 0', border: 'none' }}>
-            <Space direction="vertical" size={0} style={{ width: '100%' }}>
-              <Text strong>
-                {index + 1}) {item.date ? dayjs(item.date).format('DD.MM.YYYY') : 'Без даты'}
-              </Text>
-              <Text>{item.text}</Text>
-            </Space>
-          </List.Item>
-        )}
+        renderItem={(item, index) => {
+          const href = getPackageLinkHref(item.link);
+
+          return (
+            <List.Item style={{ padding: '4px 0', border: 'none' }}>
+              <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                <Text strong>
+                  {index + 1}) {item.date ? dayjs(item.date).format('DD.MM.YYYY') : 'Без даты'}
+                </Text>
+                {href ? (
+                  <a href={href} target="_blank" rel="noreferrer">
+                    {item.text}
+                  </a>
+                ) : (
+                  <Text>{item.text}</Text>
+                )}
+              </Space>
+            </List.Item>
+          );
+        }}
       />
     );
   }
 
-  // РЕЖИМ РЕДАКТИРОВАНИЯ
   return (
     <Form.List name={fieldName}>
       {(fields, { add, remove }) => (
@@ -71,13 +82,18 @@ export const TenderPackageList: React.FC<TenderPackageListProps> = ({
               <Form.Item
                 {...restField}
                 name={[name, 'text']}
-                rules={[{ required: true, message: 'Введите описание' }]}
+                rules={[{ required: true, message: 'Введите наименование' }]}
                 style={{ marginBottom: 0, flex: 1 }}
               >
-                <Input.TextArea
-                  placeholder="Описание документа/события"
-                  autoSize={{ minRows: 1, maxRows: 6 }}
-                />
+                <Input placeholder="Наименование" />
+              </Form.Item>
+
+              <Form.Item
+                {...restField}
+                name={[name, 'link']}
+                style={{ marginBottom: 0, width: 220, flexShrink: 0 }}
+              >
+                <Input placeholder="Ссылка" />
               </Form.Item>
 
               <Button
@@ -93,7 +109,7 @@ export const TenderPackageList: React.FC<TenderPackageListProps> = ({
 
           <Button
             type="dashed"
-            onClick={() => add({ date: null, text: '' })}
+            onClick={() => add({ date: null, text: '', link: '' })}
             icon={<PlusOutlined />}
             block
             style={{ marginTop: 8 }}

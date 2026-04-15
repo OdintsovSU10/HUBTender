@@ -74,6 +74,7 @@ export const TenderAddForm: React.FC<TenderAddFormProps> = ({
       const tenderPackageItems = (values.tender_package_items || []).map((item: any) => ({
         date: item.date?.toISOString() || null,
         text: item.text,
+        link: item.link?.trim() || null,
       }));
 
       const selectedStatus = statuses.find((status) => status.id === values.status_id);

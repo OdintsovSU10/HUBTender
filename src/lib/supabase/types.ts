@@ -62,6 +62,7 @@ export interface ChronologyItem {
 export interface TenderPackageItem {
   date: string | null;
   text: string;
+  link?: string | null;
 }
 
 export type DashboardStatus = 'calc' | 'sent' | 'waiting_pd' | 'archive';

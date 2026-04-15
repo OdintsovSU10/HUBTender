@@ -183,7 +183,61 @@ export function getChronologyItems(tender: TenderRegistryWithRelations): Chronol
 }
 
 export function getPackageItems(tender: TenderRegistryWithRelations): TenderPackageItem[] {
-  return tender.tender_package_items || [];
+  return (tender.tender_package_items || []).map((item) => ({
+    date: item.date ?? null,
+    text: item.text,
+    link: item.link?.trim() || null,
+  }));
+}
+
+export function getPackageLinkHref(link?: string | null): string | null {
+  const trimmed = link?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+const PACKAGE_BADGE_PRESETS = [
+  { color: '#4a90e2', background: 'rgba(74,144,226,0.12)', border: '1px solid rgba(74,144,226,0.24)' },
+  { color: '#10b981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.24)' },
+  { color: '#ef9f27', background: 'rgba(239,159,39,0.12)', border: '1px solid rgba(239,159,39,0.24)' },
+  { color: '#8b5cf6', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.24)' },
+  { color: '#ec4899', background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.24)' },
+  { color: '#14b8a6', background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.24)' },
+] as const;
+
+export function getTenderPackageBadgeStyle(text?: string | null) {
+  const normalized = (text || '').trim().toLocaleLowerCase('ru-RU');
+
+  if (!normalized) {
+    return PACKAGE_BADGE_PRESETS[0];
+  }
+
+  if (normalized.includes('договор')) {
+    return PACKAGE_BADGE_PRESETS[1];
+  }
+
+  if (normalized.includes('пд') || normalized.includes('проект')) {
+    return PACKAGE_BADGE_PRESETS[2];
+  }
+
+  if (normalized.includes('вор') || normalized.includes('смет')) {
+    return PACKAGE_BADGE_PRESETS[0];
+  }
+
+  if (normalized.includes('тз')) {
+    return PACKAGE_BADGE_PRESETS[3];
+  }
+
+  const hash = Array.from(normalized).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return PACKAGE_BADGE_PRESETS[hash % PACKAGE_BADGE_PRESETS.length];
 }
 
 export function getLastCallFollowUpDate(tender: TenderRegistryWithRelations): string | null {

@@ -19,6 +19,7 @@ import {
   getDashboardStatus,
   getDashboardStatusByStatusName,
   getLastCallFollowUpDate,
+  getPackageLinkHref,
   getPackageItems,
   getStatusBadgeStyle,
   getTenderStatusDisplayLabel,
@@ -343,6 +344,140 @@ function EditableChronologySection({ tenderId, items, palette, onUpdated }: Edit
   );
 }
 
+interface EditablePackageSectionProps {
+  tenderId: string;
+  items: Array<{ date: string | null; text: string; link?: string | null }>;
+  palette: TenderMonitorPalette;
+  onUpdated: () => Promise<void> | void;
+}
+
+function EditablePackageSection({ tenderId, items, palette, onUpdated }: EditablePackageSectionProps) {
+  const [draftItems, setDraftItems] = useState(items);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraftItems(items);
+  }, [items]);
+
+  const updateItem = (
+    index: number,
+    patch: Partial<{ date: string | null; text: string; link?: string | null }>
+  ) => {
+    setDraftItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
+  };
+
+  const removeItem = (index: number) => {
+    setDraftItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const addItem = () => {
+    setDraftItems((prev) => [...prev, { date: dayjs().toISOString(), text: '', link: '' }]);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+
+    try {
+      const tenderPackageItems = draftItems
+        .map((item) => ({
+          date: item.date ? dayjs(item.date).toISOString() : null,
+          text: item.text.trim(),
+          link: item.link?.trim() || null,
+        }))
+        .filter((item) => item.text);
+
+      const { error } = await supabase
+        .from('tender_registry')
+        .update({ tender_package_items: tenderPackageItems })
+        .eq('id', tenderId);
+
+      if (error) {
+        message.error(error.message);
+        return;
+      }
+
+      await onUpdated();
+      message.success('Тендерный пакет обновлен');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {draftItems.length > 0 ? (
+        draftItems.map((item, index) => {
+          const href = getPackageLinkHref(item.link);
+
+          return (
+            <div
+              key={`${item.date || 'empty'}-${index}`}
+              style={{
+                padding: '10px 12px',
+                background: palette.sectionBg,
+                borderRadius: 10,
+                border: `1px solid ${palette.borderSoft}`,
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: '128px minmax(0, 1fr) minmax(0, 1fr) 32px', gap: 8, alignItems: 'start' }}>
+                <DatePicker
+                  size="small"
+                  value={item.date ? dayjs(item.date) : null}
+                  onChange={(value) => updateItem(index, { date: value ? value.toISOString() : null })}
+                  format="DD.MM.YYYY"
+                  style={{ width: '100%' }}
+                />
+                <Input
+                  size="small"
+                  value={item.text}
+                  onChange={(event) => updateItem(index, { text: event.target.value })}
+                  placeholder="Наименование"
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Input
+                    size="small"
+                    value={item.link || ''}
+                    onChange={(event) => updateItem(index, { link: event.target.value })}
+                    placeholder="Ссылка"
+                  />
+                  {href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: palette.info, fontSize: 11, lineHeight: 1.2, wordBreak: 'break-word' }}
+                    >
+                      Открыть ссылку
+                    </a>
+                  ) : null}
+                </div>
+                <Button
+                  size="small"
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => removeItem(index)}
+                />
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        <Text style={{ color: palette.muted, fontSize: 12 }}>Тендерный пакет не заполнен</Text>
+      )}
+
+      <Space wrap size={8}>
+        <Button size="small" icon={<PlusOutlined />} onClick={addItem}>
+          Добавить строку
+        </Button>
+        <Button type="primary" size="small" onClick={() => void handleSave()} loading={saving}>
+          Сохранить
+        </Button>
+      </Space>
+    </div>
+  );
+}
+
 function InfoCard({ label, value, palette }: { label: string; value: React.ReactNode; palette: TenderMonitorPalette }) {
   return (
     <div
@@ -581,31 +716,7 @@ export const TenderMonitorModal: React.FC<TenderMonitorModalProps> = ({
           ) : null}
 
           {activeTab === 'package' ? (
-            <div>
-              {packageItems.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {packageItems.map((item, index) => (
-                    <div
-                      key={`${item.date || 'empty'}-${item.text}-${index}`}
-                      style={{
-                        display: 'flex',
-                        gap: 12,
-                        alignItems: 'center',
-                        padding: '9px 10px',
-                        background: palette.sectionBg,
-                        borderRadius: 8,
-                        border: `1px solid ${palette.borderSoft}`,
-                      }}
-                    >
-                      <div style={{ minWidth: 82, color: palette.successStrong, fontWeight: 700, fontSize: 11 }}>{formatDate(item.date)}</div>
-                      <div style={{ color: palette.text, fontSize: 12, lineHeight: 1.35 }}>{item.text}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Text style={{ color: palette.muted, fontSize: 12 }}>Тендерный пакет не заполнен</Text>
-              )}
-            </div>
+            <EditablePackageSection tenderId={tender.id} items={packageItems} palette={palette} onUpdated={onUpdate} />
           ) : null}
         </div>
       </div>

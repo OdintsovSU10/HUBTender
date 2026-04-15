@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Empty, Input, Popover, Skeleton, Space, Tag } from 'antd';
+import { Empty, Input, Popover, Skeleton, Space, Tag } from 'antd';
 import {
   EnvironmentFilled,
   FileTextOutlined,
@@ -19,8 +19,10 @@ import {
   getDashboardStatus,
   getDaysSinceControl,
   getDaysToSubmission,
-  getPackageSummary,
+  getPackageItems,
+  getPackageLinkHref,
   getStatusBadgeStyle,
+  getTenderPackageBadgeStyle,
   getTenderStatusDisplayLabel,
   type TenderMonitorSortDirection,
   type TenderMonitorSortField,
@@ -42,7 +44,6 @@ interface TenderMonitorTableProps {
   onOpenTender: (tender: TenderRegistryWithRelations) => void;
   onOpenTimeline: (tender: TenderRegistryWithRelations) => void;
   onQuickCall: (tender: TenderRegistryWithRelations) => Promise<void> | void;
-  onAddTender?: () => void;
 }
 
 type TableColumn = {
@@ -60,7 +61,7 @@ const GRID_COLUMNS: TableColumn[] = [
   { key: 'cost', label: 'Стоимость КП', template: '116px', align: 'center' },
   { key: 'rate', label: '₽/м²', template: '86px', align: 'center' },
   { key: 'submission', label: 'Дата подачи', template: '204px', align: 'center' },
-  { key: 'package', label: 'Тендерный пакет', template: '180px', align: 'center' },
+  { key: 'package', label: 'Тендерный пакет', template: 'minmax(180px, 0.7fr)', align: 'left' },
   { key: 'status', label: 'Статус / время', template: '132px', align: 'center' },
   { key: 'timeline', label: 'Хронология', template: '84px', align: 'center' },
   { key: 'invite', label: 'Приглашение', template: '82px', align: 'center' },
@@ -357,7 +358,7 @@ function TenderRow({
 }) {
   const dashboardStatus = getDashboardStatus(tender);
   const badgeStyle = getStatusBadgeStyle(dashboardStatus);
-  const packageSummary = getPackageSummary(tender);
+  const packageItems = getPackageItems(tender).filter((item) => item.text?.trim());
   const daysToSubmission = getDaysToSubmission(tender);
   const daysSinceControl = getDaysSinceControl(tender);
   const canQuickCall = dashboardStatus === 'sent' && (daysSinceControl ?? 0) > 7;
@@ -459,14 +460,55 @@ function TenderRow({
         ) : null}
       </div>
 
-      <div style={{ padding: '12px 0', textAlign: 'center' }}>
-        <div style={{ width: 72, height: 5, background: palette.sectionBg, borderRadius: 999, overflow: 'hidden', marginBottom: 6 }}>
-          <div style={{ width: `${packageSummary.percent}%`, height: '100%', background: palette.success }} />
-        </div>
-        <div style={{ color: palette.muted, fontSize: 11 }}>
-          {packageSummary.standardCount}/{5}
-          {packageSummary.extraCount > 0 ? ` +${packageSummary.extraCount}` : ''}
-        </div>
+      <div style={{ padding: '12px 0', minWidth: 0 }}>
+        {packageItems.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            {packageItems.map((item, index) => {
+              const href = getPackageLinkHref(item.link);
+
+              return href ? (
+                <a
+                  key={`${item.text}-${item.date || 'empty'}-${index}`}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  style={{
+                    display: 'inline-flex',
+                    alignSelf: 'flex-start',
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    wordBreak: 'break-word',
+                    ...getTenderPackageBadgeStyle(item.text),
+                  }}
+                >
+                  {item.text}
+                </a>
+              ) : (
+                <div
+                  key={`${item.text}-${item.date || 'empty'}-${index}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignSelf: 'flex-start',
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    wordBreak: 'break-word',
+                    ...getTenderPackageBadgeStyle(item.text),
+                  }}
+                >
+                  {item.text}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ color: palette.muted, fontSize: 12 }}>—</div>
+        )}
       </div>
 
       <div style={{ padding: '12px 0', textAlign: 'center' }}>
@@ -560,7 +602,6 @@ export const TenderMonitorTable: React.FC<TenderMonitorTableProps> = ({
   onOpenTender,
   onOpenTimeline,
   onQuickCall,
-  onAddTender,
 }) => {
   void onOpenTimeline;
 
@@ -689,11 +730,6 @@ export const TenderMonitorTable: React.FC<TenderMonitorTableProps> = ({
             />
           </Space>
 
-          {onAddTender ? (
-            <Button type="primary" onClick={onAddTender} size="small">
-              Добавить тендер
-            </Button>
-          ) : null}
         </div>
 
         {loading ? (

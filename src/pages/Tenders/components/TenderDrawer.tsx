@@ -85,6 +85,7 @@ export const TenderDrawer: React.FC<TenderDrawerProps> = ({
       const tenderPackageItems = (values.tender_package_items || []).map((item: any) => ({
         date: item.date?.toISOString() || null,
         text: item.text,
+        link: item.link?.trim() || null,
       }));
 
       const payload = {
