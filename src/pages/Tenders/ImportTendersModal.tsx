@@ -3,6 +3,7 @@ import { Modal, Upload, Button, message, Table, Alert } from 'antd';
 import { UploadOutlined, InboxOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { supabase, type ConstructionScope, type TenderStatus } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import dayjs from 'dayjs';
 
 interface ImportTendersModalProps {
@@ -37,6 +38,7 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
   constructionScopes,
   statuses,
 }) => {
+  const { user } = useAuth();
   const [parsedData, setParsedData] = useState<ParsedTender[]>([]);
   const [loading, setLoading] = useState(false);
   const [fileList, setFileList] = useState<any[]>([]);
@@ -168,6 +170,7 @@ const ImportTendersModal: React.FC<ImportTendersModalProps> = ({
           invitation_date: tender.invitation_date || null,
           status_id: status_id || null,
           sort_order: nextSortOrder++,
+          created_by: user?.id || null,
           is_archived: false,
         };
       });

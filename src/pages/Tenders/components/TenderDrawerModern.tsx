@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Drawer, Tabs, Input, DatePicker, Select, Tag, message, Button } from 'antd';
 import { EditOutlined, CalendarOutlined, DownloadOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -19,7 +19,7 @@ interface TenderDrawerModernProps {
   readOnly?: boolean;
 }
 
-// Р¦РІРµС‚РѕРІС‹Рµ СЃС…РµРјС‹ РґР»СЏ С‚РµРјРЅРѕР№ Рё СЃРІРµС‚Р»РѕР№ С‚РµРјС‹
+// Цветовые схемы для темной и светлой темы
 const getThemeColors = (isDark: boolean) => ({
   drawerBg: isDark ? '#101114' : '#ffffff',
   drawerBorder: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
@@ -40,7 +40,7 @@ const getThemeColors = (isDark: boolean) => ({
   iconColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.25)',
 });
 
-// РљРѕРјРїРѕРЅРµРЅС‚ РґР»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ СЌР»РµРјРµРЅС‚Р° С…СЂРѕРЅРѕР»РѕРіРёРё
+// Компонент для редактирования элемента хронологии
 interface ChronologyItemEditProps {
   event: any;
   index: number;
@@ -52,7 +52,7 @@ interface ChronologyItemEditProps {
 
 const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, onUpdate, allItems, isDark, readOnly = false }) => {
   const colors = getThemeColors(isDark);
-  // РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕС‚РєСЂС‹РІР°С‚СЊ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ РґР»СЏ РЅРѕРІС‹С… СЌР»РµРјРµРЅС‚РѕРІ (СЃ РїСѓСЃС‚С‹Рј С‚РµРєСЃС‚РѕРј)
+  // Автоматически открывать редактирование для новых элементов (с пустым текстом)
   const [isEditing, setIsEditing] = useState(event.text === '');
   const [editDate, setEditDate] = useState<dayjs.Dayjs | null>(
     event.date ? dayjs(event.date) : null
@@ -60,7 +60,7 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
   const [editText, setEditText] = useState(event.text);
   const [editType, setEditType] = useState(event.type || 'default');
 
-  // РћР±РЅРѕРІРёС‚СЊ Р»РѕРєР°Р»СЊРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ РїСЂРё РёР·РјРµРЅРµРЅРёРё СЃРѕР±С‹С‚РёСЏ (РїРѕСЃР»Рµ refetch)
+  // Обновить локальное состояние при изменении события (после refetch)
   useEffect(() => {
     setEditDate(event.date ? dayjs(event.date) : null);
     setEditText(event.text);
@@ -69,7 +69,7 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
 
   const handleSave = async () => {
     if (!editText.trim()) {
-      return; // РќРµ СЃРѕС…СЂР°РЅСЏС‚СЊ РїСѓСЃС‚С‹Рµ Р·Р°РїРёСЃРё
+      return; // Не сохранять пустые записи
     }
     const updatedItems = [...allItems];
     updatedItems[index] = {
@@ -102,28 +102,28 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
             onChange={setEditDate}
             format="DD.MM.YYYY"
             style={{ width: '100%' }}
-            placeholder="Р”Р°С‚Р° СЃРѕР±С‹С‚РёСЏ"
+            placeholder="Дата события"
           />
           <Select
             value={editType}
             onChange={setEditType}
             options={[
-              { value: 'default', label: 'РЎРѕР±С‹С‚РёРµ' },
-              { value: 'call_follow_up', label: 'Р—РІРѕРЅРѕРє' },
+              { value: 'default', label: 'Событие' },
+              { value: 'call_follow_up', label: 'Звонок' },
             ]}
           />
           <Input.TextArea
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
-            placeholder="РћРїРёСЃР°РЅРёРµ СЃРѕР±С‹С‚РёСЏ"
+            placeholder="Описание события"
             autoSize={{ minRows: 2, maxRows: 4 }}
           />
           <div style={{ display: 'flex', gap: 6 }}>
             <Button size="small" type="primary" onClick={handleSave}>
-              РЎРѕС…СЂР°РЅРёС‚СЊ
+              Сохранить
             </Button>
             <Button size="small" onClick={() => setIsEditing(false)}>
-              РћС‚РјРµРЅР°
+              Отмена
             </Button>
           </div>
         </div>
@@ -138,11 +138,11 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
                 marginBottom: 1,
               }}
             >
-              {event.date ? dayjs(event.date).format('DD.MM.YYYY') : 'Р‘РµР· РґР°С‚С‹'}
+              {event.date ? dayjs(event.date).format('DD.MM.YYYY') : 'Без даты'}
             </div>
             {event.type === 'call_follow_up' ? (
               <Tag color="error" style={{ marginBottom: 4 }}>
-                Р—РІРѕРЅРѕРє
+                Звонок
               </Tag>
             ) : null}
             <div
@@ -180,7 +180,7 @@ const ChronologyItemEdit: React.FC<ChronologyItemEditProps> = ({ event, index, o
   );
 };
 
-// РљРѕРјРїРѕРЅРµРЅС‚ РґР»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ СЌР»РµРјРµРЅС‚Р° С‚РµРЅРґРµСЂРЅРѕРіРѕ РїР°РєРµС‚Р°
+// Компонент для редактирования элемента тендерного пакета
 interface PackageItemEditProps {
   file: any;
   index: number;
@@ -192,14 +192,14 @@ interface PackageItemEditProps {
 
 const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate, allItems, isDark, readOnly = false }) => {
   const colors = getThemeColors(isDark);
-  // РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕС‚РєСЂС‹РІР°С‚СЊ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ РґР»СЏ РЅРѕРІС‹С… СЌР»РµРјРµРЅС‚РѕРІ (СЃ РїСѓСЃС‚С‹Рј С‚РµРєСЃС‚РѕРј)
+  // Автоматически открывать редактирование для новых элементов (с пустым текстом)
   const [isEditing, setIsEditing] = useState(file.text === '');
   const [editDate, setEditDate] = useState<dayjs.Dayjs | null>(
     file.date ? dayjs(file.date) : null
   );
   const [editText, setEditText] = useState(file.text);
 
-  // РћР±РЅРѕРІРёС‚СЊ Р»РѕРєР°Р»СЊРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ РїСЂРё РёР·РјРµРЅРµРЅРёРё С„Р°Р№Р»Р° (РїРѕСЃР»Рµ refetch)
+  // Обновить локальное состояние при изменении файла (после refetch)
   useEffect(() => {
     setEditDate(file.date ? dayjs(file.date) : null);
     setEditText(file.text);
@@ -207,7 +207,7 @@ const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate
 
   const handleSave = async () => {
     if (!editText.trim()) {
-      return; // РќРµ СЃРѕС…СЂР°РЅСЏС‚СЊ РїСѓСЃС‚С‹Рµ Р·Р°РїРёСЃРё
+      return; // Не сохранять пустые записи
     }
     const updatedItems = [...allItems];
     updatedItems[index] = {
@@ -239,19 +239,19 @@ const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate
             onChange={setEditDate}
             format="DD.MM.YYYY"
             style={{ width: '100%' }}
-            placeholder="Р”Р°С‚Р° РґРѕРєСѓРјРµРЅС‚Р°"
+            placeholder="Дата документа"
           />
           <Input
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
-            placeholder="РќР°Р·РІР°РЅРёРµ РґРѕРєСѓРјРµРЅС‚Р°"
+            placeholder="Название документа"
           />
           <div style={{ display: 'flex', gap: 6 }}>
             <Button size="small" type="primary" onClick={handleSave}>
-              РЎРѕС…СЂР°РЅРёС‚СЊ
+              Сохранить
             </Button>
             <Button size="small" onClick={() => setIsEditing(false)}>
-              РћС‚РјРµРЅР°
+              Отмена
             </Button>
           </div>
         </div>
@@ -266,7 +266,7 @@ const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate
                 marginBottom: 2,
               }}
             >
-              {file.date ? dayjs(file.date).format('DD.MM.YYYY') : 'Р‘РµР· РґР°С‚С‹'}
+              {file.date ? dayjs(file.date).format('DD.MM.YYYY') : 'Без даты'}
             </div>
             <div
               style={{
@@ -302,7 +302,7 @@ const PackageItemEdit: React.FC<PackageItemEditProps> = ({ file, index, onUpdate
   );
 };
 
-// РљРѕРјРїРѕРЅРµРЅС‚ СЂРµРґР°РєС‚РёСЂСѓРµРјРѕРіРѕ РїРѕР»СЏ
+// Компонент редактируемого поля
 interface EditableFieldProps {
   icon?: React.ReactNode;
   label: string;
@@ -329,9 +329,9 @@ const EditableField: React.FC<EditableFieldProps> = ({ icon, label, value, onSav
     try {
       await onSave(editValue);
       setIsEditing(false);
-      message.success('РћР±РЅРѕРІР»РµРЅРѕ');
+      message.success('Обновлено');
     } catch (error) {
-      message.error('РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ');
+      message.error('Ошибка обновления');
     } finally {
       setSaving(false);
     }
@@ -407,7 +407,7 @@ const EditableField: React.FC<EditableFieldProps> = ({ icon, label, value, onSav
                 cursor: 'pointer',
               }}
             >
-              вњ“
+              ✓
             </button>
             <button
               onClick={handleCancel}
@@ -421,12 +421,12 @@ const EditableField: React.FC<EditableFieldProps> = ({ icon, label, value, onSav
                 cursor: 'pointer',
               }}
             >
-              вњ•
+              ✕
             </button>
           </div>
         ) : (
           <div style={{ fontSize: 13, color: colors.normalText, fontWeight: 400 }}>
-            {value || 'вЂ”'}
+            {value || '—'}
           </div>
         )}
       </div>
@@ -457,7 +457,7 @@ const EditableField: React.FC<EditableFieldProps> = ({ icon, label, value, onSav
   );
 };
 
-// РљРѕРјРїРѕРЅРµРЅС‚ СЂРµРґР°РєС‚РёСЂСѓРµРјРѕР№ РґР°С‚С‹
+// Компонент редактируемой даты
 interface EditableDateFieldProps {
   label: string;
   value: string | null | undefined;
@@ -482,9 +482,9 @@ const EditableDateField: React.FC<EditableDateFieldProps> = ({ label, value, onS
     try {
       await onSave(editValue ? editValue.toISOString() : null);
       setIsEditing(false);
-      message.success('Р”Р°С‚Р° РѕР±РЅРѕРІР»РµРЅР°');
+      message.success('Дата обновлена');
     } catch (error) {
-      message.error('РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ');
+      message.error('Ошибка обновления');
     } finally {
       setSaving(false);
     }
@@ -542,7 +542,7 @@ const EditableDateField: React.FC<EditableDateFieldProps> = ({ label, value, onS
                   cursor: 'pointer',
                 }}
               >
-                вњ“
+                ✓
               </button>
               <button
                 onClick={handleCancel}
@@ -556,7 +556,7 @@ const EditableDateField: React.FC<EditableDateFieldProps> = ({ label, value, onS
                   cursor: 'pointer',
                 }}
               >
-                вњ•
+                ✕
               </button>
             </div>
           ) : (
@@ -571,7 +571,7 @@ const EditableDateField: React.FC<EditableDateFieldProps> = ({ label, value, onS
               }}
             >
               <CalendarOutlined style={{ color: colors.veryMutedText }} />
-              {value ? dayjs(value).format('DD.MM.YYYY') : 'вЂ”'}
+              {value ? dayjs(value).format('DD.MM.YYYY') : '—'}
             </div>
           )}
         </div>
@@ -602,7 +602,7 @@ const EditableDateField: React.FC<EditableDateFieldProps> = ({ label, value, onS
   );
 };
 
-// РљРѕРјРїРѕРЅРµРЅС‚ СЂРµРґР°РєС‚РёСЂСѓРµРјРѕРіРѕ Select РїРѕР»СЏ
+// Компонент редактируемого Select поля
 interface EditableSelectFieldProps {
   label: string;
   value: string | null | undefined;
@@ -628,9 +628,9 @@ const EditableSelectField: React.FC<EditableSelectFieldProps> = ({ label, value,
     try {
       await onSave(editValue);
       setIsEditing(false);
-      message.success('РћР±РЅРѕРІР»РµРЅРѕ');
+      message.success('Обновлено');
     } catch (error) {
-      message.error('РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ');
+      message.error('Ошибка обновления');
     } finally {
       setSaving(false);
     }
@@ -675,7 +675,7 @@ const EditableSelectField: React.FC<EditableSelectFieldProps> = ({ label, value,
                 style={{ width: '100%' }}
                 autoFocus
                 allowClear
-                placeholder="Р’С‹Р±РµСЂРёС‚Рµ Р·РЅР°С‡РµРЅРёРµ"
+                placeholder="Выберите значение"
               >
                 {options.map(opt => (
                   <Select.Option key={opt.id} value={opt.id}>
@@ -697,7 +697,7 @@ const EditableSelectField: React.FC<EditableSelectFieldProps> = ({ label, value,
                   cursor: 'pointer',
                 }}
               >
-                вњ“
+                ✓
               </button>
               <button
                 onClick={handleCancel}
@@ -711,7 +711,7 @@ const EditableSelectField: React.FC<EditableSelectFieldProps> = ({ label, value,
                   cursor: 'pointer',
                 }}
               >
-                вњ•
+                ✕
               </button>
             </div>
           ) : (
@@ -722,7 +722,7 @@ const EditableSelectField: React.FC<EditableSelectFieldProps> = ({ label, value,
                 fontWeight: 400,
               }}
             >
-              {selectedOption?.name || 'вЂ”'}
+              {selectedOption?.name || '—'}
             </div>
           )}
         </div>
@@ -798,9 +798,9 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
     try {
       await updateField('site_visit_photo_url', photoUrl);
       setIsEditingPhoto(false);
-      message.success('РћР±РЅРѕРІР»РµРЅРѕ');
+      message.success('Обновлено');
     } catch (error) {
-      message.error('РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ');
+      message.error('Ошибка обновления');
     } finally {
       setSavingPhoto(false);
     }
@@ -883,7 +883,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                     background: statusBadge.text,
                   }}
                 />
-                {(tender.status as any)?.name || 'РќРµРёР·РІРµСЃС‚РЅРѕ'}
+                {(tender.status as any)?.name || 'Неизвестно'}
               </span>
             </div>
           </div>
@@ -892,9 +892,9 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
         {/* Tabs */}
         <div className="tender-drawer-hidden-scroll" style={{ display: 'flex', marginTop: 4, overflowX: 'auto' }}>
           {[
-            { id: 'info', label: 'РРЅС„РѕСЂРјР°С†РёСЏ' },
-            { id: 'timeline', label: 'РҐСЂРѕРЅРѕР»РѕРіРёСЏ' },
-            { id: 'package', label: 'РўРµРЅРґРµСЂРЅС‹Р№ РїР°РєРµС‚' },
+            { id: 'info', label: 'Информация' },
+            { id: 'timeline', label: 'Хронология' },
+            { id: 'package', label: 'Тендерный пакет' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -934,18 +934,18 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 marginBottom: 8,
               }}
             >
-              РћР±СЉРµРєС‚
+              Объект
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 22 }}>
               <EditableField
-                label="РќРѕРјРµСЂ С‚РµРЅРґРµСЂР°"
+                label="Номер тендера"
                 value={tender.tender_number}
                 onSave={(v) => updateField('tender_number', v)}
                 isDark={isDark}
                 readOnly={readOnly}
               />
               <EditableField
-                label="РќР°РёРјРµРЅРѕРІР°РЅРёРµ"
+                label="Наименование"
                 value={tender.title}
                 onSave={(v) => updateField('title', v)}
                 multiline
@@ -953,15 +953,15 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 readOnly={readOnly}
               />
               <EditableField
-                label="Р—Р°РєР°Р·С‡РёРє"
+                label="Заказчик"
                 value={tender.client_name}
                 onSave={(v) => updateField('client_name', v)}
                 isDark={isDark}
                 readOnly={readOnly}
               />
               <EditableField
-                label="РџР»РѕС‰Р°РґСЊ"
-                value={tender.area ? `${tender.area.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} РјВІ` : null}
+                label="Площадь"
+                value={tender.area ? `${tender.area.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} м²` : null}
                 onSave={async (v) => {
                   const num = parseFloat(v.replace(/[^\d.]/g, ''));
                   await updateField('area', isNaN(num) ? null : num);
@@ -970,7 +970,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 readOnly={readOnly}
               />
               <EditableField
-                label="РђРґСЂРµСЃ"
+                label="Адрес"
                 value={tender.object_address}
                 onSave={(v) => updateField('object_address', v)}
                 multiline
@@ -978,7 +978,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 readOnly={readOnly}
               />
               <EditableField
-                label="РљРѕРѕСЂРґРёРЅР°С‚С‹"
+                label="Координаты"
                 value={tender.object_coordinates}
                 onSave={(v) => updateField('object_coordinates', v)}
                 isDark={isDark}
@@ -986,7 +986,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
               />
 
               <EditableSelectField
-                label="РћР±СЉРµРј СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР°"
+                label="Объем строительства"
                 value={tender.construction_scope_id}
                 options={constructionScopes}
                 onSave={(v) => updateField('construction_scope_id', v)}
@@ -994,16 +994,16 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 readOnly={readOnly}
               />
               <EditableField
-                label="РћР±С‰Р°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ (СЂСѓС‡РЅРѕР№ РІРІРѕРґ)"
+                label="Общая стоимость (ручной ввод)"
                 value={
                   tender.manual_total_cost != null
                     ? tender.manual_total_cost.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                     : tender.total_cost != null
-                    ? `${tender.total_cost.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (Р°РІС‚Рѕ)`
+                    ? `${tender.total_cost.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (авто)`
                     : null
                 }
                 onSave={async (v) => {
-                  // РџР°СЂСЃРёРј С‡РёСЃР»Рѕ РёР· СЃС‚СЂРѕРєРё СЃ РїСЂРѕР±РµР»Р°РјРё Рё Р·Р°РїСЏС‚С‹РјРё (РЅР°РїСЂРёРјРµСЂ "1 000 000" РёР»Рё "123456")
+                  // Парсим число из строки с пробелами и запятыми (например "1 000 000" или "123456")
                   const numStr = v.replace(/\s/g, '').replace(',', '.');
                   const num = parseFloat(numStr);
                   const rubValue = isNaN(num) ? null : num;
@@ -1024,7 +1024,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 marginBottom: 8,
               }}
             >
-              Р¤РѕС‚Рѕ РїРѕСЃРµС‰РµРЅРёСЏ
+              Фото посещения
             </div>
             <div style={{ marginBottom: 22 }}>
               {isEditingPhoto ? (
@@ -1039,7 +1039,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                       marginBottom: 6,
                     }}
                   >
-                    РЎСЃС‹Р»РєР° РЅР° С„РѕС‚Рѕ РїРѕСЃРµС‰РµРЅРёСЏ РїР»РѕС‰Р°РґРєРё
+                    Ссылка на фото посещения площадки
                   </div>
                   <Input
                     value={photoUrl}
@@ -1063,7 +1063,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                         borderColor: '#34d399',
                       }}
                     >
-                      РЎРѕС…СЂР°РЅРёС‚СЊ
+                      Сохранить
                     </Button>
                     <Button
                       size="small"
@@ -1074,7 +1074,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                         color: colors.cancelBtnText,
                       }}
                     >
-                      РћС‚РјРµРЅР°
+                      Отмена
                     </Button>
                   </div>
                 </div>
@@ -1097,7 +1097,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                       cursor: 'pointer',
                     }}
                   >
-                    РћС‚РєСЂС‹С‚СЊ С„РѕС‚Рѕ
+                    Открыть фото
                   </a>
                   {!readOnly && (
                     <Button
@@ -1120,11 +1120,11 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                       borderColor: colors.fieldBorder,
                     }}
                   >
-                    + Р”РѕР±Р°РІРёС‚СЊ СЃСЃС‹Р»РєСѓ РЅР° С„РѕС‚Рѕ
+                    + Добавить ссылку на фото
                   </Button>
                 </div>
               ) : (
-                <div style={{ fontSize: 13, color: colors.mutedText }}>вЂ”</div>
+                <div style={{ fontSize: 13, color: colors.mutedText }}>—</div>
               )}
             </div>
 
@@ -1138,25 +1138,25 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 marginBottom: 8,
               }}
             >
-              РљР»СЋС‡РµРІС‹Рµ РґР°С‚С‹
+              Ключевые даты
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <EditableDateField
-                label="РџСЂРёРіР»Р°С€РµРЅРёРµ"
+                label="Приглашение"
                 value={tender.invitation_date}
                 onSave={(v) => updateField('invitation_date', v)}
                 isDark={isDark}
                 readOnly={readOnly}
               />
               <EditableDateField
-                label="РџРѕСЃРµС‰РµРЅРёРµ РїР»РѕС‰Р°РґРєРё"
+                label="Посещение площадки"
                 value={tender.site_visit_date}
                 onSave={(v) => updateField('site_visit_date', v)}
                 isDark={isDark}
                 readOnly={readOnly}
               />
               <EditableDateField
-                label="РџРѕРґР°С‡Р° РљРџ"
+                label="Подача КП"
                 value={tender.submission_date}
                 onSave={(v) => updateField('submission_date', v)}
                 isDark={isDark}
@@ -1170,7 +1170,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 readOnly={readOnly}
               />
               <EditableDateField
-                label="Дата выхода на площадку"
+                label="Выход на площадку"
                 value={tender.construction_start_date}
                 onSave={(v) => updateField('construction_start_date', v)}
                 isDark={isDark}
@@ -1207,7 +1207,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                   await updateField('chronology_items', updatedItems);
                 }}
               >
-                Р”РѕР±Р°РІРёС‚СЊ СЃРѕР±С‹С‚РёРµ
+                Добавить событие
               </Button>
             )}
           </div>
@@ -1216,7 +1216,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
         {activeTab === 'package' && (
           <div>
             <p style={{ fontSize: 12, color: colors.mutedText, marginBottom: 14 }}>
-              Р”РѕРєСѓРјРµРЅС‚С‹ С‚РµРЅРґРµСЂРЅРѕРіРѕ РїР°РєРµС‚Р° РѕС‚ Р·Р°РєР°Р·С‡РёРєР°
+              Документы тендерного пакета от заказчика
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {packageItems.map((file: any, i: number) => (
@@ -1243,7 +1243,7 @@ export const TenderDrawerModern: React.FC<TenderDrawerModernProps> = ({
                 await updateField('tender_package_items', updatedItems);
               }}
             >
-              Р”РѕР±Р°РІРёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ
+              Добавить информацию
             </Button>
             )}
           </div>

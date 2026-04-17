@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, DatePicker, message, AutoComplete } from 'antd';
 import { supabase, type TenderRegistry, type TenderStatus, type ConstructionScope } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import dayjs from 'dayjs';
 
 interface TenderModalProps {
@@ -22,6 +23,7 @@ const TenderModal: React.FC<TenderModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
   const [tenderTitles, setTenderTitles] = useState<string[]>([]);
   const [clientNames, setClientNames] = useState<string[]>([]);
   const [areas, setAreas] = useState<number[]>([]);
@@ -106,7 +108,7 @@ const TenderModal: React.FC<TenderModalProps> = ({
 
         ({ error } = await supabase
           .from('tender_registry')
-          .insert({ ...payload, sort_order: nextSortOrder }));
+          .insert({ ...payload, sort_order: nextSortOrder, created_by: user?.id || null }));
       }
 
       setLoading(false);

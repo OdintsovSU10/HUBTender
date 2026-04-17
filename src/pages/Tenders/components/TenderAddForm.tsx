@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Form, Input, InputNumber, AutoComplete, Select, DatePicker, Row, Col, Button, message, theme } from 'antd';
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import type {
   TenderStatus,
   ConstructionScope,
@@ -29,6 +30,7 @@ export const TenderAddForm: React.FC<TenderAddFormProps> = ({
 }) => {
   const [form] = Form.useForm();
   const { token } = useToken();
+  const { user } = useAuth();
   const [clientNames, setClientNames] = useState<string[]>([]);
   const [titles, setTitles] = useState<string[]>([]);
 
@@ -91,6 +93,7 @@ export const TenderAddForm: React.FC<TenderAddFormProps> = ({
         chronology_items: chronologyItems,
         tender_package_items: tenderPackageItems,
         sort_order: nextSortOrder,
+        created_by: user?.id || null,
         is_archived: derivedDashboardStatus === 'archive',
         dashboard_status: derivedDashboardStatus,
         status_id: values.status_id === '__sent__' ? null : values.status_id || null,

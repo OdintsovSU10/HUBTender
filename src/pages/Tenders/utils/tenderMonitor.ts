@@ -140,6 +140,14 @@ export function formatMoneyFull(value?: number | null): string {
   return `${value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽`;
 }
 
+export function getEffectiveTenderTotalCost(tender: TenderRegistryWithRelations): number | null {
+  if (tender.manual_total_cost != null) {
+    return tender.manual_total_cost;
+  }
+
+  return tender.total_cost ?? null;
+}
+
 export function formatArea(value?: number | null): string {
   if (value == null) {
     return '—';
@@ -171,15 +179,20 @@ export function formatRubPerSquare(totalCost?: number | null, area?: number | nu
     return '—';
   }
 
-  return `${Math.round(totalCost / area).toLocaleString('ru-RU')} ₽`;
+  return `${(totalCost / area).toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })} ₽`;
 }
 
 export function getChronologyItems(tender: TenderRegistryWithRelations): ChronologyItem[] {
-  return (tender.chronology_items || []).map((item) => ({
-    date: item.date ?? null,
-    text: item.text,
-    type: item.type ?? 'default',
-  }));
+  return sortChronologyItems(
+    (tender.chronology_items || []).map((item) => ({
+      date: item.date ?? null,
+      text: item.text,
+      type: item.type ?? 'default',
+    }))
+  );
 }
 
 export function getPackageItems(tender: TenderRegistryWithRelations): TenderPackageItem[] {
@@ -333,7 +346,7 @@ export function sortTenders(
           : Number.MAX_SAFE_INTEGER
         : field === 'area'
           ? left.area || 0
-          : left.total_cost || 0;
+          : getEffectiveTenderTotalCost(left) || 0;
     const rightValue =
       field === 'submission_date'
         ? right.submission_date
@@ -341,7 +354,7 @@ export function sortTenders(
           : Number.MAX_SAFE_INTEGER
         : field === 'area'
           ? right.area || 0
-          : right.total_cost || 0;
+          : getEffectiveTenderTotalCost(right) || 0;
 
     if (leftValue < rightValue) {
       return -1 * factor;
@@ -375,4 +388,52 @@ export function buildCallFollowUpItem(nowIso: string): ChronologyItem {
     text: 'Позвонили заказчику',
     type: 'call_follow_up',
   };
+}
+
+export function sortChronologyItems(items: ChronologyItem[]): ChronologyItem[] {
+  return [...items]
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftTime = left.item.date ? dayjs(left.item.date).valueOf() : Number.MAX_SAFE_INTEGER;
+      const rightTime = right.item.date ? dayjs(right.item.date).valueOf() : Number.MAX_SAFE_INTEGER;
+
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
+
+export function parseMoneyInput(value: string | number | null | undefined): number | null {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.replace(/\s+/g, '').replace(/,/g, '.');
+  const lastDotIndex = normalized.lastIndexOf('.');
+  const rawFractionalPart = lastDotIndex >= 0 ? normalized.slice(lastDotIndex + 1).replace(/\./g, '') : '';
+  const hasDecimalPart = rawFractionalPart.length > 0 && rawFractionalPart.length <= 2;
+  const integerPart =
+    lastDotIndex >= 0 && hasDecimalPart
+      ? normalized.slice(0, lastDotIndex).replace(/\./g, '')
+      : normalized.replace(/\./g, '');
+  const fractionalPart = hasDecimalPart ? rawFractionalPart : '';
+  const parsed = Number(fractionalPart ? `${integerPart}.${fractionalPart}` : integerPart);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.round(parsed * 100) / 100;
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Empty, Input, Popover, Skeleton, Space, Tag } from 'antd';
 import {
+  DeleteOutlined,
   EnvironmentFilled,
   FileTextOutlined,
   LinkOutlined,
@@ -14,6 +15,7 @@ import {
   formatDateTime,
   formatMoney,
   formatRubPerSquare,
+  getEffectiveTenderTotalCost,
   getChronologyItems,
   getControlDate,
   getDashboardStatus,
@@ -44,6 +46,8 @@ interface TenderMonitorTableProps {
   onOpenTender: (tender: TenderRegistryWithRelations) => void;
   onOpenTimeline: (tender: TenderRegistryWithRelations) => void;
   onQuickCall: (tender: TenderRegistryWithRelations) => Promise<void> | void;
+  canDelete: boolean;
+  onDeleteTender: (tender: TenderRegistryWithRelations) => void;
 }
 
 type TableColumn = {
@@ -65,6 +69,7 @@ const GRID_COLUMNS: TableColumn[] = [
   { key: 'status', label: 'Статус / время', template: '132px', align: 'center' },
   { key: 'timeline', label: 'Хронология', template: '84px', align: 'center' },
   { key: 'invite', label: 'Приглашение', template: '82px', align: 'center' },
+  { key: 'delete', label: '', template: '44px', align: 'center' },
 ];
 
 const GRID_TEMPLATE = GRID_COLUMNS.map((column) => column.template).join(' ');
@@ -163,7 +168,7 @@ function MapPopover({ tender, palette }: { tender: TenderRegistryWithRelations; 
       trigger="hover"
       placement="bottomLeft"
       mouseEnterDelay={0.15}
-      destroyTooltipOnHide
+      destroyOnHidden
       content={
         <div style={{ width: 300 }}>
           <iframe
@@ -190,10 +195,12 @@ function MapPopover({ tender, palette }: { tender: TenderRegistryWithRelations; 
           ) : null}
         </div>
       }
-      overlayInnerStyle={{
-        background: palette.panelBg,
-        border: `1px solid ${palette.border}`,
-        borderRadius: 12,
+      styles={{
+        body: {
+          background: palette.panelBg,
+          border: `1px solid ${palette.border}`,
+          borderRadius: 12,
+        },
       }}
     >
       <button
@@ -224,7 +231,7 @@ function ChronologyPopover({ tender, palette }: { tender: TenderRegistryWithRela
       trigger="hover"
       placement="leftTop"
       mouseEnterDelay={0.15}
-      destroyTooltipOnHide
+      destroyOnHidden
       content={
         chronologyItems.length > 0 ? (
           <div style={{ width: 320, maxHeight: 300, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -250,10 +257,12 @@ function ChronologyPopover({ tender, palette }: { tender: TenderRegistryWithRela
           <div style={{ width: 220, color: palette.muted, fontSize: 13 }}>Хронология пока не заполнена</div>
         )
       }
-      overlayInnerStyle={{
-        background: palette.panelBg,
-        border: `1px solid ${palette.border}`,
-        borderRadius: 12,
+      styles={{
+        body: {
+          background: palette.panelBg,
+          border: `1px solid ${palette.border}`,
+          borderRadius: 12,
+        },
       }}
     >
       <div
@@ -322,7 +331,7 @@ function SectionHeader({
   palette: TenderMonitorPalette;
 }) {
   const totalArea = tenders.reduce((sum, tender) => sum + (tender.area || 0), 0);
-  const totalCost = tenders.reduce((sum, tender) => sum + (tender.total_cost || tender.manual_total_cost || 0), 0);
+  const totalCost = tenders.reduce((sum, tender) => sum + (getEffectiveTenderTotalCost(tender) || 0), 0);
 
   return (
     <div
@@ -349,16 +358,21 @@ function TenderRow({
   tender,
   onOpenTender,
   onQuickCall,
+  canDelete,
+  onDeleteTender,
   palette,
 }: {
   tender: TenderRegistryWithRelations;
   onOpenTender: (tender: TenderRegistryWithRelations) => void;
   onQuickCall: (tender: TenderRegistryWithRelations) => Promise<void> | void;
+  canDelete: boolean;
+  onDeleteTender: (tender: TenderRegistryWithRelations) => void;
   palette: TenderMonitorPalette;
 }) {
   const dashboardStatus = getDashboardStatus(tender);
   const badgeStyle = getStatusBadgeStyle(dashboardStatus);
   const packageItems = getPackageItems(tender).filter((item) => item.text?.trim());
+  const totalCost = getEffectiveTenderTotalCost(tender);
   const daysToSubmission = getDaysToSubmission(tender);
   const daysSinceControl = getDaysSinceControl(tender);
   const canQuickCall = dashboardStatus === 'sent' && (daysSinceControl ?? 0) > 7;
@@ -418,10 +432,10 @@ function TenderRow({
 
       <div style={{ padding: '12px 0', color: palette.text, textAlign: 'center', fontSize: 13, fontWeight: 600 }}>{formatArea(tender.area)}</div>
       <div style={{ padding: '12px 0', color: palette.text, textAlign: 'center', fontSize: 13, fontWeight: 600 }}>
-        {formatMoney(tender.total_cost || tender.manual_total_cost)}
+        {formatMoney(totalCost)}
       </div>
       <div style={{ padding: '12px 0', color: palette.muted, textAlign: 'center', fontSize: 12 }}>
-        {formatRubPerSquare(tender.total_cost || tender.manual_total_cost, tender.area)}
+        {formatRubPerSquare(totalCost, tender.area)}
       </div>
 
       <div style={{ padding: '12px 0', textAlign: 'center' }}>
@@ -584,6 +598,34 @@ function TenderRow({
       <div style={{ padding: '12px 0', color: palette.muted, textAlign: 'center', fontSize: 12 }}>
         {formatDate(tender.invitation_date)}
       </div>
+
+      <div style={{ padding: '12px 0', display: 'flex', justifyContent: 'center' }}>
+        {canDelete ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteTender(tender);
+            }}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 999,
+              border: `1px solid ${palette.dangerBorder}`,
+              background: palette.dangerBg,
+              color: palette.danger,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Удалить тендер"
+            aria-label="Удалить тендер"
+          >
+            <DeleteOutlined style={{ fontSize: 12 }} />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -602,6 +644,8 @@ export const TenderMonitorTable: React.FC<TenderMonitorTableProps> = ({
   onOpenTender,
   onOpenTimeline,
   onQuickCall,
+  canDelete,
+  onDeleteTender,
 }) => {
   void onOpenTimeline;
 
@@ -750,6 +794,8 @@ export const TenderMonitorTable: React.FC<TenderMonitorTableProps> = ({
                     tender={tender}
                     onOpenTender={onOpenTender}
                     onQuickCall={onQuickCall}
+                    canDelete={canDelete}
+                    onDeleteTender={onDeleteTender}
                     palette={palette}
                   />
                 ))

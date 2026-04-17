@@ -15,9 +15,11 @@ import {
   buildCallFollowUpItem,
   formatArea,
   formatMoney,
+  getEffectiveTenderTotalCost,
   getDashboardStatus,
   getTenderSearchText,
   shouldShowCallAction,
+  sortChronologyItems,
   sortTenders,
   type TenderMonitorSortDirection,
   type TenderMonitorSortField,
@@ -74,7 +76,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
 );
 
 const Tenders: React.FC = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDirector = user?.role_code === 'director' || user?.role_code === 'general_director';
@@ -90,7 +92,15 @@ const Tenders: React.FC = () => {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const { tenders, statuses, constructionScopes, tenderNumbers, loading, refetch } = useTenderData();
+  const {
+    tenders,
+    statuses,
+    constructionScopes,
+    tenderNumbers,
+    loading,
+    refetch,
+    removeTender,
+  } = useTenderData();
 
   useEffect(() => {
     if (!selectedTender) {
@@ -140,7 +150,7 @@ const Tenders: React.FC = () => {
   );
 
   const totalCost = useMemo(
-    () => tenders.reduce((sum, tender) => sum + (tender.total_cost || tender.manual_total_cost || 0), 0),
+    () => tenders.reduce((sum, tender) => sum + (getEffectiveTenderTotalCost(tender) || 0), 0),
     [tenders]
   );
 
@@ -170,7 +180,10 @@ const Tenders: React.FC = () => {
 
   const handleQuickCall = async (tender: TenderRegistryWithRelations) => {
     const chronologyItems = tender.chronology_items || [];
-    const updatedItems = [...chronologyItems, buildCallFollowUpItem(dayjs().toISOString())];
+    const updatedItems = sortChronologyItems([
+      ...chronologyItems,
+      buildCallFollowUpItem(dayjs().toISOString()),
+    ]);
 
     const { error } = await supabase
       .from('tender_registry')
@@ -184,6 +197,43 @@ const Tenders: React.FC = () => {
 
     message.success(`В хронологию "${tender.title}" добавлено событие звонка`);
     await refetch();
+  };
+
+  const handleDeleteTender = (tender: TenderRegistryWithRelations) => {
+    modal.confirm({
+      title: 'Удалить тендер?',
+      content: `Тендер "${tender.title}" будет удалён из перечня без возможности восстановления.`,
+      okText: 'Удалить',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: async () => {
+        const { data, error } = await supabase
+          .from('tender_registry')
+          .delete()
+          .eq('id', tender.id)
+          .select('id');
+
+        if (error) {
+          message.error(error.message);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          message.error('Не удалось удалить тендер. Проверьте права доступа и связанные данные.');
+          await refetch();
+          return;
+        }
+
+        if (selectedTender?.id === tender.id) {
+          setDetailOpen(false);
+          setSelectedTender(null);
+        }
+
+        removeTender(tender.id);
+        message.success(`Тендер "${tender.title}" удалён`);
+        await refetch();
+      },
+    });
   };
 
   return (
@@ -276,6 +326,8 @@ const Tenders: React.FC = () => {
           onOpenTender={(tender) => handleOpenTender(tender, 'info')}
           onOpenTimeline={(tender) => handleOpenTender(tender, 'timeline')}
           onQuickCall={handleQuickCall}
+          canDelete={!isDirector}
+          onDeleteTender={handleDeleteTender}
         />
       </div>
 

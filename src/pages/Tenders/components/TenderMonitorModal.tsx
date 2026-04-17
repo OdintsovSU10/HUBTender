@@ -16,13 +16,16 @@ import {
   formatMoneyFull,
   formatRubPerSquare,
   getChronologyItems,
+  getEffectiveTenderTotalCost,
   getDashboardStatus,
   getDashboardStatusByStatusName,
   getLastCallFollowUpDate,
   getPackageLinkHref,
   getPackageItems,
+  parseMoneyInput,
   getStatusBadgeStyle,
   getTenderStatusDisplayLabel,
+  sortChronologyItems,
   shouldShowCallAction,
 } from '../utils/tenderMonitor';
 import { getTenderMonitorPalette, type TenderMonitorPalette } from '../utils/tenderMonitorTheme';
@@ -31,7 +34,7 @@ const { Text } = Typography;
 const { TextArea } = Input;
 
 type ModalTab = 'info' | 'timeline' | 'package';
-type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'select';
+type FieldType = 'text' | 'textarea' | 'number' | 'currency' | 'date' | 'select';
 
 interface EditableMonitorFieldProps {
   tenderId: string;
@@ -84,6 +87,10 @@ function EditableMonitorField({
         }
       }
 
+      if (type === 'currency') {
+        payload = parseMoneyInput(draft);
+      }
+
       if (type === 'date') {
         payload = typeof draft === 'string' && draft ? dayjs(draft).toISOString() : null;
       }
@@ -129,6 +136,16 @@ function EditableMonitorField({
         onChange={(next) => setDraft(next)}
         style={{ width: '100%' }}
         controls={false}
+      />
+    );
+  } else if (type === 'currency') {
+    editor = (
+      <Input
+        value={typeof draft === 'string' ? draft : draft == null ? '' : String(draft)}
+        onChange={(event) => setDraft(event.target.value)}
+        size="small"
+        inputMode="decimal"
+        placeholder="Например, 1250000,50"
       />
     );
   } else if (type === 'date') {
@@ -265,10 +282,11 @@ function EditableChronologySection({ tenderId, items, palette, onUpdated }: Edit
           type: item.type || 'default',
         }))
         .filter((item) => item.text);
+      const sortedChronologyItems = sortChronologyItems(chronologyItems);
 
       const { error } = await supabase
         .from('tender_registry')
-        .update({ chronology_items: chronologyItems })
+        .update({ chronology_items: sortedChronologyItems })
         .eq('id', tenderId);
 
       if (error) {
@@ -682,8 +700,8 @@ export const TenderMonitorModal: React.FC<TenderMonitorModalProps> = ({
               />
               <EditableMonitorField tenderId={tender.id} field="tender_number" label="Номер тендера" value={tender.tender_number} displayValue={tender.tender_number || '—'} palette={palette} onUpdated={onUpdate} />
               <EditableMonitorField tenderId={tender.id} field="area" label="Площадь по СП" value={tender.area} displayValue={formatArea(tender.area)} type="number" palette={palette} onUpdated={onUpdate} />
-              <InfoCard label="Цена ₽/м²" value={formatRubPerSquare(tender.total_cost || tender.manual_total_cost, tender.area)} palette={palette} />
-              <EditableMonitorField tenderId={tender.id} field="manual_total_cost" label="Стоимость КП" value={tender.manual_total_cost} displayValue={formatMoneyFull(tender.manual_total_cost ?? tender.total_cost)} type="number" palette={palette} onUpdated={onUpdate} />
+              <InfoCard label="Цена ₽/м²" value={formatRubPerSquare(getEffectiveTenderTotalCost(tender), tender.area)} palette={palette} />
+              <EditableMonitorField tenderId={tender.id} field="manual_total_cost" label="Стоимость КП" value={tender.manual_total_cost} displayValue={formatMoneyFull(getEffectiveTenderTotalCost(tender))} type="currency" palette={palette} onUpdated={onUpdate} />
               <InfoCard label="Направлено КП" value={lastCallDate ? `${formatDate(tender.submission_date)} · контроль ${formatDate(lastCallDate)}` : formatDate(tender.submission_date)} palette={palette} />
               <EditableMonitorField tenderId={tender.id} field="submission_date" label="Дата подачи КП" value={tender.submission_date} displayValue={formatDate(tender.submission_date)} type="date" palette={palette} onUpdated={onUpdate} />
               <EditableMonitorField tenderId={tender.id} field="commission_date" label="Ввод в эксплуатацию" value={tender.commission_date} displayValue={formatDate(tender.commission_date)} type="date" palette={palette} onUpdated={onUpdate} />
